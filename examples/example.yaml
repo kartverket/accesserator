@@ -1,0 +1,8 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: config
+  namespace: default
+spec:
+  tokenx: true
+  applicationRef: "application"
