@@ -35,6 +35,10 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+##@ Versions
+
+ISTIO_VERSION = 1.28.0
+
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -172,7 +176,62 @@ deploy: manifests kustomize docker-build ## Deploy controller to the K8s cluster
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
 
+##@Operators
+
+.PHONY: install-jwker-crds
+install-jwker-crds:
+	@echo -e "🤞  Installing jwker crds..."
+	@kubectl apply -f https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_jwkers.yaml
+
+.PHONY: jwker
+jwker: install-jwker-crds
+	@echo -e "🤞  Installing Jwker..."
+	@/bin/bash scripts/install-jwker.sh
+	@kubectl wait pod --for=create --timeout=60s -n obo -l app=jwker &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	@kubectl wait pod --for=condition=Ready --timeout=60s -n obo -l app=jwker &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	@echo -e "✅  Jwker installed in namespace 'obo'!"
+
+.PHONY: tokendings
+tokendings:
+	@echo -e "🤞  Setting up Tokendings..."
+	@/bin/bash scripts/install-tokendings.sh
+	@kubectl wait pod --for=create --timeout=60s -n obo -l app=tokendings &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
+	@kubectl wait pod --for=condition=Ready --timeout=60s -n obo -l app=tokendings &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
+	@echo -e "✅  Tokendings installed in namespace 'obo'!"
+
+.PHONY: skiperator
+skiperator: ## Install Skiperator on k8s cluster
+	@echo -e "🤞  Installing Skiperator..."
+	@kubectl create namespace skiperator-system || (echo -e "❌  Error creating 'skiperator-system' namespace." && exit 1)
+	@bash ./scripts/install-skiperator.sh
+	@kubectl wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator || (echo -e "❌  Error deploying Skiperator." && exit 1)
+	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
+
+.PHONY: install-istio
+install-istio: ## Install istio
+	@echo "Downloading Istio..."
+	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
+	@echo "Installing Istio on Kubernetes cluster..."
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
+	@echo "Istio installation complete."
+
+.PHONY: install-istio-gateways
+install-istio-gateways: helm install-istio ## Install istio gateways
+	@echo "Creating istio-gateways namespace..."
+	@kubectl create namespace istio-gateways || true
+	@echo "Installing istio-gateways"
+	@helm install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@echo "Istio gateways installed."
+
 ##@ Dependencies
+
+.PHONY: helm
+helm: ## Fetch helm charts for Istio
+	# Ensure istio helm repo exists
+	@helm repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts)
+	# Make sure the requested ISTIO_VERSION is available; update index if not
+	@helm search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && helm repo update)
+	@helm search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin

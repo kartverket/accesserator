@@ -23,6 +23,7 @@ k9s.pkg-path = "k9s"
 go.pkg-path = "go"
 gum.pkg-path = "gum"
 kind.pkg-path = "kind"
+kubernetes-helm.pkg-path = "kubernetes-helm"
 
 
 ## Environment Variables ---------------------------------------------

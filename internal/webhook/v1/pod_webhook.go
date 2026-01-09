@@ -20,9 +20,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/pkg/utilities"
+	"github.com/kartverket/skiperator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -36,7 +41,7 @@ var podlog = logf.Log.WithName("pod-resource")
 func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&corev1.Pod{}).
 		WithValidator(&PodCustomValidator{}).
-		WithDefaulter(&PodCustomDefaulter{}).
+		WithDefaulter(&PodCustomDefaulter{Client: mgr.GetClient()}).
 		Complete()
 }
 
@@ -50,13 +55,13 @@ func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
 type PodCustomDefaulter struct {
-	// TODO(user): Add more fields as needed for defaulting
+	Client client.Client
 }
 
 var _ webhook.CustomDefaulter = &PodCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
-func (d *PodCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
+func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
 	pod, ok := obj.(*corev1.Pod)
 
 	if !ok {
@@ -64,11 +69,88 @@ func (d *PodCustomDefaulter) Default(_ context.Context, obj runtime.Object) erro
 	}
 	podlog.Info("Defaulting for Pod", "name", pod.GetName())
 
-	// Add label to identify pods processed by accesserator
 	if pod.Labels == nil {
-		pod.Labels = make(map[string]string)
+		// Nothing to mutate
+		return nil
 	}
-	pod.Labels["accesserator"] = "washerenot"
+
+	appName, appNameExists := pod.Labels["application.skiperator.no/app-name"]
+	if !appNameExists {
+		// Nothing to mutate
+		return nil
+	}
+
+	// Fetch the resource named by appName. (Placeholder type until Skiperator Application API is wired in)
+	if d.Client == nil {
+		return fmt.Errorf("webhook client is not configured")
+	}
+
+	var skiperatorApplication v1alpha1.Application
+	podlog.Info("Fetching Application resource", "name", appName)
+	if exists := d.Client.Get(ctx, types.NamespacedName{
+		Name:      appName,
+		Namespace: pod.Namespace,
+	}, &skiperatorApplication); exists != nil {
+		return fmt.Errorf("failed to fetch Application resource named %s: %w", appName, exists)
+	}
+
+	// Check if Application has correct label
+	if skiperatorApplication.Labels["skiperator/security"] != "enabled" {
+		// Nothing to mutate
+		return nil
+	}
+
+	var securityConfigList v1alpha.SecurityConfigList
+	podlog.Info("Fetching SecurityConfig resources")
+	if securityConfigListErr := d.Client.List(ctx, &securityConfigList, client.InNamespace(pod.Namespace)); securityConfigListErr != nil {
+		return fmt.Errorf("failed to fetch SecurityConfig resources %w", securityConfigListErr)
+	}
+
+	var securityConfigForApplication []v1alpha.SecurityConfig
+	for _, securityConfig := range securityConfigList.Items {
+		if securityConfig.Spec.ApplicationRef == appName {
+			securityConfigForApplication = append(securityConfigForApplication, securityConfig)
+		}
+	}
+	if len(securityConfigForApplication) < 1 {
+		// This is an unwanted state because the Application is labeled with the label skiperator/security=enabled, so validating webhook will fail for this case.
+		podlog.Info("no SecurityConfig resource found for Application", "name", appName)
+		return nil
+	} else if len(securityConfigForApplication) > 1 {
+		return fmt.Errorf("multiple SecurityConfig resources found for Application %s", appName)
+	}
+	securityConfig := securityConfigForApplication[0]
+
+	if securityConfig.Spec.Tokenx != nil && *securityConfig.Spec.Tokenx {
+		// TokenX is enabled for this Application
+		// We inject an init container with texas in the pod
+		expectedJwkerSecretName := fmt.Sprintf("%s-jwker-secret", appName)
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
+			Name:          "texas",
+			Image:         "ghcr.io/nais/texas:latest",
+			Ports:         []corev1.ContainerPort{{ContainerPort: 3000}},
+			RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
+			Env: []corev1.EnvVar{
+				{
+					Name:  "TOKEN_X_ENABLED",
+					Value: "true",
+				},
+				{
+					Name:  "MASKINPORTEN_ENABLED",
+					Value: "false",
+				},
+				{
+					Name:  "AZURE_ENABLED",
+					Value: "false",
+				},
+				{
+					Name:  "IDPORTEB_ENABLED",
+					Value: "false",
+				},
+			},
+			EnvFrom: []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: expectedJwkerSecretName}}}},
+		})
+	}
 
 	return nil
 }
@@ -96,17 +178,7 @@ func (v *PodCustomValidator) ValidateCreate(_ context.Context, obj runtime.Objec
 	}
 	podlog.Info("Validation for Pod upon creation", "name", pod.GetName())
 
-	if pod.Labels == nil {
-		return nil, fmt.Errorf("expected a Pod with a label 'washere'%T", obj)
-	}
-
-	if _, ok := pod.Labels["accesserator"]; !ok {
-		return nil, fmt.Errorf("expected a Pod with a key 'accesserator' but it was not found")
-	}
-	labelValue := pod.Labels["accesserator"]
-	if labelValue != "washere" {
-		return nil, fmt.Errorf("expected a Pod with label 'accesserator=washere' but got 'accesserator=%s'", labelValue)
-	}
+	// TODO: Implement validation logic for Pod creation
 
 	return nil, nil
 }

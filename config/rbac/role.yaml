@@ -36,3 +36,11 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - skiperator.kartverket.no
+  resources:
+  - applications
+  verbs:
+  - get
+  - list
+  - watch
