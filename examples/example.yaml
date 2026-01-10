@@ -3,25 +3,8 @@ kind: Namespace
 metadata:
   name: test
   labels:
-    webhooks: enabled
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-kube-system-to-accesserator-webhook
-  namespace: accesserator-system
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - protocol: TCP
-          port: 443
+    accesserator-webhooks: enabled
+    istio.io/rev: default
 ---
 apiVersion: skiperator.kartverket.no/v1alpha1
 kind: Application
@@ -60,10 +43,10 @@ spec:
       rules:
         - application: app-jwker
           namespace: test
-          cluster: kind-kind
+          cluster: kind-accesserator
     outbound:
       rules:
         - application: app-jwker
           namespace: test
-          cluster: kind-kind
+          cluster: kind-accesserator
   secretName: app-jwker-secret

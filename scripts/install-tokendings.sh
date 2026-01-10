@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-KUBECONTEXT=${KUBECONTEXT:-"kind-kind"}
+KUBECONTEXT=${KUBECONTEXT:-"kind-accesserator"}
 
 echo "🤞  Creating namespace: obo"
 
@@ -57,7 +57,7 @@ spec:
     - name: ISSUER_URL
       value: http://tokendings.obo:7456
     - name: SUBJECT_TOKEN_ISSUERS
-      value: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0/.well-known/openid-configuration
+      value: http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration
     - name: APPLICATION_PORT
       value: "7456"
   replicas: 1
@@ -113,6 +113,26 @@ spec:
       app: tokendings
   policyTypes:
   - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tokendings-egress
+  namespace: obo
+spec:
+  podSelector:
+    matchLabels:
+      app: tokendings
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: auth
+      ports:
+        - port: 8080
+          protocol: TCP
 EOF
 )"
 

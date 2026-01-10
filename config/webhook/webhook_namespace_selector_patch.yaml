@@ -6,7 +6,7 @@ webhooks:
 - name: mpod-v1.kb.io
   namespaceSelector:
     matchExpressions:
-    - key: webhooks
+    - key: accesserator-webhooks
       operator: In
       values:
       - enabled
@@ -19,7 +19,7 @@ webhooks:
   - name: vpod-v1.kb.io
     namespaceSelector:
       matchExpressions:
-        - key: webhooks
+        - key: accesserator-webhooks
           operator: In
           values:
             - enabled

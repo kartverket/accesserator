@@ -3,6 +3,9 @@
   "manifest": {
     "version": 1,
     "install": {
+      "cloud-provider-kind": {
+        "pkg-path": "cloud-provider-kind"
+      },
       "docker": {
         "pkg-path": "docker"
       },
@@ -27,6 +30,9 @@
       "kubectx": {
         "pkg-path": "kubectx"
       },
+      "kubefwd": {
+        "pkg-path": "kubefwd"
+      },
       "kubernetes-helm": {
         "pkg-path": "kubernetes-helm"
       }
@@ -41,6 +47,126 @@
     "options": {}
   },
   "packages": [
+    {
+      "attr_path": "cloud-provider-kind",
+      "broken": false,
+      "derivation": "/nix/store/pi5y4msqwakzgx2xxm8hrgsjp2nll6kn-cloud-provider-kind-0.6.0.drv",
+      "description": "Load Balancer implementation for Kubernetes-in-Docker",
+      "install_id": "cloud-provider-kind",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "cloud-provider-kind-0.6.0",
+      "pname": "cloud-provider-kind",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:01:31.832746Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.6.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ifzwmmmn0hgspjvdpkhf4b30il33fahc-cloud-provider-kind-0.6.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cloud-provider-kind",
+      "broken": false,
+      "derivation": "/nix/store/b58gnx99lsbj70w0aal27jy7zlfcjirj-cloud-provider-kind-0.6.0.drv",
+      "description": "Load Balancer implementation for Kubernetes-in-Docker",
+      "install_id": "cloud-provider-kind",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "cloud-provider-kind-0.6.0",
+      "pname": "cloud-provider-kind",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:17:35.053803Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.6.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rbzjnqd0x2mdrq6r5jq1mybzr44imc92-cloud-provider-kind-0.6.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cloud-provider-kind",
+      "broken": false,
+      "derivation": "/nix/store/m97rhmmd98rgn3rca4q630iza36nshms-cloud-provider-kind-0.6.0.drv",
+      "description": "Load Balancer implementation for Kubernetes-in-Docker",
+      "install_id": "cloud-provider-kind",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "cloud-provider-kind-0.6.0",
+      "pname": "cloud-provider-kind",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:33:48.655021Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.6.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/kzr2i973xz2znwmv8igmzq037zq7hrdb-cloud-provider-kind-0.6.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cloud-provider-kind",
+      "broken": false,
+      "derivation": "/nix/store/xvcb1q73cpxw16g1wgfkklas7mjxfmcc-cloud-provider-kind-0.6.0.drv",
+      "description": "Load Balancer implementation for Kubernetes-in-Docker",
+      "install_id": "cloud-provider-kind",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "cloud-provider-kind-0.6.0",
+      "pname": "cloud-provider-kind",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:49:54.504748Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.6.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7p754lz00f9xday37s4hnjn99x6zs21x-cloud-provider-kind-0.6.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
     {
       "attr_path": "docker",
       "broken": false,
@@ -1008,6 +1134,126 @@
       ],
       "outputs": {
         "out": "/nix/store/r0pamkj0dd650x124gqvq5vn7cgh8sjz-kubectx-0.9.5"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubefwd",
+      "broken": false,
+      "derivation": "/nix/store/vr99dnmmc20v3nyphvi33gkgah26hban-kubefwd-1.22.5.drv",
+      "description": "Bulk port forwarding Kubernetes services for local development",
+      "install_id": "kubefwd",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "kubefwd-1.22.5",
+      "pname": "kubefwd",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:01:47.311143Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.22.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/9hmnvf0a35xzkciw1i2zs37b0pgq4ryz-kubefwd-1.22.5"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubefwd",
+      "broken": false,
+      "derivation": "/nix/store/q0nlh10kbwkwbcxd1pwpph50dc0gq9ay-kubefwd-1.22.5.drv",
+      "description": "Bulk port forwarding Kubernetes services for local development",
+      "install_id": "kubefwd",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "kubefwd-1.22.5",
+      "pname": "kubefwd",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:17:57.335593Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.22.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/1cdl8m3ink1ly3cr33jycck5igipxdz1-kubefwd-1.22.5"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubefwd",
+      "broken": false,
+      "derivation": "/nix/store/i9qhykw12q9ia1gwkj3nj3hx6h640072-kubefwd-1.22.5.drv",
+      "description": "Bulk port forwarding Kubernetes services for local development",
+      "install_id": "kubefwd",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "kubefwd-1.22.5",
+      "pname": "kubefwd",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:34:04.399369Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.22.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/2dmb7favj9544b89askjgdkg9pn34lnb-kubefwd-1.22.5"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubefwd",
+      "broken": false,
+      "derivation": "/nix/store/6xnmmzvgzk8fpnmyxgcsvvl9pn198m7p-kubefwd-1.22.5.drv",
+      "description": "Bulk port forwarding Kubernetes services for local development",
+      "install_id": "kubefwd",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "name": "kubefwd-1.22.5",
+      "pname": "kubefwd",
+      "rev": "1306659b587dc277866c7b69eb97e5f07864d8c4",
+      "rev_count": 912002,
+      "rev_date": "2025-12-15T06:20:37Z",
+      "scrape_date": "2025-12-16T03:50:19.785428Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.22.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ndbnr503vwcays7lz2dnng62a1pp20cj-kubefwd-1.22.5"
       },
       "system": "x86_64-linux",
       "group": "toplevel",

@@ -24,6 +24,8 @@ go.pkg-path = "go"
 gum.pkg-path = "gum"
 kind.pkg-path = "kind"
 kubernetes-helm.pkg-path = "kubernetes-helm"
+cloud-provider-kind.pkg-path = "cloud-provider-kind"
+kubefwd.pkg-path = "kubefwd"
 
 
 ## Environment Variables ---------------------------------------------

@@ -43,3 +43,6 @@ bin/
 .idea/
 istio-*
 !**/istio/
+
+# Local webhook certs
+webhook-certs/

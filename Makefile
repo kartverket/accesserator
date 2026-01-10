@@ -35,15 +35,27 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
-##@ Versions
+##@ Variables
 
-ISTIO_VERSION = 1.28.0
+KUBERNETES_VERSION			= 1.35.0
+KIND_IMAGE					= kindest/node:v$(KUBERNETES_VERSION)
+KIND_CLUSTER_NAME          ?= accesserator
+KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
+ISTIO_VERSION 				= 1.28.0
+CERT_MANAGER_VERSION		= 1.19.2
 
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
+
+.PHONY: local
+local: ensureflox cluster cert-manager istio skiperator tokendings jwker mock-oauth2 generate install ## Set up entire local development environment with external dependencies
+
+.PHONY: clean
+clean: ensureflox
+	@kind delete cluster --name $(KIND_CLUSTER_NAME)
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
@@ -72,7 +84,7 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 KIND_CLUSTER ?= accesserator-test-e2e
 
 .PHONY: setup-test-e2e
-setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
+setup-test-e2e: ensureflox ## Set up a Kind cluster for e2e tests if it does not exist
 	@command -v $(KIND) >/dev/null 2>&1 || { \
 		echo "Kind is not installed. Please install Kind manually."; \
 		exit 1; \
@@ -86,12 +98,12 @@ setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
 	esac
 
 .PHONY: test-e2e
-test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
+test-e2e: ensureflox setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
 	KIND=$(KIND) KIND_CLUSTER=$(KIND_CLUSTER) go test -tags=e2e ./test/e2e/ -v -ginkgo.v
 	$(MAKE) cleanup-test-e2e
 
 .PHONY: cleanup-test-e2e
-cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
+cleanup-test-e2e: ensureflox ## Tear down the Kind cluster used for e2e tests
 	@$(KIND) delete cluster --name $(KIND_CLUSTER)
 
 .PHONY: lint
@@ -156,77 +168,124 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: webhooks
+webhooks: kustomize ## Install mutating and validating webhook into the K8s cluster
+	@/bin/bash ./scripts/create-webhook-certs.sh
+	$(KUBECTL) --context $(KUBECONTEXT) apply -f config/webhook/local-webhooks.yaml
+	@CABUNDLE=$$(tr -d '\n' < webhook-certs/caBundle); \
+	$(KUBECTL) --context $(KUBECONTEXT) patch mutatingwebhookconfiguration accesserator-mutating-webhook-configuration --type='json' -p="[{\"op\":\"replace\",\"path\":\"/webhooks/0/clientConfig/caBundle\",\"value\":\"$$CABUNDLE\"}]"; \
+	$(KUBECTL) --context $(KUBECONTEXT) patch validatingwebhookconfiguration accesserator-validating-webhook-configuration --type='json' -p="[{\"op\":\"replace\",\"path\":\"/webhooks/0/clientConfig/caBundle\",\"value\":\"$$CABUNDLE\"}]"
+
 .PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+install: ensureflox manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply -f -; else echo "No CRDs to install; skipping."; fi
 
 .PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+uninstall: ensureflox manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -; else echo "No CRDs to delete; skipping."; fi
 
 .PHONY: deploy
-deploy: manifests kustomize docker-build ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: ensureflox manifests kustomize docker-build ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	kind load docker-image ${IMG}
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" apply -f -
 
 .PHONY: undeploy
-undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+undeploy: ensureflox kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
 
-##@Operators
+##@ Cluster
+
+.PHONY: cluster
+cluster: ensureflox ## Create Kind cluster with kube context kind-accesserator
+	@echo Create kind cluster... >&2
+	@kind create cluster --image $(KIND_IMAGE) --name ${KIND_CLUSTER_NAME}
+
+##@ Operators
 
 .PHONY: install-jwker-crds
-install-jwker-crds:
+install-jwker-crds: ensureflox ## Installing Jwker CRDs
 	@echo -e "🤞  Installing jwker crds..."
-	@kubectl apply -f https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_jwkers.yaml
+	@kubectl apply -f https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_jwkers.yaml --context $(KUBECONTEXT)
 
 .PHONY: jwker
-jwker: install-jwker-crds
+jwker: ensureflox install-jwker-crds ## Installing Jwker on k8s cluster
 	@echo -e "🤞  Installing Jwker..."
-	@/bin/bash scripts/install-jwker.sh
-	@kubectl wait pod --for=create --timeout=60s -n obo -l app=jwker &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
-	@kubectl wait pod --for=condition=Ready --timeout=60s -n obo -l app=jwker &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/install-jwker.sh
+	@kubectl wait pod --for=create --timeout=60s -n obo -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	@kubectl wait pod --for=condition=Ready --timeout=60s -n obo -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
 	@echo -e "✅  Jwker installed in namespace 'obo'!"
 
-.PHONY: tokendings
-tokendings:
-	@echo -e "🤞  Setting up Tokendings..."
-	@/bin/bash scripts/install-tokendings.sh
-	@kubectl wait pod --for=create --timeout=60s -n obo -l app=tokendings &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
-	@kubectl wait pod --for=condition=Ready --timeout=60s -n obo -l app=tokendings &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
-	@echo -e "✅  Tokendings installed in namespace 'obo'!"
-
 .PHONY: skiperator
-skiperator: ## Install Skiperator on k8s cluster
+skiperator: ensureflox ## Install Skiperator on k8s cluster
 	@echo -e "🤞  Installing Skiperator..."
 	@kubectl create namespace skiperator-system || (echo -e "❌  Error creating 'skiperator-system' namespace." && exit 1)
-	@bash ./scripts/install-skiperator.sh
-	@kubectl wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator || (echo -e "❌  Error deploying Skiperator." && exit 1)
+	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-skiperator.sh
+	@kubectl wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
 .PHONY: install-istio
-install-istio: ## Install istio
-	@echo "Downloading Istio..."
+install-istio: ensureflox ## Install istio
+	@echo "⬇️ Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
-	@echo "Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
-	@echo "Istio installation complete."
+	@echo "⛵️  Installing Istio on Kubernetes cluster..."
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal &> /dev/null
+	@echo "✅  Istio installation complete."
 
-.PHONY: install-istio-gateways
-install-istio-gateways: helm install-istio ## Install istio gateways
-	@echo "Creating istio-gateways namespace..."
-	@kubectl create namespace istio-gateways || true
-	@echo "Installing istio-gateways"
-	@helm install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
-	@echo "Istio gateways installed."
+.PHONY: istio
+istio: ensureflox helm install-istio ## Install istio gateways
+	@echo "⛵️ Creating istio-gateways namespace..."
+	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
+	@echo "⬇️  Installing istio-gateways"
+	@helm install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@echo "✅  Istio gateways installed."
+
+.PHONY: cert-manager
+cert-manager: ensureflox
+	@echo -e "🤞  Installing cert-manager..."
+	@kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v$(CERT_MANAGER_VERSION)/cert-manager.yaml
+	@echo "🕑  Waiting for cert-manager to be ready..."
+	@kubectl -n cert-manager wait deploy --all --for=condition=Available --timeout=60s
+	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/create-cluster-issuer.sh
+	@echo -e "✅  Cert-manager installed!"
+
+##@ Helper services
+
+.PHONY: tokendings
+tokendings: ensureflox ## Deploying tokendings oauth authorization server
+	@echo -e "🤞  Setting up Tokendings..."
+	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/install-tokendings.sh
+	@kubectl wait pod --for=create --timeout=60s -n obo -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
+	@kubectl wait pod --for=condition=Ready --timeout=60s -n obo -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
+	@echo -e "✅  Tokendings installed in namespace 'obo'!"
+
+.PHONY: mock-oauth2
+mock-oauth2: ensureflox ## Deployinh Mock-OAuth service in auth namespace
+	@echo -e "🤞  Deploying 'mock-oauth2'..."
+	@KUBECONTEXT=$(KUBECONTEXT) MOCK_OAUTH2_CONFIG=scripts/mock-oauth2-server-config.json /bin/bash ./scripts/install-mock-oauth2.sh
+	@echo -e "✅  'mock-oauth2' is ready and running"
+
+##@ Helpers
+
+.PHONY: mock-token
+mock-token: ensureflox ensurekubefwd ## Retrieves a JWT issued by mock-oauth2
+	@command -v jq >/dev/null 2>&1 || { echo -e "❌  jq is required (used to parse JSON). Please install jq and try again."; exit 1; }
+	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
+		-d "grant_type=authorization_code" \
+		-d "code=code" \
+		-d "client_id=something" | jq -r '.access_token // empty'); \
+	if [ -z "$$token" ]; then \
+		echo -e "❌  No access_token found in response"; \
+		exit 1; \
+	fi; \
+	echo "$$token"
 
 ##@ Dependencies
 
 .PHONY: helm
-helm: ## Fetch helm charts for Istio
+helm: ensureflox ## Fetch helm charts for Istio
 	# Ensure istio helm repo exists
 	@helm repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts)
 	# Make sure the requested ISTIO_VERSION is available; update index if not
@@ -308,3 +367,21 @@ endef
 define gomodver
 $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' $(1) 2>/dev/null)
 endef
+
+### CUSTOM TARGETS ###
+ensureflox:
+	@if ! command -v "flox" >/dev/null 2>&1; then \
+		echo -e "❌  Flox is not installed. Please install Flox (https://flox.dev/docs/install-flox/) and try again."; \
+		exit 1; \
+	fi
+ifndef FLOX_ENV
+	echo -e "❌  Flox is not activated. Please activate flox with 'flox activate' and try again." && exit 1
+endif
+
+ensurekubefwd:
+	@pgrep -f "kubefwd( |$$)" >/dev/null 2>&1 || { \
+		echo -e "❌  kubefwd is not running."; \
+		echo -e "    Start it in another terminal with:"; \
+		echo -e "      sudo kubefwd svc -n <namespace> --context $(KUBECONTEXT)"; \
+		exit 1; \
+	}
