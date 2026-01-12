@@ -10,7 +10,8 @@
         "pkg-path": "docker"
       },
       "go": {
-        "pkg-path": "go"
+        "pkg-path": "go",
+        "version": "1.24.6"
       },
       "gum": {
         "pkg-path": "gum"
