@@ -38,6 +38,9 @@
       }
     },
     "vars": {
+      "GOCACHE": "$HOME/.cache/go-build",
+      "GOMODCACHE": "$HOME/go/pkg/mod",
+      "GOPATH": "$HOME/go",
       "INTRO_MESSAGE": "Accesserator environment activated"
     },
     "hook": {},

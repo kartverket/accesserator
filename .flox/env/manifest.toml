@@ -34,6 +34,10 @@ kubefwd.pkg-path = "kubefwd"
 ## -------------------------------------------------------------------
 [vars]
 INTRO_MESSAGE = "Accesserator environment activated"
+# Go cache directories - set to writable locations outside Nix store
+GOMODCACHE = "$HOME/go/pkg/mod"
+GOCACHE = "$HOME/.cache/go-build"
+GOPATH = "$HOME/go"
 
 
 ## Activation Hook ---------------------------------------------------
