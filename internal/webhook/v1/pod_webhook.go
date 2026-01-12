@@ -113,8 +113,12 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 		}
 	}
 	if len(securityConfigForApplication) < 1 {
-		// This is an unwanted state because the Application is labeled with the label skiperator/security=enabled, so validating webhook will fail for this case.
-		podlog.Info("no SecurityConfig resource found for Application", "name", appName)
+		// This is an unwanted state because the Application is labeled with
+		// the label skiperator/security=enabled, so validating webhook will fail for this case.
+
+		message := `the application is labelled with skiperator/security=enabled 
+		but no SecurityConfig resource was found for Application`
+		podlog.Info(message, "name", appName)
 		return nil
 	} else if len(securityConfigForApplication) > 1 {
 		return fmt.Errorf("multiple SecurityConfig resources found for Application %s", appName)
@@ -126,9 +130,11 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 		// We inject an init container with texas in the pod
 		expectedJwkerSecretName := fmt.Sprintf("%s-jwker-secret", appName)
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-			Name:          "texas",
-			Image:         "ghcr.io/nais/texas:latest",
-			Ports:         []corev1.ContainerPort{{ContainerPort: 3000}},
+			Name:  "texas",
+			Image: "ghcr.io/nais/texas:latest",
+			Ports: []corev1.ContainerPort{{ContainerPort: 3000}},
+			// NOTE: RestartPolicy Always is only avaiable for init containers in Kubernetes v1.33+
+			// https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior
 			RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
 			Env: []corev1.EnvVar{
 				{
@@ -144,7 +150,7 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 					Value: "false",
 				},
 				{
-					Name:  "IDPORTEB_ENABLED",
+					Name:  "IDPORTEN_ENABLED",
 					Value: "false",
 				},
 			},
