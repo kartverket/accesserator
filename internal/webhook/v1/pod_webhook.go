@@ -129,7 +129,9 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 	if securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled {
 		// TokenX is enabled for this Application
 		// We inject an init container with texas in the pod
-		expectedJwkerSecretName := fmt.Sprintf("%s-jwker-secret", appName)
+		expectedJwkerSecretName := utilities.GetJwkerSecretName(
+			utilities.GetJwkerName(securityConfig.Name),
+		)
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 			Name:  "texas",
 			Image: "ghcr.io/nais/texas:latest",
