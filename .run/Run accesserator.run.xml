@@ -3,6 +3,9 @@
     <module name="accesserator" />
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="-webhook-cert-path=./webhook-certs" />
+    <envs>
+      <env name="ACCESSERATOR_CLUSTER_NAME" value="kind-accesserator" />
+    </envs>
     <kind value="FILE" />
     <package value="github.com/kartverket/accesserator" />
     <directory value="$PROJECT_DIR$" />
