@@ -37,6 +37,18 @@ rules:
   - patch
   - update
 - apiGroups:
+  - nais.io
+  resources:
+  - jwker
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - skiperator.kartverket.no
   resources:
   - applications
