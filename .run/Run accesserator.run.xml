@@ -5,6 +5,8 @@
     <parameters value="-webhook-cert-path=./webhook-certs" />
     <envs>
       <env name="ACCESSERATOR_CLUSTER_NAME" value="kind-accesserator" />
+      <env name="ACCESSERATOR_TOKENX_NAME" value="tokendings" />
+      <env name="ACCESSERATOR_TOKENX_NAMESPACE" value="obo" />
     </envs>
     <kind value="FILE" />
     <package value="github.com/kartverket/accesserator" />

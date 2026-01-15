@@ -25,11 +25,14 @@ import (
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/internal/state"
+	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/jwker"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	networkv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -112,6 +115,18 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Namespace: securityConfig.Namespace,
 	}
 
+	tokenxEgressObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetTokenxEgressName(securityConfig.Name, config.Get().TokenxName),
+		Namespace: securityConfig.Namespace,
+	}
+
+	/*
+		tokenxIngressObjectMeta := metav1.ObjectMeta{
+			Name:      utilities.GetTokenxIngressName(securityConfig.Name, config.Get().TokenxName),
+			Namespace: config.Get().TokenxNamespace,
+		}
+	*/
+
 	controllerResources := []reconciliation.ControllerResource{
 		ControllerResourceAdapter[*naisiov1.Jwker]{
 			reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
@@ -129,6 +144,40 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				},
 			},
 		},
+		ControllerResourceAdapter[*networkv1.NetworkPolicy]{
+			reconciliation.ReconcilerAdapter[*networkv1.NetworkPolicy]{
+				Func: reconciliation.ResourceReconciler[*networkv1.NetworkPolicy]{
+					ResourceKind:    "NetworkPolicy",
+					ResourceName:    tokenxEgressObjectMeta.Name,
+					DesiredResource: utilities.Ptr(egress.GetDesired(tokenxEgressObjectMeta, *scope)),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *networkv1.NetworkPolicy) bool {
+						return !reflect.DeepEqual(current.Spec, desired.Spec)
+					},
+					UpdateFields: func(current, desired *networkv1.NetworkPolicy) {
+						current.Spec = desired.Spec
+					},
+				},
+			},
+		},
+		/*
+			ControllerResourceAdapter[*networkv1.NetworkPolicy]{
+				reconciliation.ReconcilerAdapter[*networkv1.NetworkPolicy]{
+					Func: reconciliation.ResourceReconciler[*networkv1.NetworkPolicy]{
+						ResourceKind:    "NetworkPolicy",
+						ResourceName:    tokenxIngressObjectMeta.Name,
+						DesiredResource: utilities.Ptr(ingress.GetDesired(tokenxIngressObjectMeta, *scope)),
+						Scope:           scope,
+						ShouldUpdate: func(current, desired *networkv1.NetworkPolicy) bool {
+							return !reflect.DeepEqual(current.Spec, desired.Spec)
+						},
+						UpdateFields: func(current, desired *networkv1.NetworkPolicy) {
+							current.Spec = desired.Spec
+						},
+					},
+				},
+			},
+		*/
 	}
 
 	defer func() {
