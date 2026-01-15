@@ -33,6 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+const (
+	TexasInitContainerName = "texas"
+	TexasUrlEnvVarName     = "TEXAS_URL"
+)
+
 // nolint:unused
 // log is for logging in this package.
 var podlog = logf.Log.WithName("pod-resource")
@@ -40,7 +45,7 @@ var podlog = logf.Log.WithName("pod-resource")
 // SetupPodWebhookWithManager registers the webhook for Pod in the manager.
 func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&corev1.Pod{}).
-		WithValidator(&PodCustomValidator{}).
+		WithValidator(&PodCustomValidator{Client: mgr.GetClient()}).
 		WithDefaulter(&PodCustomDefaulter{Client: mgr.GetClient()}).
 		Complete()
 }
@@ -63,11 +68,11 @@ var _ webhook.CustomDefaulter = &PodCustomDefaulter{}
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
 func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
 	pod, ok := obj.(*corev1.Pod)
-
 	if !ok {
 		return fmt.Errorf("expected an Pod object but got %T", obj)
 	}
-	podlog.Info("Defaulting for Pod", "name", pod.GetName())
+
+	podlog.Info("Defaulting for Pod")
 
 	if pod.Labels == nil {
 		// Nothing to mutate
@@ -133,7 +138,7 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 			utilities.GetJwkerName(securityConfig.Name),
 		)
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-			Name:  "texas",
+			Name:  TexasInitContainerName,
 			Image: "ghcr.io/nais/texas:latest",
 			Ports: []corev1.ContainerPort{{ContainerPort: 3000}},
 			// NOTE: RestartPolicy Always is only avaiable for init containers in Kubernetes v1.33+
@@ -163,7 +168,7 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 		for i := range pod.Spec.Containers {
 			if pod.Spec.Containers[i].Name == appName {
 				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
-					Name:  "TEXAS_URL",
+					Name:  TexasUrlEnvVarName,
 					Value: "http://localhost:3000",
 				})
 			}
@@ -183,35 +188,19 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type PodCustomValidator struct {
-	// TODO(user): Add more fields as needed for validation
+	Client client.Client
 }
 
 var _ webhook.CustomValidator = &PodCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pod object but got %T", obj)
-	}
-	podlog.Info("Validation for Pod upon creation", "name", pod.GetName())
-
-	// TODO: Implement validation logic for Pod creation
-
-	return nil, nil
+func (v *PodCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	return ValidatePod(ctx, v.Client, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	pod, ok := newObj.(*corev1.Pod)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pod object for the newObj but got %T", newObj)
-	}
-	podlog.Info("Validation for Pod upon update", "name", pod.GetName())
-
-	// TODO(user): fill in your validation logic upon object update.
-
-	return nil, nil
+func (v *PodCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	return ValidatePod(ctx, v.Client, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Pod.
@@ -222,7 +211,105 @@ func (v *PodCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Obj
 	}
 	podlog.Info("Validation for Pod upon deletion", "name", pod.GetName())
 
-	// TODO(user): fill in your validation logic upon object deletion.
+	// Nothing to do here
+
+	return nil, nil
+}
+
+func ValidatePod(ctx context.Context, crudClient client.Client, obj runtime.Object) (admission.Warnings, error) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("expected an Pod object but got %T", obj)
+	}
+
+	podlog.Info("Validating for Pod", "name", pod.GetName())
+
+	if pod.Labels == nil {
+		// Nothing to mutate
+		return nil, nil
+	}
+
+	appName, appNameExists := pod.Labels["application.skiperator.no/app-name"]
+	if !appNameExists {
+		// Nothing to mutate
+		return nil, nil
+	}
+
+	// Fetch the resource named by appName. (Placeholder type until Skiperator Application API is wired in)
+	if crudClient == nil {
+		return nil, fmt.Errorf("webhook client is not configured")
+	}
+
+	var skiperatorApplication v1alpha1.Application
+	podlog.Info("Fetching Application resource", "name", appName)
+	if exists := crudClient.Get(ctx, types.NamespacedName{
+		Name:      appName,
+		Namespace: pod.Namespace,
+	}, &skiperatorApplication); exists != nil {
+		return nil, fmt.Errorf("failed to fetch Application resource named %s: %w", appName, exists)
+	}
+
+	// Check if Application has correct label
+	if skiperatorApplication.Labels["skiperator/security"] != "enabled" {
+		// Nothing to mutate
+		return nil, nil
+	}
+
+	var securityConfigList v1alpha.SecurityConfigList
+	podlog.Info("Fetching SecurityConfig resources")
+	if securityConfigListErr := crudClient.List(ctx, &securityConfigList, client.InNamespace(pod.Namespace)); securityConfigListErr != nil {
+		return nil, fmt.Errorf("failed to fetch SecurityConfig resources %w", securityConfigListErr)
+	}
+
+	var securityConfigForApplication []v1alpha.SecurityConfig
+	for _, securityConfig := range securityConfigList.Items {
+		if securityConfig.Spec.ApplicationRef == appName {
+			securityConfigForApplication = append(securityConfigForApplication, securityConfig)
+		}
+	}
+	if len(securityConfigForApplication) < 1 {
+		podlog.Info(`the application is labelled with skiperator/security=enabled 
+		but no SecurityConfig resource was found for Application`, "name", appName)
+		return nil, fmt.Errorf(`the application is labelled with skiperator/security=enabled 
+		but no SecurityConfig resource was found for Application`)
+	} else if len(securityConfigForApplication) > 1 {
+		podlog.Info("multiple SecurityConfig resources found for Application", "name", appName)
+		return nil, fmt.Errorf("multiple SecurityConfig resources found for Application")
+	}
+	securityConfig := securityConfigForApplication[0]
+
+	if securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled {
+		// Validate that the Texas init container exists
+		hasTexasInitContainer := false
+		for _, initContainer := range pod.Spec.InitContainers {
+			if initContainer.Name == TexasInitContainerName {
+				hasTexasInitContainer = true
+				break
+			}
+		}
+		if !hasTexasInitContainer {
+			podlog.Info("TokenX is enabled but texas init container is missing")
+			return nil, fmt.Errorf("TokenX is enabled but init container '%s' is missing", TexasInitContainerName)
+		}
+
+		// Validate that the application container has the TEXAS_URL env variable
+		hasTexasUrlEnvVar := false
+		for _, container := range pod.Spec.Containers {
+			if container.Name == appName {
+				for _, envVar := range container.Env {
+					if envVar.Name == TexasUrlEnvVarName {
+						hasTexasUrlEnvVar = true
+						break
+					}
+				}
+				break
+			}
+		}
+		if !hasTexasUrlEnvVar {
+			podlog.Info("TokenX is enabled but TEXAS_URL env var is missing", "container", appName)
+			return nil, fmt.Errorf("TokenX is enabled but container '%s' is missing environment variable '%s'", appName, TexasUrlEnvVarName)
+		}
+	}
 
 	return nil, nil
 }
