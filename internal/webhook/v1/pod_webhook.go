@@ -19,8 +19,10 @@ package v1
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,10 +36,13 @@ import (
 )
 
 const (
-	TexasImageUrl          = "ghcr.io/nais/texas:latest"
 	TexasInitContainerName = "texas"
-	TexasUrlEnvVarName     = "TEXAS_URL"
-	TexasPortNumber        = 3000
+	TexasPortName          = "http"
+
+	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
+	AzureEnabledEnvVarName        = "AZURE_ENABLED"
+	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
+	TokenXEnabledEnvVarName       = "TOKEN_X_ENABLED"
 )
 
 // nolint:unused
@@ -51,8 +56,6 @@ func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
 		WithDefaulter(&PodCustomDefaulter{Client: mgr.GetClient()}).
 		Complete()
 }
-
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
 // +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create,versions=v1,name=mpod-v1.kb.io,admissionReviewVersions=v1
 
@@ -76,57 +79,26 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 
 	podlog.Info("Defaulting for Pod")
 
-	config, err := getSecurityConfigForPod(ctx, d.Client, pod)
+	securityConfigForPod, err := getSecurityConfigForPod(ctx, d.Client, pod)
 	if err != nil {
-		// For defaulter, we log the error but don't fail the mutation
-		// The validating webhook will catch this
-		// TODO: should we throw error instead?
-		return nil
+		return err
 	}
-	if !config.SecurityEnabled {
+	if !securityConfigForPod.SecurityEnabled {
 		return nil
 	}
 
-	if config.SecurityConfig.Spec.Tokenx != nil && config.SecurityConfig.Spec.Tokenx.Enabled {
+	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
 		// TokenX is enabled for this Application
 		// We inject an init container with texas in the pod
-		expectedJwkerSecretName := utilities.GetJwkerSecretName(
-			utilities.GetJwkerName(config.SecurityConfig.Name),
-		)
-		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-			Name:  TexasInitContainerName,
-			Image: TexasImageUrl,
-			Ports: []corev1.ContainerPort{{ContainerPort: TexasPortNumber}},
-			// NOTE: RestartPolicy Always is only avaiable for init containers in Kubernetes v1.33+
-			// https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior
-			RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
-			Env: []corev1.EnvVar{
-				{
-					Name:  "TOKEN_X_ENABLED",
-					Value: "true",
-				},
-				{
-					Name:  "MASKINPORTEN_ENABLED",
-					Value: "false",
-				},
-				{
-					Name:  "AZURE_ENABLED",
-					Value: "false",
-				},
-				{
-					Name:  "IDPORTEN_ENABLED",
-					Value: "false",
-				},
-			},
-			EnvFrom: []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: expectedJwkerSecretName}}}},
-		})
+		podlog.Info("Tokenx is enabled, injecting texas init container")
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, securityConfigForPod.TexasContainer)
 
+		podlog.Info("Injecting texas url")
 		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == config.AppName {
+			if pod.Spec.Containers[i].Name == securityConfigForPod.AppName {
 				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
-					Name: TexasUrlEnvVarName,
-					// TODO: should the configuration provide the texas-localhost-url?
-					Value: fmt.Sprintf("http://localhost:%s", TexasPortNumber),
+					Name:  config.Get().TexasUrlEnvVarName,
+					Value: getTexasUrlEnvVarValue(),
 				})
 			}
 		}
@@ -135,7 +107,6 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 	return nil
 }
 
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 // NOTE: If you want to customise the 'path', use the flags '--defaulting-path' or '--validation-path'.
 // +kubebuilder:webhook:path=/validate--v1-pod,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create,versions=v1,name=vpod-v1.kb.io,admissionReviewVersions=v1
 
@@ -177,6 +148,7 @@ type PodSecurityConfiguration struct {
 	SecurityConfig  *v1alpha.SecurityConfig
 	AppName         string
 	SecurityEnabled bool
+	TexasContainer  corev1.Container
 }
 
 // getSecurityConfigForPod extracts the SecurityConfig for a given pod and determines if security is enabled.
@@ -236,11 +208,61 @@ func getSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod 
 		return nil, fmt.Errorf("%s", msg)
 	}
 
+	securityConfig := &securityConfigForApplication[0]
+
+	texasContainer := getTexasContainer(securityConfig.Name)
+
 	return &PodSecurityConfiguration{
-		SecurityConfig:  &securityConfigForApplication[0],
+		SecurityConfig:  securityConfig,
 		AppName:         appName,
 		SecurityEnabled: true,
+		TexasContainer:  texasContainer,
 	}, nil
+}
+
+func getTexasContainer(securityConfigName string) corev1.Container {
+	texasImageUrl := fmt.Sprintf(
+		"%s:%s",
+		config.Get().TexasImageName,
+		config.Get().TexasImageTag,
+	)
+	expectedJwkerSecretName := utilities.GetJwkerSecretName(
+		utilities.GetJwkerName(securityConfigName),
+	)
+
+	return corev1.Container{
+		Name:  TexasInitContainerName,
+		Image: texasImageUrl,
+		Ports: []corev1.ContainerPort{
+			{
+				ContainerPort: config.Get().TexasPort,
+				Name:          TexasPortName,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
+		// NOTE: RestartPolicy Always is only avaiable for init containers in Kubernetes v1.33+
+		// https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior
+		RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
+		Env: []corev1.EnvVar{
+			{
+				Name:  TokenXEnabledEnvVarName,
+				Value: "true",
+			},
+			{
+				Name:  MaskinportenEnabledEnvVarName,
+				Value: "false",
+			},
+			{
+				Name:  AzureEnabledEnvVarName,
+				Value: "false",
+			},
+			{
+				Name:  IdportenEnabledEnvVarName,
+				Value: "false",
+			},
+		},
+		EnvFrom: []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: expectedJwkerSecretName}}}},
+	}
 }
 
 func validatePod(ctx context.Context, crudClient client.Client, obj runtime.Object) (admission.Warnings, error) {
@@ -251,30 +273,38 @@ func validatePod(ctx context.Context, crudClient client.Client, obj runtime.Obje
 
 	podlog.Info("Validating for Pod", "name", pod.GetName())
 
-	config, err := getSecurityConfigForPod(ctx, crudClient, pod)
-	if err != nil {
-		return nil, err
+	securityConfigForPod, getSecurityConfigForPodErr := getSecurityConfigForPod(ctx, crudClient, pod)
+	if getSecurityConfigForPodErr != nil {
+		podlog.Error(getSecurityConfigForPodErr, "Failed to validate for Pod")
+		return nil, getSecurityConfigForPodErr
 	}
-	if !config.SecurityEnabled {
+	if !securityConfigForPod.SecurityEnabled {
 		return nil, nil
 	}
 
-	if config.SecurityConfig.Spec.Tokenx != nil && config.SecurityConfig.Spec.Tokenx.Enabled {
-		warnings, err2 := validateTokenxCorrectlyConfigured(pod, config)
-		if err2 != nil {
-			return warnings, err2
+	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
+		warnings, validateTokenXConfErr := validateTokenxCorrectlyConfigured(pod, securityConfigForPod)
+		if validateTokenXConfErr != nil {
+			podlog.Error(validateTokenXConfErr, "Failed to validate for Pod")
+			return warnings, validateTokenXConfErr
 		}
 	}
 
 	return nil, nil
 }
 
-func validateTokenxCorrectlyConfigured(pod *corev1.Pod, config *PodSecurityConfiguration) (admission.Warnings, error) {
+func validateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *PodSecurityConfiguration) (admission.Warnings, error) {
 	// Validate that the Texas init container exists
 	hasTexasInitContainer := false
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == TexasInitContainerName {
 			hasTexasInitContainer = true
+			if !isTexasContainerEqual(
+				securityConfigForPod.TexasContainer,
+				initContainer,
+			) {
+				return nil, fmt.Errorf("texas init container is not as expected given the SecurityConfig")
+			}
 			break
 		}
 	}
@@ -286,9 +316,9 @@ func validateTokenxCorrectlyConfigured(pod *corev1.Pod, config *PodSecurityConfi
 	// Validate that the application container has the TEXAS_URL env variable
 	hasTexasUrlEnvVar := false
 	for _, container := range pod.Spec.Containers {
-		if container.Name == config.AppName {
+		if container.Name == securityConfigForPod.AppName {
 			for _, envVar := range container.Env {
-				if envVar.Name == TexasUrlEnvVarName {
+				if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == getTexasUrlEnvVarValue() {
 					hasTexasUrlEnvVar = true
 					break
 				}
@@ -297,8 +327,25 @@ func validateTokenxCorrectlyConfigured(pod *corev1.Pod, config *PodSecurityConfi
 		}
 	}
 	if !hasTexasUrlEnvVar {
-		podlog.Info("TokenX is enabled but TEXAS_URL env var is missing", "container", config.AppName)
-		return nil, fmt.Errorf("TokenX is enabled but container '%s' is missing environment variable '%s'", config.AppName, TexasUrlEnvVarName)
+		podlog.Info("TokenX is enabled but TEXAS_URL env var is missing", "container", securityConfigForPod.AppName)
+		return nil, fmt.Errorf("TokenX is enabled but container '%s' is missing environment variable '%s'", securityConfigForPod.AppName, config.Get().TexasUrlEnvVarName)
 	}
 	return nil, nil
+}
+
+func isTexasContainerEqual(expected, actual corev1.Container) bool {
+	isEqual := true
+	if expected.Name != actual.Name ||
+		expected.Image != actual.Image ||
+		!reflect.DeepEqual(expected.RestartPolicy, actual.RestartPolicy) ||
+		!reflect.DeepEqual(expected.Env, actual.Env) ||
+		!reflect.DeepEqual(expected.EnvFrom, actual.EnvFrom) ||
+		!reflect.DeepEqual(expected.Ports, actual.Ports) {
+		isEqual = false
+	}
+	return isEqual
+}
+
+func getTexasUrlEnvVarValue() string {
+	return fmt.Sprintf("http://localhost:%d", config.Get().TexasPort)
 }
