@@ -28,8 +28,8 @@ import (
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
-	"github.com/kartverket/accesserator/pkg/resourcegenerators/jwker"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	networkv1 "k8s.io/api/networking/v1"
@@ -67,6 +67,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch
 // +kubebuilder:rbac:groups=nais.io,resources=jwker,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rlog := log.GetLogger(ctx)
@@ -120,13 +121,6 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Namespace: securityConfig.Namespace,
 	}
 
-	/*
-		tokenxIngressObjectMeta := metav1.ObjectMeta{
-			Name:      utilities.GetTokenxIngressName(securityConfig.Name, config.Get().TokenxName),
-			Namespace: config.Get().TokenxNamespace,
-		}
-	*/
-
 	controllerResources := []reconciliation.ControllerResource{
 		ControllerResourceAdapter[*naisiov1.Jwker]{
 			reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
@@ -160,24 +154,6 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				},
 			},
 		},
-		/*
-			ControllerResourceAdapter[*networkv1.NetworkPolicy]{
-				reconciliation.ReconcilerAdapter[*networkv1.NetworkPolicy]{
-					Func: reconciliation.ResourceReconciler[*networkv1.NetworkPolicy]{
-						ResourceKind:    "NetworkPolicy",
-						ResourceName:    tokenxIngressObjectMeta.Name,
-						DesiredResource: utilities.Ptr(ingress.GetDesired(tokenxIngressObjectMeta, *scope)),
-						Scope:           scope,
-						ShouldUpdate: func(current, desired *networkv1.NetworkPolicy) bool {
-							return !reflect.DeepEqual(current.Spec, desired.Spec)
-						},
-						UpdateFields: func(current, desired *networkv1.NetworkPolicy) {
-							current.Spec = desired.Spec
-						},
-					},
-				},
-			},
-		*/
 	}
 
 	defer func() {
@@ -218,8 +194,8 @@ func (r *SecurityConfigReconciler) doReconcile(
 	}
 
 	if len(errs) > 0 {
-		r.Recorder.Eventf(&scope.SecurityConfig, "Warning", "ReconcileFailed", "SecurityConfig failed during reconciliation")
-		r.Recorder.Eventf(&scope.SecurityConfig, "Warning", "ReconcileFailed", "SecurityConfig failed during reconciliation")
+		r.Recorder.Eventf(&scope.SecurityConfig, "Error", "ReconcileFailed", "SecurityConfig failed during reconciliation")
+		r.Recorder.Eventf(&scope.SecurityConfig, "Error", "ReconcileFailed", "SecurityConfig failed during reconciliation")
 		return ctrl.Result{}, k8sErrors.NewAggregate(errs)
 	}
 	r.Recorder.Eventf(&scope.SecurityConfig, "Normal", "ReconcileSuccess", "SecurityConfig reconciled successfully")
@@ -258,36 +234,41 @@ func (r *SecurityConfigReconciler) updateStatus(
 
 	switch {
 	case scope.InvalidConfig:
-		securityConfig.Status.Phase = accesseratorv1alpha.PhaseInvalid
-		securityConfig.Status.Ready = false
-		securityConfig.Status.Message = *scope.ValidationErrorMessage
-		statusCondition.Status = metav1.ConditionFalse
-		statusCondition.Reason = "InvalidConfiguration"
-		statusCondition.Message = *scope.ValidationErrorMessage
+		securityConfig.Status.SetPhaseInvalid(*scope.ValidationErrorMessage)
+		accesseratorv1alpha.SetConditionInvalid(&statusCondition, *scope.ValidationErrorMessage)
 
 	case len(scope.Descendants) != reconciliation.CountReconciledResources(controllerResources):
-		securityConfig.Status.Phase = accesseratorv1alpha.PhasePending
-		securityConfig.Status.Ready = false
-		securityConfig.Status.Message = "SecurityConfig pending due to missing Descendants."
-		statusCondition.Status = metav1.ConditionUnknown
-		statusCondition.Reason = "ReconciliationPending"
-		statusCondition.Message = "Descendants of SecurityConfig are not reconciled yet."
+		securityConfig.Status.SetPhasePending("SecurityConfig pending due to missing Descendants.")
+		accesseratorv1alpha.SetConditionPending(&statusCondition, "Descendants of SecurityConfig are not reconciled yet.")
 
 	case len(scope.GetErrors()) > 0:
-		securityConfig.Status.Phase = accesseratorv1alpha.PhaseFailed
-		securityConfig.Status.Ready = false
-		securityConfig.Status.Message = "SecurityConfig reconciliation failed."
-		statusCondition.Status = metav1.ConditionFalse
-		statusCondition.Reason = "ReconciliationFailed"
-		statusCondition.Message = "Descendants of SecurityConfig failed during reconciliation."
+		securityConfig.Status.SetPhaseFailed("SecurityConfig reconciliation failed.")
+		accesseratorv1alpha.SetConditionFailed(&statusCondition, "Descendants of SecurityConfig failed during reconciliation.")
+
+	case scope.TokenXConfig.Enabled:
+		jwkerResource, getJwkerErr := scope.GetJwker(ctx, r.Client)
+		if getJwkerErr != nil {
+			rLog.Error(
+				getJwkerErr,
+				fmt.Sprintf(
+					"Failed to get Jwker resource with name %s when updating SecurityConfig status",
+					utilities.GetJwkerName(securityConfig.Kind),
+				),
+			)
+			r.Recorder.Eventf(&securityConfig, "Error", "StatusUpdateFailed", "Failed to get Jwker resource with name %s.", utilities.GetJwkerName(securityConfig.Kind))
+		}
+		if jwkerResource.Status.SynchronizationState != "RolloutComplete" {
+			securityConfig.Status.SetPhasePending("SecurityConfig pending due to missing TokenX secret.")
+			statusMsg := fmt.Sprintf("Jwker resource with name %s has not finished registering an OAuth client", jwkerResource.Name)
+			accesseratorv1alpha.SetConditionPending(&statusCondition, statusMsg)
+		} else {
+			securityConfig.Status.SetPhaseReady("SecurityConfig ready.")
+			accesseratorv1alpha.SetConditionReady(&statusCondition, "Descendants of SecurityConfig reconciled successfully.")
+		}
 
 	default:
-		securityConfig.Status.Phase = accesseratorv1alpha.PhaseReady
-		securityConfig.Status.Ready = true
-		securityConfig.Status.Message = "SecurityConfig ready."
-		statusCondition.Status = metav1.ConditionTrue
-		statusCondition.Reason = "ReconciliationSuccess"
-		statusCondition.Message = "Descendants of SecurityConfig reconciled successfully."
+		securityConfig.Status.SetPhaseReady("SecurityConfig ready.")
+		accesseratorv1alpha.SetConditionReady(&statusCondition, "Descendants of SecurityConfig reconciled successfully.")
 	}
 
 	var conditions []metav1.Condition
@@ -347,7 +328,7 @@ func (r *SecurityConfigReconciler) updateStatus(
 					securityConfig.Name,
 				),
 			)
-			r.Recorder.Eventf(&securityConfig, "Warning", "StatusUpdateFailed", "Status update of SecurityConfig failed.")
+			r.Recorder.Eventf(&securityConfig, "Error", "StatusUpdateFailed", "Status update of SecurityConfig failed.")
 		} else {
 			r.Recorder.Eventf(&securityConfig, "Normal", "StatusUpdateSuccess", "Status of SecurityConfig updated successfully.")
 		}
