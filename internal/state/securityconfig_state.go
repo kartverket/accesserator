@@ -1,11 +1,15 @@
 package state
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1/podtypes"
+	nais_io_v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -73,4 +77,19 @@ func GetID(resourceKind, resourceName string) string {
 
 func (s *Scope) IsMisconfigured() bool {
 	return s.InvalidConfig
+}
+
+func (s *Scope) GetJwker(ctx context.Context, k8sClient client.Client) (*nais_io_v1.Jwker, error) {
+	var jwker nais_io_v1.Jwker
+	if k8sClient == nil {
+		return nil, fmt.Errorf("k8sClient not configured")
+	}
+	jwkerName := utilities.GetJwkerName(s.SecurityConfig.Name)
+	if err := k8sClient.Get(ctx, types.NamespacedName{
+		Name:      jwkerName,
+		Namespace: s.SecurityConfig.Namespace,
+	}, &jwker); err != nil {
+		return nil, fmt.Errorf("failed to fetch Jwker resource named %s: %w", jwkerName, err)
+	}
+	return &jwker, nil
 }
