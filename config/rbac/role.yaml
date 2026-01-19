@@ -1,0 +1,70 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+- apiGroups:
+  - accesserator.kartverket.no
+  resources:
+  - securityconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - accesserator.kartverket.no
+  resources:
+  - securityconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - accesserator.kartverket.no
+  resources:
+  - securityconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - nais.io
+  resources:
+  - jwker
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - skiperator.kartverket.no
+  resources:
+  - applications
+  verbs:
+  - get
+  - list
+  - watch

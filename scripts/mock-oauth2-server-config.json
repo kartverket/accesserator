@@ -1,0 +1,20 @@
+{
+  "interactiveLogin": true,
+  "tokenCallbacks": [
+    {
+      "issuerId": "accesserator",
+      "requestMappings": [
+        {
+          "requestParam": "code",
+          "match": "code",
+          "claims": {
+            "iss": "http://mock-oauth2.auth:8080/accesserator",
+            "sub": "some-random-uuid",
+            "role": "some-random-role",
+            "aud": "some-random-audience"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -10,6 +10,7 @@
 
 # Test binary, built with `go test -c`
 *.test
+bin/*
 
 # Code coverage profiles and other test artifacts
 *.out
@@ -17,16 +18,31 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Added by goreleaser init:
+dist/
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# macOS system files
+.DS_Store
+
+# Debug binary
+cmd/__debug_bin*
 
 # Go workspace file
 go.work
 go.work.sum
+cover.out
 
 # env file
-.env
+.env*
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# env file
+bin/
+.idea/
+istio-*
+!**/istio/
+
+# Local webhook certs
+webhook-certs/
