@@ -238,6 +238,7 @@ install-istio: ## Install istio
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "⛵️  Installing Istio on Kubernetes cluster..."
 	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal &> /dev/null
+	@rm -rf istio-$(ISTIO_VERSION)
 	@echo "✅  Istio installation complete."
 
 .PHONY: istio-gateways
