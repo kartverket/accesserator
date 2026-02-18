@@ -1,10 +1,11 @@
-package utilities
+package utilities_test
 
 import (
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -13,7 +14,7 @@ import (
 
 func TestPtr(t *testing.T) {
 	v := 42
-	ptr := Ptr(v)
+	ptr := utilities.Ptr(v)
 	assert.NotNil(t, ptr)
 	assert.Equal(t, v, *ptr)
 }
@@ -23,29 +24,29 @@ func TestLowestNonZeroResult(t *testing.T) {
 	one := ctrl.Result{RequeueAfter: 1 * time.Second}
 	two := ctrl.Result{RequeueAfter: 2 * time.Second}
 
-	assert.Equal(t, zero, LowestNonZeroResult(zero, zero))
-	assert.Equal(t, one, LowestNonZeroResult(zero, one))
-	assert.Equal(t, one, LowestNonZeroResult(one, zero))
-	assert.Equal(t, one, LowestNonZeroResult(one, two))
-	assert.Equal(t, one, LowestNonZeroResult(two, one))
+	assert.Equal(t, zero, utilities.LowestNonZeroResult(zero, zero))
+	assert.Equal(t, one, utilities.LowestNonZeroResult(zero, one))
+	assert.Equal(t, one, utilities.LowestNonZeroResult(one, zero))
+	assert.Equal(t, one, utilities.LowestNonZeroResult(one, two))
+	assert.Equal(t, one, utilities.LowestNonZeroResult(two, one))
 }
 
 func TestGetJwkerName(t *testing.T) {
 	appRef := "my-app"
-	assert.Equal(t, appRef, GetJwkerName(appRef))
+	assert.Equal(t, appRef, utilities.GetJwkerName(appRef))
 }
 
 func TestGetJwkerSecretName(t *testing.T) {
 	jwkerName := "foo"
-	want := fmt.Sprintf("%s-%s", jwkerName, JwkerSecretNameSuffix)
-	assert.Equal(t, want, GetJwkerSecretName(jwkerName))
+	want := fmt.Sprintf("%s-%s", jwkerName, utilities.JwkerSecretNameSuffix)
+	assert.Equal(t, want, utilities.GetJwkerSecretName(jwkerName))
 }
 
 func TestGetTokenxEgressName(t *testing.T) {
 	secName := "sec"
 	tokenx := "tok"
-	want := fmt.Sprintf("%s-%s-%s", secName, tokenx, EgressNameSuffix)
-	assert.Equal(t, want, GetTokenxEgressName(secName, tokenx))
+	want := fmt.Sprintf("%s-%s-%s", secName, tokenx, utilities.EgressNameSuffix)
+	assert.Equal(t, want, utilities.GetTokenxEgressName(secName, tokenx))
 }
 
 func TestGetMockKubernetesClient(t *testing.T) {
@@ -54,6 +55,6 @@ func TestGetMockKubernetesClient(t *testing.T) {
 	obj.SetAPIVersion("v1")
 	obj.SetKind("ConfigMap")
 	obj.SetName("test-cm")
-	client := GetMockKubernetesClient(scheme, obj)
+	client := utilities.GetMockKubernetesClient(scheme, obj)
 	assert.NotNil(t, client)
 }

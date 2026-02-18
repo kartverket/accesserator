@@ -1,8 +1,9 @@
-package controller
+package controller_test
 
 import (
 	"context"
 
+	"github.com/kartverket/accesserator/internal/controller"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
@@ -150,7 +151,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}).Should(Equal(accesseratorv1alpha.PhasePending))
 
 			By("Marking the Jwker resource as finished reconciling")
-			jwker.Status.SynchronizationState = jwkerSynchronizationStateReady
+			jwker.Status.SynchronizationState = controller.JwkerSynchronizationStateReady
 			Expect(k8sClient.Status().Update(ctx, jwker)).To(Succeed())
 
 			By("Reconciling again to let SecurityConfig transition to PhaseReady")
@@ -282,8 +283,8 @@ var _ = Describe("SecurityConfig Controller", func() {
 
 func getSecurityConfigReconciler(
 	eventRecorder events.EventRecorder,
-) *SecurityConfigReconciler {
-	return &SecurityConfigReconciler{
+) *controller.SecurityConfigReconciler {
+	return &controller.SecurityConfigReconciler{
 		Client:   gvkInjectingClient{k8sClient},
 		Scheme:   gvkInjectingClient{k8sClient}.Scheme(),
 		Recorder: eventRecorder,
