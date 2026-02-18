@@ -61,7 +61,7 @@ var _ admission.Defaulter[*corev1.Pod] = &PodCustomDefaulter{}
 func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error {
 	podlog.Info("Defaulting for Pod")
 
-	securityConfigForPod, err := getSecurityConfigForPod(ctx, d.Client, pod)
+	securityConfigForPod, err := GetSecurityConfigForPod(ctx, d.Client, pod)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 			if pod.Spec.Containers[i].Name == securityConfigForPod.AppName {
 				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 					Name:  config.Get().TexasUrlEnvVarName,
-					Value: getTexasUrlEnvVarValue(),
+					Value: GetTexasUrlEnvVarValue(),
 				})
 			}
 		}
@@ -125,10 +125,10 @@ type PodSecurityConfiguration struct {
 	TexasContainer  corev1.Container
 }
 
-// getSecurityConfigForPod extracts the SecurityConfig for a given pod and determines if security is enabled.
+// GetSecurityConfigForPod extracts the SecurityConfig for a given pod and determines if security is enabled.
 // Returns PodSecurityConfiguration with SecurityEnabled=false if security is not enabled or not applicable.
 // Returns an error if validation fails (e.g., missing SecurityConfig when security label is present).
-func getSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
+func GetSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
 	if pod.Labels == nil {
 		return &PodSecurityConfiguration{SecurityEnabled: false}, nil
 	}
@@ -197,7 +197,7 @@ func getSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod 
 		return nil, fmt.Errorf("%s", msg)
 	}
 
-	texasContainer, err := getTexasContainer(*securityConfig)
+	texasContainer, err := GetTexasContainer(*securityConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct Texas container: %w", err)
 	}
@@ -210,7 +210,7 @@ func getSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod 
 	}, nil
 }
 
-func getTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container, error) {
+func GetTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container, error) {
 	if securityConfig.Spec.Tokenx == nil || !securityConfig.Spec.Tokenx.Enabled {
 		return nil, fmt.Errorf("a texas container should not be created if tokenx is not enabled")
 	}
@@ -280,7 +280,7 @@ func getTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container
 func validatePod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
 
-	securityConfigForPod, getSecurityConfigForPodErr := getSecurityConfigForPod(ctx, crudClient, pod)
+	securityConfigForPod, getSecurityConfigForPodErr := GetSecurityConfigForPod(ctx, crudClient, pod)
 	if getSecurityConfigForPodErr != nil {
 		podlog.Error(getSecurityConfigForPodErr, "Failed to validate for Pod")
 		return nil, getSecurityConfigForPodErr
@@ -290,7 +290,7 @@ func validatePod(ctx context.Context, crudClient client.Client, pod *corev1.Pod)
 	}
 
 	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
-		validateTokenXConfErr := validateTokenxCorrectlyConfigured(pod, securityConfigForPod)
+		validateTokenXConfErr := ValidateTokenxCorrectlyConfigured(pod, securityConfigForPod)
 		if validateTokenXConfErr != nil {
 			podlog.Error(validateTokenXConfErr, "Failed to validate for Pod")
 			return nil, validateTokenXConfErr
@@ -300,13 +300,13 @@ func validatePod(ctx context.Context, crudClient client.Client, pod *corev1.Pod)
 	return nil, nil
 }
 
-func validateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *PodSecurityConfiguration) error {
+func ValidateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *PodSecurityConfiguration) error {
 	// Validate that the Texas init container exists
 	hasTexasInitContainer := false
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == TexasInitContainerName {
 			hasTexasInitContainer = true
-			if !isTexasContainerEqual(
+			if !IsTexasContainerEqual(
 				securityConfigForPod.TexasContainer,
 				initContainer,
 			) {
@@ -325,7 +325,7 @@ func validateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *Po
 	for _, container := range pod.Spec.Containers {
 		if container.Name == securityConfigForPod.AppName {
 			for _, envVar := range container.Env {
-				if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == getTexasUrlEnvVarValue() {
+				if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == GetTexasUrlEnvVarValue() {
 					hasTexasUrlEnvVar = true
 					break
 				}
@@ -346,7 +346,7 @@ func validateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *Po
 	return nil
 }
 
-func isTexasContainerEqual(expected, actual corev1.Container) bool {
+func IsTexasContainerEqual(expected, actual corev1.Container) bool {
 	return expected.Name == actual.Name &&
 		expected.Image == actual.Image &&
 		reflect.DeepEqual(expected.RestartPolicy, actual.RestartPolicy) &&
@@ -358,6 +358,6 @@ func isTexasContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy)
 }
 
-func getTexasUrlEnvVarValue() string {
+func GetTexasUrlEnvVarValue() string {
 	return fmt.Sprintf("http://localhost:%d", config.Get().TexasPort)
 }

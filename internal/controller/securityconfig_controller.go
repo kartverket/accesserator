@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const jwkerSynchronizationStateReady = "RolloutComplete"
+const JwkerSynchronizationStateReady = "RolloutComplete"
 
 // SecurityConfigReconciler reconciles a SecurityConfig object
 type SecurityConfigReconciler struct {
@@ -253,7 +253,7 @@ func (r *SecurityConfigReconciler) updateStatus(
 			)
 			r.Recorder.Eventf(&securityConfig, original, "Warning", "StatusUpdateFailed", "StatusUpdate", "Failed to get Jwker resource with name %s.", utilities.GetJwkerName(securityConfig.Spec.ApplicationRef))
 		}
-		if jwkerResource.Status.SynchronizationState != jwkerSynchronizationStateReady {
+		if jwkerResource.Status.SynchronizationState != JwkerSynchronizationStateReady {
 			securityConfig.Status.SetPhasePending("SecurityConfig pending due to missing TokenX secret.")
 			statusMsg := fmt.Sprintf("Jwker resource with name %s has not finished registering an OAuth client", jwkerResource.Name)
 			accesseratorv1alpha.SetConditionPending(&statusCondition, statusMsg)
