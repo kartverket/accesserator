@@ -11,12 +11,10 @@ import (
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -40,7 +38,7 @@ var podlog = logf.Log.WithName("pod-webhook")
 
 // SetupPodWebhookWithManager registers the webhook for Pod in the manager.
 func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&corev1.Pod{}).
+	return ctrl.NewWebhookManagedBy(mgr, &corev1.Pod{}).
 		WithValidator(&PodCustomValidator{Client: mgr.GetClient()}).
 		WithDefaulter(&PodCustomDefaulter{Client: mgr.GetClient()}).
 		Complete()
@@ -57,15 +55,10 @@ type PodCustomDefaulter struct {
 	Client client.Client
 }
 
-var _ webhook.CustomDefaulter = &PodCustomDefaulter{}
+var _ admission.Defaulter[*corev1.Pod] = &PodCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
-func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return fmt.Errorf("expected an Pod object but got %T", obj)
-	}
-
+func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error {
 	podlog.Info("Defaulting for Pod")
 
 	securityConfigForPod, err := getSecurityConfigForPod(ctx, d.Client, pod)
@@ -104,24 +97,20 @@ type PodCustomValidator struct {
 	Client client.Client
 }
 
-var _ webhook.CustomValidator = &PodCustomValidator{}
+var _ admission.Validator[*corev1.Pod] = &PodCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	return validatePod(ctx, v.Client, obj)
+func (v *PodCustomValidator) ValidateCreate(ctx context.Context, pod *corev1.Pod) (admission.Warnings, error) {
+	return validatePod(ctx, v.Client, pod)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateUpdate(ctx context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	return validatePod(ctx, v.Client, newObj)
+func (v *PodCustomValidator) ValidateUpdate(ctx context.Context, _, newPod *corev1.Pod) (admission.Warnings, error) {
+	return validatePod(ctx, v.Client, newPod)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pod object but got %T", obj)
-	}
+func (v *PodCustomValidator) ValidateDelete(_ context.Context, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validation for Pod upon deletion", "name", pod.GetName())
 
 	// Nothing to do
@@ -288,12 +277,7 @@ func getTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container
 	}, nil
 }
 
-func validatePod(ctx context.Context, crudClient client.Client, obj runtime.Object) (admission.Warnings, error) {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return nil, fmt.Errorf("expected an Pod object but got %T", obj)
-	}
-
+func validatePod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
 
 	securityConfigForPod, getSecurityConfigForPodErr := getSecurityConfigForPod(ctx, crudClient, pod)
