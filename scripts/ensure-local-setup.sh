@@ -16,13 +16,6 @@ command -v "${KUBECTL_BIN}" >/dev/null 2>&1 || {
   echo "❌  kubectl is not installed." >&2
 }
 
-# kind cluster exists
-if ! "${KIND_BIN}" get clusters 2>/dev/null | grep -qx "${KIND_CLUSTER_NAME}"; then
-  echo "❌  Kind cluster '${KIND_CLUSTER_NAME}' is not running." >&2
-  echo "    Set up local environment with: make local" >&2
-  exit 1
-fi
-
 # current context
 ctx="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"
 if [[ "${ctx}" != "${KUBECONTEXT}" ]]; then
