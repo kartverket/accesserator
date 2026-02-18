@@ -229,7 +229,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 		It("should recreate owned resources when they are deleted", func() {
 			By("Reconciling the SecurityConfig to create owned resources")
 
-			fakeRecorder := record.NewFakeRecorder(100)
+			fakeRecorder := events.NewFakeRecorder(100)
 			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
