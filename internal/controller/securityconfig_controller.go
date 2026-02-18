@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sErrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -38,7 +38,7 @@ const jwkerSynchronizationStateReady = "RolloutComplete"
 type SecurityConfigReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -79,9 +79,11 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	r.Recorder.Eventf(
 		securityConfig,
+		nil,
 		"Normal",
 		"ReconcileStarted",
-		fmt.Sprintf("SecurityConfig with name %s started.", req.String()),
+		"Reconcile",
+		"SecurityConfig with name %s started.", req.String(),
 	)
 
 	rlog.Debug("SecurityConfig found", "name", req.NamespacedName)
@@ -170,22 +172,17 @@ func (r *SecurityConfigReconciler) doReconcile(
 		if err != nil {
 			r.Recorder.Eventf(
 				&scope.SecurityConfig,
+				nil,
 				"Warning",
 				fmt.Sprintf("%sReconcileFailed", rf.GetResourceKind()),
-				fmt.Sprintf(
-					"%s with name %s failed during reconciliation.",
-					rf.GetResourceKind(),
-					rf.GetResourceName(),
-				),
+				"Reconcile",
+				"%s with name %s failed during reconciliation.",
+				rf.GetResourceKind(),
+				rf.GetResourceName(),
 			)
 			errs = append(errs, err)
 		} else {
-			r.Recorder.Eventf(
-				&scope.SecurityConfig,
-				"Normal",
-				fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()),
-				fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()),
-			)
+			r.Recorder.Eventf(&scope.SecurityConfig, nil, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()), "Reconcile", "%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName())
 		}
 		if len(errs) > 0 {
 			continue
@@ -194,11 +191,10 @@ func (r *SecurityConfigReconciler) doReconcile(
 	}
 
 	if len(errs) > 0 {
-		r.Recorder.Eventf(&scope.SecurityConfig, "Error", "ReconcileFailed", "SecurityConfig failed during reconciliation")
-		r.Recorder.Eventf(&scope.SecurityConfig, "Error", "ReconcileFailed", "SecurityConfig failed during reconciliation")
+		r.Recorder.Eventf(&scope.SecurityConfig, nil, "Warning", "ReconcileFailed", "Reconcile", "SecurityConfig failed during reconciliation")
 		return ctrl.Result{}, k8sErrors.NewAggregate(errs)
 	}
-	r.Recorder.Eventf(&scope.SecurityConfig, "Normal", "ReconcileSuccess", "SecurityConfig reconciled successfully")
+	r.Recorder.Eventf(&scope.SecurityConfig, nil, "Normal", "ReconcileSuccess", "Reconcile", "SecurityConfig reconciled successfully")
 	return result, nil
 }
 
@@ -255,7 +251,7 @@ func (r *SecurityConfigReconciler) updateStatus(
 					utilities.GetJwkerName(securityConfig.Spec.ApplicationRef),
 				),
 			)
-			r.Recorder.Eventf(&securityConfig, "Error", "StatusUpdateFailed", "Failed to get Jwker resource with name %s.", utilities.GetJwkerName(securityConfig.Spec.ApplicationRef))
+			r.Recorder.Eventf(&securityConfig, original, "Warning", "StatusUpdateFailed", "StatusUpdate", "Failed to get Jwker resource with name %s.", utilities.GetJwkerName(securityConfig.Spec.ApplicationRef))
 		}
 		if jwkerResource.Status.SynchronizationState != jwkerSynchronizationStateReady {
 			securityConfig.Status.SetPhasePending("SecurityConfig pending due to missing TokenX secret.")
@@ -328,9 +324,9 @@ func (r *SecurityConfigReconciler) updateStatus(
 					securityConfig.Name,
 				),
 			)
-			r.Recorder.Eventf(&securityConfig, "Error", "StatusUpdateFailed", "Status update of SecurityConfig failed.")
+			r.Recorder.Eventf(&securityConfig, original, "Warning", "StatusUpdateFailed", "StatusUpdate", "Status update of SecurityConfig failed.")
 		} else {
-			r.Recorder.Eventf(&securityConfig, "Normal", "StatusUpdateSuccess", "Status of SecurityConfig updated successfully.")
+			r.Recorder.Eventf(&securityConfig, original, "Normal", "StatusUpdateSuccess", "StatusUpdate", "Status of SecurityConfig updated successfully.")
 		}
 	}
 }
