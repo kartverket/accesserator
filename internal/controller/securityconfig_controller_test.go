@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -112,7 +112,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 		It("should create a Jwker resource and a NetworkPolicy when TokenX is enabled", func() {
 			By("Reconciling the SecurityConfig with TokenX enabled")
 
-			fakeRecorder := record.NewFakeRecorder(100)
+			fakeRecorder := events.NewFakeRecorder(100)
 			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -188,7 +188,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 
 			By("Reconciling the SecurityConfig with TokenX disabled")
 
-			fakeRecorder := record.NewFakeRecorder(100)
+			fakeRecorder := events.NewFakeRecorder(100)
 			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -281,7 +281,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 })
 
 func getSecurityConfigReconciler(
-	eventRecorder record.EventRecorder,
+	eventRecorder events.EventRecorder,
 ) *SecurityConfigReconciler {
 	return &SecurityConfigReconciler{
 		Client:   gvkInjectingClient{k8sClient},
