@@ -16,7 +16,8 @@ version = 1
 ## -------------------------------------------------------------------
 [install]
 kubectl.pkg-path = "kubectl"
-docker.pkg-path = "docker"
+colima.pkg-path = "colima"
+docker-client.pkg-path = "docker-client"
 kubebuilder.pkg-path = "kubebuilder"
 kubectx.pkg-path = "kubectx"
 k9s.pkg-path = "k9s"
