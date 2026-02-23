@@ -4,23 +4,23 @@ set -eo pipefail
 KUBECONTEXT=${KUBECONTEXT:-"kind-accesserator"}
 KUBECTL_BIN="${KUBECTL_BIN:-./bin/kubectl}"
 
-echo "🤞  Creating namespace: obo"
+echo "🤞  Creating namespace: jwker-system"
 
 # Attempt to create the namespace and capture both stdout and stderr
 # NOTE: `set -e` would abort the script on a non-zero exit code here (e.g. AlreadyExists),
 # so we temporarily disable it to handle the error explicitly.
 set +e
-output=$("${KUBECTL_BIN}" create namespace "obo" --context "$KUBECONTEXT" 2>&1)
+output=$("${KUBECTL_BIN}" create namespace "jwker-system" --context "$KUBECONTEXT" 2>&1)
 exit_code=$?
 set -e
 
 # Check the exit code and output
 if [ $exit_code -eq 0 ]; then
-    echo "✅  Namespace 'obo' created successfully"
+    echo "✅  Namespace 'jwker-system' created successfully"
 elif echo "$output" | grep -qiE "already exists|AlreadyExists"; then
-    echo "✅  Namespace 'obo' already exists, continuing..."
+    echo "✅  Namespace 'jwker-system' already exists, continuing..."
 else
-    echo -e "❌  Error creating 'obo' namespace:"
+    echo -e "❌  Error creating 'jwker-system' namespace:"
     echo "$output"
     exit 1
 fi
@@ -31,7 +31,7 @@ apiVersion: skiperator.kartverket.no/v1alpha1
 kind: Application
 metadata:
   name: jwker
-  namespace: obo
+  namespace: jwker-system
 spec:
   image: ghcr.io/nais/jwker:2025-01-07-145102-876d62d@sha256:8f6db2eff60db7c24c8d9df510e5f3aa3cee4df4b168ef8084094975f468b549
   port: 8080
@@ -40,7 +40,7 @@ spec:
     - name: JWKER_CLIENT_ID
       value: dfb2cec9-3b6d-456b-a14f-649236247e3d
     - name: TOKENDINGS_URL
-      value: http://tokendings.obo:7456
+      value: http://tokendings.jwker-system:7456
     - name: CLUSTER_NAME
       value: kind-accesserator
     - name: JWKER_PRIVATE_JWK
@@ -57,7 +57,7 @@ metadata:
   labels:
     app: jwker
   name: jwker
-  namespace: obo
+  namespace: jwker-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -65,7 +65,7 @@ metadata:
   labels:
     app: jwker
   name: jwker
-  namespace: obo
+  namespace: jwker-system
 rules:
   - apiGroups:
       - "*"
@@ -86,7 +86,7 @@ metadata:
   labels:
     app: jwker
   name: jwker
-  namespace: obo
+  namespace: jwker-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -94,7 +94,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: jwker
-    namespace: obo
+    namespace: jwker-system
 EOF
 )"
 
