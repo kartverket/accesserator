@@ -16,8 +16,6 @@ version = 1
 ## -------------------------------------------------------------------
 [install]
 kubectl.pkg-path = "kubectl"
-colima.pkg-path = "colima"
-docker-client.pkg-path = "docker-client"
 kubebuilder.pkg-path = "kubebuilder"
 kubectx.pkg-path = "kubectx"
 k9s.pkg-path = "k9s"
@@ -34,7 +32,6 @@ kubefwd.pkg-path = "kubefwd"
 ## -------------------------------------------------------------------
 [vars]
 INTRO_MESSAGE = "Accesserator environment activated"
-DOCKER_HOST = "unix://${HOME}/.colima/default/docker.sock"
 
 ## Activation Hook ---------------------------------------------------
 ##  ... run by _bash_ shell when you run 'flox activate'.
@@ -43,12 +40,10 @@ DOCKER_HOST = "unix://${HOME}/.colima/default/docker.sock"
 on-activate = '''
   set -e  # Exit on any error
 
-  # Start colima
-  colima start --cpu 4 --memory 8
-
-  # Setup local cluster with dependencies
-  go mod tidy
-  make clean local
+  # Ensure local setup is ready, otherwise clean and rebuild
+  if ! make ensurelocal; then
+    make clean local
+  fi
 '''
 
 
@@ -104,11 +99,11 @@ gum style \
 ## Other Environment Options -----------------------------------------
 [options]
 # Systems that environment is compatible with
-# systems = [
-#   "aarch64-darwin",
-#   "aarch64-linux",
-#   "x86_64-darwin",
-#   "x86_64-linux",
-# ]
+systems = [
+  "aarch64-darwin",
+  "aarch64-linux",
+  "x86_64-darwin",
+  "x86_64-linux",
+]
 # Uncomment to disable CUDA detection.
 # cuda-detection = false
