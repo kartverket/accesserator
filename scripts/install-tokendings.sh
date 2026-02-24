@@ -30,9 +30,30 @@ TOKENDINGS_MANIFESTS="$(cat <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-ingress-to-tokendings
+  name: tokendings-ingress-egress
   namespace: jwker-system
 spec:
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: jwker-system
+          podSelector:
+            matchLabels:
+              app: database
+      ports:
+        - port: 5432
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: auth
+          podSelector:
+            matchLabels:
+              app: mock-oauth2
+      ports:
+        - port: 8080
+          protocol: TCP
   ingress:
     - ports:
         - port: 7456
@@ -42,6 +63,7 @@ spec:
       app: tokendings
   policyTypes:
     - Ingress
+    - Egress
 ---
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
@@ -67,18 +89,11 @@ metadata:
   namespace: jwker-system
 spec:
   accessPolicy:
-    inbound:
-      rules:
-        - application: jwker
     outbound:
       external:
         - host: test.idporten.no
         - host: test.ansattporten.no
         - host: login.microsoftonline.com
-      rules:
-        - application: database
-        - application: mock-oauth2
-          namespace: auth
   env:
     - name: DB_JDBC_URL
       value: jdbc:postgresql://database:5432/token-exchange?user=user&password=pwd
@@ -105,6 +120,29 @@ spec:
     targetCpuUtilization: 80
     targetMemoryUtilization: 90
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-ingress
+  namespace: jwker-system
+spec:
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: jwker-system
+          podSelector:
+            matchLabels:
+              app: tokendings
+      ports:
+        - port: 5432
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app: database
+  policyTypes:
+    - Ingress
+---
 apiVersion: skiperator.kartverket.no/v1alpha1
 kind: Application
 metadata:
@@ -127,10 +165,6 @@ spec:
   filesFrom:
     - emptyDir: postgresql
       mountPath: /var/run/postgresql
-  accessPolicy:
-    inbound:
-      rules:
-        - application: tokendings
 EOF
 )"
 
