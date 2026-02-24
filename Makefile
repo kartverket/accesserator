@@ -69,7 +69,7 @@ sourceenv: ## Source environment variables from .env file
 	@set -a; [ -f .env ] && . .env; set +a
 
 .PHONY: local
-local: cluster accesserator-namespace cert-manager istio-gateways skiperator tokendings jwker ztoperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
+local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker ztoperator generate install ## Set up entire local development environment with external dependencies
 
 .PHONY: clean
 clean: kind ## Clean up local environment by deleting kind cluster
