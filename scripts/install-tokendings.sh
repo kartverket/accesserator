@@ -77,6 +77,8 @@ spec:
         - host: login.microsoftonline.com
       rules:
         - application: database
+        - application: mock-oauth2
+          namespace: auth
   env:
     - name: DB_JDBC_URL
       value: jdbc:postgresql://database:5432/token-exchange?user=user&password=pwd
