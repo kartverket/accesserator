@@ -31,6 +31,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-ingress-to-tokendings
+  namespace: jwker-system
 spec:
   ingress:
     - ports:
@@ -46,6 +47,7 @@ apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: allow-jwker
+  namespace: jwker-system
 spec:
   action: DENY
   rules:
