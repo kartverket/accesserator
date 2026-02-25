@@ -1,4 +1,4 @@
-package v1
+package v1_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
+	v1 "github.com/kartverket/accesserator/internal/webhook/v1"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -116,7 +117,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = SetupPodWebhookWithManager(mgr)
+	err = v1.SetupPodWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook
@@ -212,7 +213,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Name:      skiperatorAppName,
 				Namespace: ns.GetName(),
 				Labels: map[string]string{
-					SecurityEnabledLabelName: SecurityEnabledLabelValue,
+					v1.SecurityEnabledLabelName: v1.SecurityEnabledLabelValue,
 				},
 			},
 		}
@@ -240,7 +241,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 			pod.Labels = make(map[string]string)
 		}
 
-		pod.Labels[SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 
 		mutatedPod := &corev1.Pod{}
@@ -248,7 +249,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 		Expect(getErr).NotTo(HaveOccurred())
 
 		Expect(mutatedPod.Spec.InitContainers).NotTo(BeNil())
-		Expect(mutatedPod.Spec.InitContainers).To(ContainElement(HaveField("Name", Equal(TexasInitContainerName))))
+		Expect(mutatedPod.Spec.InitContainers).To(ContainElement(HaveField("Name", Equal(v1.TexasInitContainerName))))
 	})
 
 	It("does not inject a texas sidecar as an init container when pod is updated", func() {
@@ -272,7 +273,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 		if updatedPod.Labels == nil {
 			updatedPod.Labels = make(map[string]string)
 		}
-		updatedPod.Labels[SkiperatorApplicationRefLabel] = skiperatorAppName
+		updatedPod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 		Expect(k8sClient.Update(ctx, updatedPod)).To(Succeed())
 
 		// Ensure no new init containers are injected on update

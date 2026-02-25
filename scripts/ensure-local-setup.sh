@@ -16,13 +16,6 @@ command -v "${KUBECTL_BIN}" >/dev/null 2>&1 || {
   echo "❌  kubectl is not installed." >&2
 }
 
-# kind cluster exists
-if ! "${KIND_BIN}" get clusters 2>/dev/null | grep -qx "${KIND_CLUSTER_NAME}"; then
-  echo "❌  Kind cluster '${KIND_CLUSTER_NAME}' is not running." >&2
-  echo "    Set up local environment with: make local" >&2
-  exit 1
-fi
-
 # current context
 ctx="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"
 if [[ "${ctx}" != "${KUBECONTEXT}" ]]; then
@@ -31,7 +24,7 @@ if [[ "${ctx}" != "${KUBECONTEXT}" ]]; then
   exit 1
 fi
 
-required_namespaces=(obo skiperator-system ztoperator-system cert-manager istio-system auth istio-gateways)
+required_namespaces=(jwker-system skiperator-system ztoperator-system cert-manager istio-system auth istio-gateways)
 
 for ns in "${required_namespaces[@]}"; do
   if ! "${KUBECTL_BIN}" get namespace "${ns}" --context "${KUBECONTEXT}" >/dev/null 2>&1; then

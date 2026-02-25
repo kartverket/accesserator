@@ -19,9 +19,6 @@ CONTAINER_TOOL ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-.PHONY: all
-all: build
-
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -72,10 +69,10 @@ sourceenv: ## Source environment variables from .env file
 	@set -a; [ -f .env ] && . .env; set +a
 
 .PHONY: local
-local: cluster accesserator-namespace cert-manager istio-gateways skiperator tokendings jwker ztoperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
+local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker ztoperator generate install ## Set up entire local development environment with external dependencies
 
 .PHONY: clean
-clean: ## Clean up local environment by deleting kind cluster
+clean: kind ## Clean up local environment by deleting kind cluster
 	"$(KIND)" delete cluster --name $(KIND_CLUSTER_NAME)
 
 .PHONY: generate
@@ -214,9 +211,9 @@ install-jwker-crds: ## Installing Jwker CRDs
 jwker: install-jwker-crds ## Installing Jwker on k8s cluster
 	@echo -e "🤞  Installing Jwker..."
 	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/install-jwker.sh
-	"$(KUBECTL)" wait pod --for=create --timeout=60s -n obo -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
-	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n obo -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
-	@echo -e "✅  Jwker installed in namespace 'obo'!"
+	"$(KUBECTL)" wait pod --for=create --timeout=60s -n jwker-system -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n jwker-system -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	@echo -e "✅  Jwker installed in namespace 'jwker-system'!"
 
 .PHONY: skiperator
 skiperator: ## Install Skiperator on k8s cluster
@@ -237,7 +234,8 @@ install-istio: ## Install istio
 	@echo "⬇️ Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "⛵️  Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal &> /dev/null
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
+	@rm -rf istio-$(ISTIO_VERSION)
 	@echo "✅  Istio installation complete."
 
 .PHONY: istio-gateways
@@ -264,9 +262,9 @@ cert-manager: kustomize kubectl ## Install cert-manager to the cluster
 tokendings: ## Deploying tokendings oauth authorization server
 	@echo -e "🤞  Setting up Tokendings..."
 	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/install-tokendings.sh
-	"$(KUBECTL)" wait pod --for=create --timeout=60s -n obo -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
-	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n obo -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
-	@echo -e "✅  Tokendings installed in namespace 'obo'!"
+	"$(KUBECTL)" wait pod --for=create --timeout=60s -n jwker-system -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
+	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n jwker-system -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
+	@echo -e "✅  Tokendings installed in namespace 'jwker-system'!"
 
 .PHONY: mock-oauth2
 mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
@@ -332,7 +330,7 @@ CHAINSAW_VERSION ?= v0.2.14
 CONTROLLER_TOOLS_VERSION ?= v0.19.0
 KUBECTL_VERSION ?= v1.34.2
 KIND_VERSION ?= v0.30.0
-GOLANGCI_LINT_VERSION ?= v2.5.0
+GOLANGCI_LINT_VERSION ?= v2.10.1
 HELM_VERSION ?= v4.0.0
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)

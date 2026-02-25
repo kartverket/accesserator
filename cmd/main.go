@@ -205,7 +205,7 @@ func main() {
 	if err := (&controller.SecurityConfigReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("securityconfig-controller"),
+		Recorder: mgr.GetEventRecorder("securityconfig-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SecurityConfig")
 		os.Exit(1)

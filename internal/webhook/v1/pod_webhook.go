@@ -11,12 +11,10 @@ import (
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -40,7 +38,7 @@ var podlog = logf.Log.WithName("pod-webhook")
 
 // SetupPodWebhookWithManager registers the webhook for Pod in the manager.
 func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&corev1.Pod{}).
+	return ctrl.NewWebhookManagedBy(mgr, &corev1.Pod{}).
 		WithValidator(&PodCustomValidator{Client: mgr.GetClient()}).
 		WithDefaulter(&PodCustomDefaulter{Client: mgr.GetClient()}).
 		Complete()
@@ -57,18 +55,13 @@ type PodCustomDefaulter struct {
 	Client client.Client
 }
 
-var _ webhook.CustomDefaulter = &PodCustomDefaulter{}
+var _ admission.Defaulter[*corev1.Pod] = &PodCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
-func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return fmt.Errorf("expected an Pod object but got %T", obj)
-	}
-
+func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error {
 	podlog.Info("Defaulting for Pod")
 
-	securityConfigForPod, err := getSecurityConfigForPod(ctx, d.Client, pod)
+	securityConfigForPod, err := GetSecurityConfigForPod(ctx, d.Client, pod)
 	if err != nil {
 		return err
 	}
@@ -87,7 +80,7 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, obj runtime.Object) er
 			if pod.Spec.Containers[i].Name == securityConfigForPod.AppName {
 				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 					Name:  config.Get().TexasUrlEnvVarName,
-					Value: getTexasUrlEnvVarValue(),
+					Value: GetTexasUrlEnvVarValue(),
 				})
 			}
 		}
@@ -104,24 +97,20 @@ type PodCustomValidator struct {
 	Client client.Client
 }
 
-var _ webhook.CustomValidator = &PodCustomValidator{}
+var _ admission.Validator[*corev1.Pod] = &PodCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	return validatePod(ctx, v.Client, obj)
+func (v *PodCustomValidator) ValidateCreate(ctx context.Context, pod *corev1.Pod) (admission.Warnings, error) {
+	return validatePod(ctx, v.Client, pod)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateUpdate(ctx context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	return validatePod(ctx, v.Client, newObj)
+func (v *PodCustomValidator) ValidateUpdate(ctx context.Context, _, newPod *corev1.Pod) (admission.Warnings, error) {
+	return validatePod(ctx, v.Client, newPod)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Pod.
-func (v *PodCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return nil, fmt.Errorf("expected a Pod object but got %T", obj)
-	}
+func (v *PodCustomValidator) ValidateDelete(_ context.Context, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validation for Pod upon deletion", "name", pod.GetName())
 
 	// Nothing to do
@@ -136,10 +125,10 @@ type PodSecurityConfiguration struct {
 	TexasContainer  corev1.Container
 }
 
-// getSecurityConfigForPod extracts the SecurityConfig for a given pod and determines if security is enabled.
+// GetSecurityConfigForPod extracts the SecurityConfig for a given pod and determines if security is enabled.
 // Returns PodSecurityConfiguration with SecurityEnabled=false if security is not enabled or not applicable.
 // Returns an error if validation fails (e.g., missing SecurityConfig when security label is present).
-func getSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
+func GetSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
 	if pod.Labels == nil {
 		return &PodSecurityConfiguration{SecurityEnabled: false}, nil
 	}
@@ -208,7 +197,7 @@ func getSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod 
 		return nil, fmt.Errorf("%s", msg)
 	}
 
-	texasContainer, err := getTexasContainer(*securityConfig)
+	texasContainer, err := GetTexasContainer(*securityConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct Texas container: %w", err)
 	}
@@ -221,7 +210,7 @@ func getSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod 
 	}, nil
 }
 
-func getTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container, error) {
+func GetTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container, error) {
 	if securityConfig.Spec.Tokenx == nil || !securityConfig.Spec.Tokenx.Enabled {
 		return nil, fmt.Errorf("a texas container should not be created if tokenx is not enabled")
 	}
@@ -288,15 +277,10 @@ func getTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container
 	}, nil
 }
 
-func validatePod(ctx context.Context, crudClient client.Client, obj runtime.Object) (admission.Warnings, error) {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return nil, fmt.Errorf("expected an Pod object but got %T", obj)
-	}
-
+func validatePod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
 
-	securityConfigForPod, getSecurityConfigForPodErr := getSecurityConfigForPod(ctx, crudClient, pod)
+	securityConfigForPod, getSecurityConfigForPodErr := GetSecurityConfigForPod(ctx, crudClient, pod)
 	if getSecurityConfigForPodErr != nil {
 		podlog.Error(getSecurityConfigForPodErr, "Failed to validate for Pod")
 		return nil, getSecurityConfigForPodErr
@@ -306,7 +290,7 @@ func validatePod(ctx context.Context, crudClient client.Client, obj runtime.Obje
 	}
 
 	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
-		validateTokenXConfErr := validateTokenxCorrectlyConfigured(pod, securityConfigForPod)
+		validateTokenXConfErr := ValidateTokenxCorrectlyConfigured(pod, securityConfigForPod)
 		if validateTokenXConfErr != nil {
 			podlog.Error(validateTokenXConfErr, "Failed to validate for Pod")
 			return nil, validateTokenXConfErr
@@ -316,13 +300,13 @@ func validatePod(ctx context.Context, crudClient client.Client, obj runtime.Obje
 	return nil, nil
 }
 
-func validateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *PodSecurityConfiguration) error {
+func ValidateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *PodSecurityConfiguration) error {
 	// Validate that the Texas init container exists
 	hasTexasInitContainer := false
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == TexasInitContainerName {
 			hasTexasInitContainer = true
-			if !isTexasContainerEqual(
+			if !IsTexasContainerEqual(
 				securityConfigForPod.TexasContainer,
 				initContainer,
 			) {
@@ -341,7 +325,7 @@ func validateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *Po
 	for _, container := range pod.Spec.Containers {
 		if container.Name == securityConfigForPod.AppName {
 			for _, envVar := range container.Env {
-				if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == getTexasUrlEnvVarValue() {
+				if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == GetTexasUrlEnvVarValue() {
 					hasTexasUrlEnvVar = true
 					break
 				}
@@ -362,7 +346,7 @@ func validateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *Po
 	return nil
 }
 
-func isTexasContainerEqual(expected, actual corev1.Container) bool {
+func IsTexasContainerEqual(expected, actual corev1.Container) bool {
 	return expected.Name == actual.Name &&
 		expected.Image == actual.Image &&
 		reflect.DeepEqual(expected.RestartPolicy, actual.RestartPolicy) &&
@@ -374,6 +358,6 @@ func isTexasContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy)
 }
 
-func getTexasUrlEnvVarValue() string {
+func GetTexasUrlEnvVarValue() string {
 	return fmt.Sprintf("http://localhost:%d", config.Get().TexasPort)
 }

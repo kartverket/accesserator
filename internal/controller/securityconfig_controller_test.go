@@ -1,8 +1,9 @@
-package controller
+package controller_test
 
 import (
 	"context"
 
+	"github.com/kartverket/accesserator/internal/controller"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
@@ -11,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -112,7 +113,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 		It("should create a Jwker resource and a NetworkPolicy when TokenX is enabled", func() {
 			By("Reconciling the SecurityConfig with TokenX enabled")
 
-			fakeRecorder := record.NewFakeRecorder(100)
+			fakeRecorder := events.NewFakeRecorder(100)
 			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -150,7 +151,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}).Should(Equal(accesseratorv1alpha.PhasePending))
 
 			By("Marking the Jwker resource as finished reconciling")
-			jwker.Status.SynchronizationState = jwkerSynchronizationStateReady
+			jwker.Status.SynchronizationState = controller.JwkerSynchronizationStateReady
 			Expect(k8sClient.Status().Update(ctx, jwker)).To(Succeed())
 
 			By("Reconciling again to let SecurityConfig transition to PhaseReady")
@@ -188,7 +189,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 
 			By("Reconciling the SecurityConfig with TokenX disabled")
 
-			fakeRecorder := record.NewFakeRecorder(100)
+			fakeRecorder := events.NewFakeRecorder(100)
 			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -229,7 +230,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 		It("should recreate owned resources when they are deleted", func() {
 			By("Reconciling the SecurityConfig to create owned resources")
 
-			fakeRecorder := record.NewFakeRecorder(100)
+			fakeRecorder := events.NewFakeRecorder(100)
 			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -281,9 +282,9 @@ var _ = Describe("SecurityConfig Controller", func() {
 })
 
 func getSecurityConfigReconciler(
-	eventRecorder record.EventRecorder,
-) *SecurityConfigReconciler {
-	return &SecurityConfigReconciler{
+	eventRecorder events.EventRecorder,
+) *controller.SecurityConfigReconciler {
+	return &controller.SecurityConfigReconciler{
 		Client:   gvkInjectingClient{k8sClient},
 		Scheme:   gvkInjectingClient{k8sClient}.Scheme(),
 		Recorder: eventRecorder,
