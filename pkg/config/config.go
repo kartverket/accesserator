@@ -17,9 +17,10 @@ type Config struct {
 	TexasUrlEnvVarName string `split_words:"true" default:"TEXAS_URL"`
 }
 
-var cfg Config
+var appCfg Config
 
 func Load() error {
+	cfg := Config{}
 	if err := envconfig.Process("accesserator", &cfg); err != nil {
 		return err
 	}
@@ -37,9 +38,10 @@ func Load() error {
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
 	}
+	appCfg = cfg
 	return nil
 }
 
 func Get() Config {
-	return cfg
+	return appCfg
 }
