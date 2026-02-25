@@ -1,9 +1,10 @@
-package config
+package config_test
 
 import (
 	"fmt"
-	"os"
 	"testing"
+
+	"github.com/kartverket/accesserator/pkg/config"
 )
 
 const (
@@ -27,34 +28,14 @@ func setAllEnvVars(t *testing.T) {
 	t.Setenv("ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME", defaultTexasUrlEnvVarName)
 }
 
-func clearAllEnvVars(t *testing.T) {
-	t.Helper()
-	for _, key := range []string{
-		"ACCESSERATOR_CLUSTER_NAME",
-		"ACCESSERATOR_TOKENX_NAME",
-		"ACCESSERATOR_TOKENX_NAMESPACE",
-		"ACCESSERATOR_TEXAS_IMAGE_NAME",
-		"ACCESSERATOR_TEXAS_IMAGE_TAG",
-		"ACCESSERATOR_TEXAS_PORT",
-		"ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME",
-	} {
-		t.Setenv(key, "")
-		err := os.Unsetenv(key)
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
 func TestLoad_AllRequiredSet(t *testing.T) {
 	setAllEnvVars(t)
 
-	cfg = Config{}
-	if err := Load(); err != nil {
+	if err := config.Load(); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	c := Get()
+	c := config.Get()
 	if c.ClusterName != defaultClusterName {
 		t.Errorf("ClusterName = %q, want %q", c.ClusterName, defaultClusterName)
 	}
@@ -67,17 +48,15 @@ func TestLoad_AllRequiredSet(t *testing.T) {
 }
 
 func TestLoad_Defaults(t *testing.T) {
-	clearAllEnvVars(t)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
 
-	cfg = Config{}
-	if err := Load(); err != nil {
+	if err := config.Load(); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	c := Get()
+	c := config.Get()
 	if c.TokenxName != defaultTokenxName {
 		t.Errorf("TokenxName = %q, want default %q", c.TokenxName, defaultTokenxName)
 	}
@@ -93,12 +72,10 @@ func TestLoad_Defaults(t *testing.T) {
 }
 
 func TestLoad_MissingClusterName(t *testing.T) {
-	clearAllEnvVars(t)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
 
-	cfg = Config{}
-	err := Load()
+	err := config.Load()
 	if err == nil {
 		t.Fatal("expected error for missing CLUSTER_NAME, got nil")
 	}
@@ -108,12 +85,10 @@ func TestLoad_MissingClusterName(t *testing.T) {
 }
 
 func TestLoad_MissingTokenxNamespace(t *testing.T) {
-	clearAllEnvVars(t)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
 
-	cfg = Config{}
-	err := Load()
+	err := config.Load()
 	if err == nil {
 		t.Fatal("expected error for missing TOKENX_NAMESPACE, got nil")
 	}
@@ -123,12 +98,10 @@ func TestLoad_MissingTokenxNamespace(t *testing.T) {
 }
 
 func TestLoad_MissingTexasImageTag(t *testing.T) {
-	clearAllEnvVars(t)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 
-	cfg = Config{}
-	err := Load()
+	err := config.Load()
 	if err == nil {
 		t.Fatal("expected error for missing TEXAS_IMAGE_TAG, got nil")
 	}
@@ -138,10 +111,7 @@ func TestLoad_MissingTexasImageTag(t *testing.T) {
 }
 
 func TestLoad_AllRequiredMissing(t *testing.T) {
-	clearAllEnvVars(t)
-
-	cfg = Config{}
-	err := Load()
+	err := config.Load()
 	if err == nil {
 		t.Fatal("expected error when all required vars missing, got nil")
 	}
@@ -161,15 +131,13 @@ func TestLoad_InvalidPort(t *testing.T) {
 	setAllEnvVars(t)
 	t.Setenv("ACCESSERATOR_TEXAS_PORT", "not-a-number")
 
-	cfg = Config{}
-	err := Load()
+	err := config.Load()
 	if err == nil {
 		t.Fatal("expected error for invalid port, got nil")
 	}
 }
 
 func TestLoad_CustomValues(t *testing.T) {
-	clearAllEnvVars(t)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", "prod-cluster")
 	t.Setenv("ACCESSERATOR_TOKENX_NAME", "custom-tokendings")
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "custom-ns")
@@ -178,12 +146,11 @@ func TestLoad_CustomValues(t *testing.T) {
 	t.Setenv("ACCESSERATOR_TEXAS_PORT", "8080")
 	t.Setenv("ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME", "CUSTOM_URL")
 
-	cfg = Config{}
-	if err := Load(); err != nil {
+	if err := config.Load(); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	c := Get()
+	c := config.Get()
 	if c.ClusterName != "prod-cluster" {
 		t.Errorf("ClusterName = %q, want %q", c.ClusterName, "prod-cluster")
 	}
@@ -207,16 +174,37 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 }
 
-func TestGet_ReturnsLoadedConfig(t *testing.T) {
+func TestLoad_DoesNotUpdateGlobalOnError(t *testing.T) {
+	// First, load a valid config
+	setAllEnvVars(t)
+	if err := config.Load(); err != nil {
+		t.Fatalf("initial Load failed: %v", err)
+	}
+	before := config.Get()
+
+	// Now attempt a Load that will fail (invalid port)
+	t.Setenv("ACCESSERATOR_TEXAS_PORT", "not-a-number")
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for invalid port, got nil")
+	}
+
+	// appCfg should still hold the previous valid config
+	after := config.Get()
+	if before != after {
+		t.Errorf("Get() changed after failed Load: before=%+v, after=%+v", before, after)
+	}
+}
+
+func TestGet_ReturnsConsistentConfig(t *testing.T) {
 	setAllEnvVars(t)
 
-	cfg = Config{}
-	if err := Load(); err != nil {
+	if err := config.Load(); err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	c1 := Get()
-	c2 := Get()
+	c1 := config.Get()
+	c2 := config.Get()
 	if c1 != c2 {
 		t.Errorf("Get() returned different values on successive calls")
 	}
