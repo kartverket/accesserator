@@ -11,11 +11,13 @@ kind: Application
 metadata:
   name: app
   namespace: test
-  labels:
-    skiperator/security: "enabled"
 spec:
   image: nginxinc/nginx-unprivileged:latest
   port: 8080
+  podSettings:
+    annotations:
+      accesserator.kartverket.no/verify: "true"
+      accesserator.kartverket.no/services: "texas"
   replicas: 1
   accessPolicy:
     outbound:
@@ -37,11 +39,13 @@ kind: Application
 metadata:
   name: another-app
   namespace: test
-  labels:
-    skiperator/security: "enabled"
 spec:
   image: nginxinc/nginx-unprivileged:latest
   port: 8080
+  podSettings:
+    annotations:
+      accesserator.kartverket.no/verify: "true"
+      accesserator.kartverket.no/services: "texas"
   replicas: 1
   accessPolicy:
     inbound:
