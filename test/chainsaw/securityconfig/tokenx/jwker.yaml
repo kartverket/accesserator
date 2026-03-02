@@ -5,13 +5,11 @@ metadata:
 spec:
   accessPolicy:
     inbound:
-      rules: []
-    outbound:
       rules:
         - application: mock-oauth2
           namespace: auth
           cluster: kind-accesserator
-
+    outbound: {}
   secretName: app-jwker-secret
 status:
   synchronizationSecretName: app-jwker-secret
