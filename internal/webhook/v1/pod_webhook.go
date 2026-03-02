@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
-	"github.com/kartverket/skiperator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,18 +18,52 @@ import (
 )
 
 const (
-	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
-	SecurityEnabledLabelName      = "skiperator/security"
-	SecurityEnabledLabelValue     = "enabled"
-
-	TexasInitContainerName = "texas"
-	TexasPortName          = "http"
+	SkiperatorApplicationRefLabel     = "application.skiperator.no/app-name"
+	AccesseratorServicesAnnotation    = "accesserator.kartverket.no/services"
+	AccesseratorVerifyAnnotationKey   = "accesserator.kartverket.no/verify"
+	AccesseratorVerifyAnnotationValue = "true"
+	TexasInitContainerName            = "texas"
+	TexasPortName                     = "http"
 
 	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
 	AzureEnabledEnvVarName        = "AZURE_ENABLED"
 	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
 	TokenXEnabledEnvVarName       = "TOKEN_X_ENABLED"
+
+	Texas ServiceType = iota
 )
+
+type PodSecurityConfiguration struct {
+	SecurityConfig                   v1alpha.SecurityConfig
+	AppName                          string
+	CreatedFromSkiperatorApplication bool
+	AccesseratorServices             []AccesseratorService
+}
+
+type AccesseratorService struct {
+	ServiceType  ServiceType
+	Container    corev1.Container
+	ValidateFunc func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error
+}
+
+type ServiceType int
+
+func (serviceType ServiceType) String() string {
+	switch serviceType {
+	case Texas:
+		return TexasInitContainerName
+	default:
+		return "unknown"
+	}
+}
+
+type TexasEnvVars struct {
+	TokenXEnabled       string
+	MaskinportenEnabled string
+	AzureEnabled        string
+	IdportenEnabled     string
+	IntegrationSecrets  []corev1.EnvFromSource
+}
 
 // nolint:unused
 // log is for logging in this package.
@@ -61,28 +94,31 @@ var _ admission.Defaulter[*corev1.Pod] = &PodCustomDefaulter{}
 func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error {
 	podlog.Info("Defaulting for Pod")
 
-	securityConfigForPod, err := GetSecurityConfigForPod(ctx, d.Client, pod)
+	podSecurityConfig, err := GetPodSecurityConfiguration(ctx, d.Client, pod)
 	if err != nil {
 		return err
 	}
-	if !securityConfigForPod.SecurityEnabled {
+	if !podSecurityConfig.CreatedFromSkiperatorApplication {
 		return nil
 	}
 
-	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
-		// TokenX is enabled for this Application
-		// We inject an init container with texas in the pod
-		podlog.Info("Tokenx is enabled, injecting texas init container")
-		pod.Spec.InitContainers = append(pod.Spec.InitContainers, securityConfigForPod.TexasContainer)
-
-		podlog.Info("Injecting texas url")
-		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == securityConfigForPod.AppName {
-				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
-					Name:  config.Get().TexasUrlEnvVarName,
-					Value: GetTexasUrlEnvVarValue(),
-				})
+	for _, accesseratorService := range podSecurityConfig.AccesseratorServices {
+		switch accesseratorService.ServiceType {
+		case Texas:
+			for i := range pod.Spec.Containers {
+				if pod.Spec.Containers[i].Name == podSecurityConfig.AppName {
+					pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
+						Name:  config.Get().TexasUrlEnvVarName,
+						Value: GetTexasUrlEnvVarValue(),
+					})
+					break
+				}
 			}
+			podlog.Info(fmt.Sprintf("Injecting %s", accesseratorService.ServiceType.String()))
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, accesseratorService.Container)
+
+		default:
+			return fmt.Errorf("failed to mutate pod with accesserator service '%s'", accesseratorService.ServiceType.String())
 		}
 	}
 
@@ -118,113 +154,79 @@ func (v *PodCustomValidator) ValidateDelete(_ context.Context, pod *corev1.Pod) 
 	return nil, nil
 }
 
-type PodSecurityConfiguration struct {
-	SecurityConfig  *v1alpha.SecurityConfig
-	AppName         string
-	SecurityEnabled bool
-	TexasContainer  corev1.Container
-}
-
-// GetSecurityConfigForPod extracts the SecurityConfig for a given pod and determines if security is enabled.
-// Returns PodSecurityConfiguration with SecurityEnabled=false if security is not enabled or not applicable.
-// Returns an error if validation fails (e.g., missing SecurityConfig when security label is present).
-func GetSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
+// GetPodSecurityConfiguration returns the PodSecurityConfiguration for a given pod.
+// The PodSecurityConfiguration holds the SecurityConfig for a pod, which Skiperator application the pod stems from
+// and which services (Texas, opa, etc.) the pod should have.
+// Returns an error if the SecurityConfig cannot be found.
+func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
 	if pod.Labels == nil {
-		return &PodSecurityConfiguration{SecurityEnabled: false}, nil
+		return &PodSecurityConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
 	appName, appNameExists := pod.Labels[SkiperatorApplicationRefLabel]
 	if !appNameExists {
-		return &PodSecurityConfiguration{SecurityEnabled: false}, nil
+		return &PodSecurityConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
 
-	if crudClient == nil {
+	if k8sClient == nil {
 		return nil, fmt.Errorf("webhook client is not configured")
 	}
 
-	var skiperatorApplication v1alpha1.Application
-	podlog.Info("Fetching Application resource", "name", appName)
-	if err := crudClient.Get(ctx, types.NamespacedName{
-		Name:      appName,
-		Namespace: pod.Namespace,
-	}, &skiperatorApplication); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("no Application found with the name %s/%s: %w", pod.Namespace, appName, err)
+	accesseratorVerifyAnnotationValue, accesseratorVerifyAnnotationExists := pod.Annotations[AccesseratorVerifyAnnotationKey]
+	accesseratorServicesAnnotationValue, accesseratorServicesAnnotationExists := pod.Annotations[AccesseratorServicesAnnotation]
+	var accesseratorServiceTypes []ServiceType
+	if accesseratorServicesAnnotationExists {
+		accesseratorServiceTypes = ParseAccesseratorServices(accesseratorServicesAnnotationValue)
+	}
+
+	var securityConfig v1alpha.SecurityConfig
+	if (accesseratorVerifyAnnotationExists && accesseratorVerifyAnnotationValue == AccesseratorVerifyAnnotationValue) || len(accesseratorServiceTypes) > 0 {
+		// The pod want to verify the correct existence of a SecurityConfig AND/OR the pod has an annotation specifying which Accesserator services it wants.
+		// Either case, we need to fetch the SecurityConfig.
+		securityConfigForApplication, getSecurityConfigErr := GetSecurityConfigForApplication(ctx, k8sClient, types.NamespacedName{Namespace: pod.Namespace, Name: appName})
+		if getSecurityConfigErr != nil {
+			return nil, getSecurityConfigErr
 		}
-		return nil, fmt.Errorf("failed to fetch Application resource named %s/%s: %w", pod.Namespace, appName, err)
+		securityConfig = *securityConfigForApplication
 	}
 
-	if skiperatorApplication.Labels[SecurityEnabledLabelName] != SecurityEnabledLabelValue {
-		return &PodSecurityConfiguration{
-			AppName:         appName,
-			SecurityEnabled: false,
-		}, nil
-	}
-
-	var securityConfigList v1alpha.SecurityConfigList
-	podlog.Info("Fetching SecurityConfig resources")
-	if err := crudClient.List(ctx, &securityConfigList, client.InNamespace(pod.Namespace)); err != nil {
-		return nil, fmt.Errorf("failed to fetch SecurityConfig resources: %w", err)
-	}
-
-	var securityConfigForApplication []v1alpha.SecurityConfig
-	for _, securityConfig := range securityConfigList.Items {
-		if securityConfig.Spec.ApplicationRef == appName {
-			securityConfigForApplication = append(securityConfigForApplication, securityConfig)
+	accesseratorServices := make([]AccesseratorService, 0, len(accesseratorServiceTypes))
+	for _, serviceType := range accesseratorServiceTypes {
+		switch serviceType {
+		case Texas:
+			texasContainer := GetTexasContainer(securityConfig)
+			serviceValidationFunc, getServiceValidationFuncErr := GetServiceValidationFunc(Texas, &texasContainer)
+			if getServiceValidationFuncErr != nil {
+				return nil, getServiceValidationFuncErr
+			}
+			accesseratorServices = append(
+				accesseratorServices,
+				AccesseratorService{
+					ServiceType:  Texas,
+					Container:    texasContainer,
+					ValidateFunc: serviceValidationFunc,
+				},
+			)
+		default:
+			return nil, fmt.Errorf("pod annotated with unknown accesserator service type: %s", serviceType)
 		}
-	}
-
-	if len(securityConfigForApplication) < 1 {
-		msg := fmt.Sprintf(
-			"the application is labelled with %s=%s but no SecurityConfig resource was found for Application",
-			SecurityEnabledLabelName,
-			SecurityEnabledLabelValue,
-		)
-		podlog.Info(msg, "name", appName)
-		return nil, fmt.Errorf("%s", msg)
-	}
-
-	if len(securityConfigForApplication) > 1 {
-		msg := "multiple SecurityConfig resources found for Application"
-		podlog.Info(msg, "name", appName)
-		return nil, fmt.Errorf("%s", msg)
-	}
-
-	securityConfig := &securityConfigForApplication[0]
-
-	if securityConfig == nil {
-		msg := "SecurityConfig resource for Application was nil"
-		podlog.Info(msg, "name", appName)
-		return nil, fmt.Errorf("%s", msg)
-	}
-
-	texasContainer, err := GetTexasContainer(*securityConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct Texas container: %w", err)
 	}
 
 	return &PodSecurityConfiguration{
-		SecurityConfig:  securityConfig,
-		AppName:         appName,
-		SecurityEnabled: true,
-		TexasContainer:  *texasContainer,
+		SecurityConfig:                   securityConfig,
+		AppName:                          appName,
+		CreatedFromSkiperatorApplication: true,
+		AccesseratorServices:             accesseratorServices,
 	}, nil
 }
 
-func GetTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container, error) {
-	if securityConfig.Spec.Tokenx == nil || !securityConfig.Spec.Tokenx.Enabled {
-		return nil, fmt.Errorf("a texas container should not be created if tokenx is not enabled")
-	}
-
+func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	texasImageUrl := fmt.Sprintf(
 		"%s:%s",
 		config.Get().TexasImageName,
 		config.Get().TexasImageTag,
 	)
-	expectedJwkerSecretName := utilities.GetJwkerSecretName(
-		utilities.GetJwkerName(securityConfig.Spec.ApplicationRef),
-	)
-
-	return &corev1.Container{
+	texasEnvVars := GetTexasEnvVars(securityConfig)
+	return corev1.Container{
 		Name:  TexasInitContainerName,
 		Image: texasImageUrl,
 		Ports: []corev1.ContainerPort{
@@ -258,92 +260,68 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container
 		Env: []corev1.EnvVar{
 			{
 				Name:  TokenXEnabledEnvVarName,
-				Value: "true",
+				Value: texasEnvVars.TokenXEnabled,
 			},
 			{
 				Name:  MaskinportenEnabledEnvVarName,
-				Value: "false",
+				Value: texasEnvVars.MaskinportenEnabled,
 			},
 			{
 				Name:  AzureEnabledEnvVarName,
-				Value: "false",
+				Value: texasEnvVars.AzureEnabled,
 			},
 			{
 				Name:  IdportenEnabledEnvVarName,
-				Value: "false",
+				Value: texasEnvVars.IdportenEnabled,
 			},
 		},
-		EnvFrom: []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: expectedJwkerSecretName}}}},
-	}, nil
+		EnvFrom: texasEnvVars.IntegrationSecrets,
+	}
 }
 
-func validatePod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
+func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
+	var integrationSecrets []corev1.EnvFromSource
+	tokenxEnabled := "false"
+	if securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled {
+		tokenxEnabled = "true"
+		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: utilities.GetJwkerSecretName(utilities.GetJwkerName(securityConfig.Spec.ApplicationRef)),
+				},
+			},
+		})
+	}
+	return TexasEnvVars{
+		TokenXEnabled:       tokenxEnabled,
+		MaskinportenEnabled: "false",
+		AzureEnabled:        "false",
+		IdportenEnabled:     "false",
+		IntegrationSecrets:  integrationSecrets,
+	}
+}
+
+func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
 
-	securityConfigForPod, getSecurityConfigForPodErr := GetSecurityConfigForPod(ctx, crudClient, pod)
+	podSecurityConfig, getSecurityConfigForPodErr := GetPodSecurityConfiguration(ctx, k8sClient, pod)
 	if getSecurityConfigForPodErr != nil {
 		podlog.Error(getSecurityConfigForPodErr, "Failed to validate for Pod")
 		return nil, getSecurityConfigForPodErr
 	}
-	if !securityConfigForPod.SecurityEnabled {
+	if !podSecurityConfig.CreatedFromSkiperatorApplication {
 		return nil, nil
 	}
 
-	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
-		validateTokenXConfErr := ValidateTokenxCorrectlyConfigured(pod, securityConfigForPod)
-		if validateTokenXConfErr != nil {
-			podlog.Error(validateTokenXConfErr, "Failed to validate for Pod")
-			return nil, validateTokenXConfErr
+	// Validate that each accesserator service is configured correctly
+	for _, accesseratorService := range podSecurityConfig.AccesseratorServices {
+		if err := accesseratorService.ValidateFunc(*pod, podSecurityConfig.SecurityConfig); err != nil {
+			podlog.Error(err, "Failed to validate for Pod")
+			return nil, err
 		}
 	}
 
 	return nil, nil
-}
-
-func ValidateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *PodSecurityConfiguration) error {
-	// Validate that the Texas init container exists
-	hasTexasInitContainer := false
-	for _, initContainer := range pod.Spec.InitContainers {
-		if initContainer.Name == TexasInitContainerName {
-			hasTexasInitContainer = true
-			if !IsTexasContainerEqual(
-				securityConfigForPod.TexasContainer,
-				initContainer,
-			) {
-				return fmt.Errorf("texas init container is not as expected given the SecurityConfig")
-			}
-			break
-		}
-	}
-	if !hasTexasInitContainer {
-		podlog.Info("TokenX is enabled but texas init container is missing")
-		return fmt.Errorf("TokenX is enabled but init container '%s' is missing", TexasInitContainerName)
-	}
-
-	// Validate that the application container has the TEXAS_URL env variable
-	hasTexasUrlEnvVar := false
-	for _, container := range pod.Spec.Containers {
-		if container.Name == securityConfigForPod.AppName {
-			for _, envVar := range container.Env {
-				if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == GetTexasUrlEnvVarValue() {
-					hasTexasUrlEnvVar = true
-					break
-				}
-			}
-			break
-		}
-	}
-	if !hasTexasUrlEnvVar {
-		errMsg := fmt.Sprintf(
-			"TokenX is enabled but %s env var is missing for pod from skiperator app with name %s/%s",
-			pod.Namespace,
-			securityConfigForPod.AppName,
-			config.Get().TexasUrlEnvVarName,
-		)
-		podlog.Info(errMsg)
-		return fmt.Errorf("%s", errMsg)
-	}
-	return nil
 }
 
 func IsTexasContainerEqual(expected, actual corev1.Container) bool {
@@ -360,4 +338,117 @@ func IsTexasContainerEqual(expected, actual corev1.Container) bool {
 
 func GetTexasUrlEnvVarValue() string {
 	return fmt.Sprintf("http://localhost:%d", config.Get().TexasPort)
+}
+
+func GetSecurityConfigForApplication(ctx context.Context, k8sClient client.Client, applicationObjectKey client.ObjectKey) (*v1alpha.SecurityConfig, error) {
+	var securityConfigList v1alpha.SecurityConfigList
+	podlog.Info("Fetching SecurityConfig resources")
+	if err := k8sClient.List(ctx, &securityConfigList, client.InNamespace(applicationObjectKey.Namespace)); err != nil {
+		return nil, fmt.Errorf("failed to fetch SecurityConfig resources: %w", err)
+	}
+
+	var securityConfigForApplication []v1alpha.SecurityConfig
+	for _, securityConfig := range securityConfigList.Items {
+		if securityConfig.Spec.ApplicationRef == applicationObjectKey.Name {
+			securityConfigForApplication = append(securityConfigForApplication, securityConfig)
+		}
+	}
+
+	if len(securityConfigForApplication) < 1 {
+		msg := "no SecurityConfig resource was found for the corresponding Application"
+		podlog.Info(msg, "namespacedName", applicationObjectKey)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	if len(securityConfigForApplication) > 1 {
+		msg := "multiple SecurityConfig resources found for Application"
+		podlog.Info(msg, "namespacedName", applicationObjectKey)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	securityConfig := &securityConfigForApplication[0]
+
+	if securityConfig == nil {
+		msg := "SecurityConfig resource for Application was nil"
+		podlog.Info(msg, "namespacedName", applicationObjectKey)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	if !securityConfig.Status.Ready {
+		msg := "SecurityConfig resource for Application is not ready"
+		podlog.Info(msg, "namespacedName", applicationObjectKey)
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	return securityConfig, nil
+}
+
+func ParseAccesseratorServices(annotationValue string) []ServiceType {
+	var services []ServiceType
+	for _, s := range strings.Split(annotationValue, ",") {
+		trimmed := strings.TrimSpace(s)
+		if trimmed == "" {
+			continue
+		}
+		switch strings.ToLower(trimmed) {
+		case Texas.String():
+			services = append(services, Texas)
+		}
+	}
+	return services
+}
+
+func GetServiceValidationFunc(serviceType ServiceType, sidecarContainer *corev1.Container) (func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error, error) {
+	switch serviceType {
+	case Texas:
+		return func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
+			// Validate that TEXAS_URL env var has the correct value
+			hasTexasUrlEnvVar := false
+			for _, container := range pod.Spec.Containers {
+				if container.Name == securityConfig.Spec.ApplicationRef {
+					for _, envVar := range container.Env {
+						if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == GetTexasUrlEnvVarValue() {
+							hasTexasUrlEnvVar = true
+							break
+						}
+					}
+					break
+				}
+			}
+			if !hasTexasUrlEnvVar {
+				return fmt.Errorf(
+					"pod is annotated to have Texas but %s env var is missing for pod with name %s/%s",
+					config.Get().TexasUrlEnvVarName,
+					pod.Namespace,
+					pod.Name,
+				)
+			}
+
+			// Validate that the Texas init container is correctly configured
+			texasContainerCorrectlyConfigured := false
+			if sidecarContainer != nil {
+				for _, initContainer := range pod.Spec.InitContainers {
+					if initContainer.Name == TexasInitContainerName {
+						if IsTexasContainerEqual(
+							*sidecarContainer,
+							initContainer,
+						) {
+							texasContainerCorrectlyConfigured = true
+						}
+						break
+					}
+				}
+			}
+			if !texasContainerCorrectlyConfigured {
+				return fmt.Errorf(
+					"pod is annotated to have Texas, but Texas init container is missing or not correctly configured for pod with name %s/%s",
+					pod.Namespace,
+					pod.Name,
+				)
+			}
+			return nil
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown service type '%s'", serviceType.String())
+	}
 }
