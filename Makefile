@@ -367,6 +367,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 HELM ?= $(LOCALBIN)/helm
+KUBEFWD ?= $(LOCALBIN)/kubefwd
+JQ ?= $(LOCALBIN)/jq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.7.1
@@ -376,6 +378,8 @@ KUBECTL_VERSION ?= v1.34.2
 KIND_VERSION ?= v0.30.0
 GOLANGCI_LINT_VERSION ?= v2.10.1
 HELM_VERSION ?= v4.0.0
+KUBEFWD_VERSION ?= 1.25.12
+JQ_VERSION ?= 1.8.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -397,10 +401,62 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
-.PHONY: kind
+.PHONY: jq
+jq: $(JQ) ## Download jq locally if necessary.
+$(JQ): $(LOCALBIN)
+	@set -e; \
+	if [ -x "$(JQ)" ]; then \
+		echo "✅ jq already exists at $(JQ)"; \
+		exit 0; \
+	fi; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$arch" in \
+		x86_64|amd64) arch=amd64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "❌ Unsupported architecture: $$arch" >&2; exit 1 ;; \
+	esac; \
+	case "$$os" in \
+		linux) binary="jq-linux-$${arch}" ;; \
+		darwin) binary="jq-macos-$${arch}" ;; \
+		*) echo "❌ Unsupported OS: $$os" >&2; exit 1 ;; \
+	esac; \
+	url="https://github.com/jqlang/jq/releases/download/jq-$(JQ_VERSION)/$${binary}"; \
+	echo "Downloading jq $(JQ_VERSION) from $$url"; \
+	curl -L -o "$(JQ)" "$$url"; \
+	chmod +x "$(JQ)"; \
+	echo "✅ jq installed at $(JQ)"
 kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
+
+.PHONY: kubefwd
+kubefwd: $(KUBEFWD) ## Download kubefwd locally if necessary.
+$(KUBEFWD): $(LOCALBIN)
+	@set -e; \
+	if [ -x "$(KUBEFWD)" ]; then \
+		echo "✅ kubefwd already exists at $(KUBEFWD)"; \
+		exit 0; \
+	fi; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$arch" in \
+		x86_64|amd64) arch=x86_64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "❌ Unsupported architecture: $$arch" >&2; exit 1 ;; \
+	esac; \
+	case "$$os" in \
+		linux) os_name=Linux ;; \
+		darwin) os_name=Darwin ;; \
+		*) echo "❌ Unsupported OS: $$os" >&2; exit 1 ;; \
+	esac; \
+	url="https://github.com/txn2/kubefwd/releases/download/v$(KUBEFWD_VERSION)/kubefwd_$${os_name}_$${arch}.tar.gz"; \
+	echo "Downloading kubefwd $(KUBEFWD_VERSION) from $$url"; \
+	curl -L -o kubefwd.tar.gz "$$url"; \
+	tar -xzf kubefwd.tar.gz -C "$(LOCALBIN)" kubefwd; \
+	chmod +x "$(KUBEFWD)"; \
+	rm kubefwd.tar.gz; \
+	echo "✅ kubefwd installed at $(KUBEFWD)"
 
 .PHONY: helm
 helm: $(HELM) ## Download helm locally if necessary.
