@@ -274,6 +274,47 @@ mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
 
 ##@ Helpers
 
+.PHONY: mock-oauth2-ingress
+mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, restarting kubefwd if necessary
+	@echo -e "🔍  Checking if mock-oauth2 is running in the cluster..."; \
+	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=10s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) 2>/dev/null || { \
+		echo -e "❌  mock-oauth2 is not ready. Deploy it first with 'make mock-oauth2'."; \
+		exit 1; \
+	}; \
+	echo -e "✅  mock-oauth2 is ready"; \
+	STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null); \
+	if [ "$$STATUS" = "200" ]; then \
+		echo -e "✅  mock-oauth2 is reachable on http://mock-oauth2.auth:8080"; \
+		exit 0; \
+	fi; \
+	echo -e "⚠️   mock-oauth2 is not reachable. Restarting kubefwd..."; \
+	echo -e "⏳  Stopping kubefwd..."; \
+	PKILL_OUTPUT=$$(sudo pkill -f "kubefwd" 2>&1); \
+	if echo "$$PKILL_OUTPUT" | grep -q "not allowed"; then \
+		echo -e "❌  sudo is not permitted to run pkill on this machine: $$PKILL_OUTPUT"; \
+		exit 1; \
+	fi; \
+	echo -e "✅  kubefwd stopped"; \
+	sleep 1; \
+	echo -e "⏳  Starting kubefwd..."; \
+	KUBEFWD_OUTPUT=$$(sudo "$(KUBEFWD)" svc -n auth --context $(KUBECONTEXT) &> /tmp/kubefwd.log 2>&1 & echo $$?); \
+	if echo "$$KUBEFWD_OUTPUT" | grep -q "not allowed"; then \
+		echo -e "❌  sudo is not permitted to run kubefwd on this machine: $$KUBEFWD_OUTPUT"; \
+		exit 1; \
+	fi; \
+	echo -e "✅  kubefwd started"; \
+	echo -e "⏳  Waiting for kubefwd to establish connections..."; \
+	for i in $$(seq 1 15); do \
+		sleep 2; \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null); \
+		if [ "$$STATUS" = "200" ]; then \
+			echo -e "✅  mock-oauth2 is now reachable on http://mock-oauth2.auth:8080"; \
+			exit 0; \
+		fi; \
+	done; \
+	echo -e "❌  mock-oauth2 is still not reachable after restarting kubefwd. Try to re-deploy mock-oauth2 with 'make mock-oauth2' or check /tmp/kubefwd.log for details."; \
+	exit 1
+
 .PHONY: mock-token
 mock-token: ensureflox ensurekubefwd ## Retrieves a JWT issued by mock-oauth2
 	@command -v jq >/dev/null 2>&1 || { echo -e "❌  jq is required (used to parse JSON). Please install jq and try again."; exit 1; }
