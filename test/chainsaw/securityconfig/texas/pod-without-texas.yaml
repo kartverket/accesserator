@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: app
+    app.kubernetes.io/managed-by: skiperator
+    app.kubernetes.io/name: app
+    application.skiperator.no/app: app
+    application.skiperator.no/app-name: app
+    skiperator.kartverket.no/controller: application
+spec:
+  containers:
+    - image: nginxinc/nginx-unprivileged@sha256:0ac6770a4747ee05799deba85731496e001bbfdcd204a27f364090fa9ad77157
+      imagePullPolicy: Always
+      name: app
+      ports:
+        - containerPort: 8080
+          name: main
+          protocol: TCP
+      resources: {}
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          add:
+            - NET_BIND_SERVICE
+          drop:
+            - ALL
+        privileged: false
+        readOnlyRootFilesystem: true
+        runAsGroup: 150
+        runAsNonRoot: true
+        runAsUser: 150
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  imagePullSecrets:
+    - name: github-auth
+  nodeName: accesserator-control-plane
+  preemptionPolicy: PreemptLowerPriority
+  priority: 20000
+  priorityClassName: skip-medium
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext:
+    fsGroup: 150
+    seccompProfile:
+      type: RuntimeDefault
+    supplementalGroups:
+      - 150
+  serviceAccount: app
+  serviceAccountName: app
+  terminationGracePeriodSeconds: 30
+  tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
