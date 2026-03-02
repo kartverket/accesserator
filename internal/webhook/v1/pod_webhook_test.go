@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("pod_webhook.go unit tests", func() {
@@ -33,39 +34,79 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 	Describe("SetupPodWebhookWithManager", func() {
 		It("panics when manager is nil (sanity coverage)", func() {
-			// This is a lightweight coverage test. Proper webhook wiring is validated via envtest/chainsaw.
+			// This is a lightweight coverage test. Proper webhook wiring is validated via chainsaw.
 			Expect(func() { _ = v1.SetupPodWebhookWithManager(ctrl.Manager(nil)) }).To(Panic())
 		})
 	})
 
-	Describe("getTexasContainer", func() {
-		It("returns error when tokenx is not enabled", func() {
+	Describe("GetTexasContainer", func() {
+		It("builds a Texas init container with tokenx disabled then tokenx is not configured in SecurityConfig", func() {
 			applicationRef := "myapp"
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+				},
+			}
+			c := v1.GetTexasContainer(securityConfig)
+			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s", config.Get().TexasImageName, config.Get().TexasImageTag)))
+			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
+			Expect(c.SecurityContext).ToNot(BeNil())
+			Expect(c.Env).NotTo(BeEmpty())
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.TokenXEnabledEnvVarName, Value: "false"}))
+			Expect(c.EnvFrom).To(BeEmpty())
+			Expect(c.EnvFrom).NotTo(
+				ContainElement(
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+							},
+						},
+					},
+				),
+			)
+		})
+
+		It("builds a Texas init container with tokenx disabled then tokenx is disabled in SecurityConfig", func() {
+			applicationRef := "myapp"
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
 					Tokenx: &v1alpha.TokenXSpec{
 						Enabled: false,
 					},
-					ApplicationRef: applicationRef,
 				},
 			}
-			c, err := v1.GetTexasContainer(securityConfig)
-			Expect(err).To(MatchError(Equal("a texas container should not be created if tokenx is not enabled")))
-			Expect(c).To(BeNil())
+			c := v1.GetTexasContainer(securityConfig)
+			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s", config.Get().TexasImageName, config.Get().TexasImageTag)))
+			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
+			Expect(c.SecurityContext).ToNot(BeNil())
+			Expect(c.Env).NotTo(BeEmpty())
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.TokenXEnabledEnvVarName, Value: "false"}))
+			Expect(c.EnvFrom).To(BeEmpty())
+			Expect(c.EnvFrom).NotTo(
+				ContainElement(
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+							},
+						},
+					},
+				),
+			)
 		})
-
-		It("builds a texas init container with expected basic properties", func() {
+		It("builds a Texas init container with tokenx enabled then tokenx is enabled in SecurityConfig", func() {
 			applicationRef := "myapp"
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
 					Tokenx: &v1alpha.TokenXSpec{
 						Enabled: true,
 					},
-					ApplicationRef: applicationRef,
 				},
 			}
-			c, err := v1.GetTexasContainer(securityConfig)
-			Expect(err).ToNot(HaveOccurred())
+			c := v1.GetTexasContainer(securityConfig)
 			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s", config.Get().TexasImageName, config.Get().TexasImageTag)))
 			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
 			Expect(c.SecurityContext).ToNot(BeNil())
@@ -86,7 +127,96 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 	})
 
-	Describe("isTexasContainerEqual", func() {
+	Describe("GetSecurityConfigForApplication", func() {
+		It("errors when no SecurityConfig exists for the given application", func() {
+			cfg, err := v1.GetSecurityConfigForApplication(
+				ctx,
+				k8sClient,
+				client.ObjectKey{Namespace: "ns", Name: "nonexistent-app"},
+			)
+			Expect(err).To(MatchError(Equal("no SecurityConfig resource was found for the corresponding Application")))
+			Expect(cfg).To(BeNil())
+		})
+
+		It("errors when multiple SecurityConfigs exist for the given application", func() {
+			cfg, err := v1.GetSecurityConfigForApplication(
+				ctx,
+				utilities.GetMockKubernetesClient(
+					scheme,
+					&v1alpha.SecurityConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "security-config-1",
+							Namespace: "ns",
+						},
+						Spec: v1alpha.SecurityConfigSpec{
+							ApplicationRef: "myapp",
+						},
+					},
+					&v1alpha.SecurityConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "security-config-2",
+							Namespace: "ns",
+						},
+						Spec: v1alpha.SecurityConfigSpec{
+							ApplicationRef: "myapp",
+						},
+					},
+				),
+				client.ObjectKey{Namespace: "ns", Name: "myapp"},
+			)
+			Expect(err).To(MatchError(Equal("multiple SecurityConfig resources found for Application")))
+			Expect(cfg).To(BeNil())
+		})
+
+		It("error when SecurityConfig is not ready", func() {
+			cfg, err := v1.GetSecurityConfigForApplication(
+				ctx,
+				utilities.GetMockKubernetesClient(
+					scheme,
+					&v1alpha.SecurityConfig{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "security-config",
+							Namespace: "ns",
+						},
+						Spec: v1alpha.SecurityConfigSpec{
+							ApplicationRef: "myapp",
+						},
+					},
+				),
+				client.ObjectKey{Namespace: "ns", Name: "myapp"},
+			)
+			Expect(err).To(MatchError(Equal("SecurityConfig resource for Application is not ready")))
+			Expect(cfg).To(BeNil())
+		})
+
+		It("returns the SecurityConfig when exactly one exists for the given application and it is ready", func() {
+			expectedSecurityConfig := &v1alpha.SecurityConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "security-config",
+					Namespace: "ns",
+				},
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: "myapp",
+				},
+			}
+			mockClient := utilities.GetMockKubernetesClient(scheme, expectedSecurityConfig)
+			Expect(mockClient.Get(ctx, client.ObjectKeyFromObject(expectedSecurityConfig), expectedSecurityConfig)).To(Succeed())
+			// Simulate the SecurityConfig becoming ready after being created.
+			expectedSecurityConfig.Status.Ready = true
+			Expect(mockClient.Update(ctx, expectedSecurityConfig)).To(Succeed())
+
+			cfg, err := v1.GetSecurityConfigForApplication(
+				ctx,
+				mockClient,
+				client.ObjectKey{Namespace: "ns", Name: "myapp"},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cfg).To(Equal(expectedSecurityConfig))
+			Expect(cfg.Status.Ready).To(BeTrue())
+		})
+	})
+
+	Describe("IsTexasContainerEqual", func() {
 		It("returns true for identical containers and false when a field differs", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
@@ -95,26 +225,24 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 					ApplicationRef: "myapp",
 				}}
-			a, errA := v1.GetTexasContainer(securityConfig)
-			Expect(errA).ToNot(HaveOccurred())
-			b, errB := v1.GetTexasContainer(securityConfig)
-			Expect(errB).ToNot(HaveOccurred())
-			Expect(v1.IsTexasContainerEqual(*a, *b)).To(BeTrue())
+			a := v1.GetTexasContainer(securityConfig)
+			b := v1.GetTexasContainer(securityConfig)
+			Expect(v1.IsTexasContainerEqual(a, b)).To(BeTrue())
 
-			b.Image = b.Image + "-changed"
-			Expect(v1.IsTexasContainerEqual(*a, *b)).To(BeFalse())
+			b.Env = append(b.Env, corev1.EnvVar{Name: "DUMMY_ENV_VAR", Value: "dummy"})
+			Expect(v1.IsTexasContainerEqual(a, b)).To(BeFalse())
 		})
 	})
 
-	Describe("getSecurityConfigForPod", func() {
-		It("returns SecurityEnabled=false when Pod is not created from Skiperator Application", func() {
+	Describe("GetPodSecurityConfiguration", func() {
+		It("returns CreatedFromSkiperatorApplication=false when Pod is not created from Skiperator Application", func() {
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns"}}
-			cfg, err := v1.GetSecurityConfigForPod(ctx, nil, pod)
+			cfg, err := v1.GetPodSecurityConfiguration(ctx, nil, pod)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(*cfg).To(Equal(v1.PodSecurityConfiguration{SecurityEnabled: false}))
+			Expect(*cfg).To(Equal(v1.PodSecurityConfiguration{CreatedFromSkiperatorApplication: false}))
 		})
 
-		It("returns error when Pod is created from Skiperator Application, but crudClient is nil", func() {
+		It("returns error when Pod is created from Skiperator Application, but k8sClient is nil", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "p",
@@ -124,12 +252,12 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			cfg, err := v1.GetSecurityConfigForPod(ctx, nil, pod)
+			cfg, err := v1.GetPodSecurityConfiguration(ctx, nil, pod)
 			Expect(err).To(MatchError(Equal("webhook client is not configured")))
 			Expect(cfg).To(BeNil())
 		})
 
-		It("returns error when Pod is created from Skiperator Application but Skiperator Application does not exist", func() {
+		It("returns error when no SecurityConfig resource was found for a given pod with correct annotation", func() {
 			skiperatorAppName := skiperatorAppName
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -138,86 +266,17 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Labels: map[string]string{
 						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
+					Annotations: map[string]string{
+						v1.AccesseratorVerifyAnnotationKey: v1.AccesseratorVerifyAnnotationValue,
+					},
 				},
 			}
-			cfg, err := v1.GetSecurityConfigForPod(
+			cfg, err := v1.GetPodSecurityConfiguration(
 				ctx,
 				utilities.GetMockKubernetesClient(scheme),
 				pod,
 			)
-			Expect(err).To(MatchError(ContainSubstring(
-				fmt.Sprintf("no Application found with the name %s/%s", pod.Namespace, skiperatorAppName),
-			)))
-			Expect(cfg).To(BeNil())
-		})
-
-		It("returns SecurityEnabled=false when referenced Skiperator Application has no security label", func() {
-			skiperatorAppName := skiperatorAppName
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "p",
-					Namespace: "ns",
-					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
-					},
-				},
-			}
-			cfg, err := v1.GetSecurityConfigForPod(
-				ctx,
-				utilities.GetMockKubernetesClient(
-					scheme,
-					&v1alpha1.Application{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      skiperatorAppName,
-							Namespace: pod.Namespace,
-						},
-					},
-				),
-				pod,
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(*cfg).To(Equal(
-				v1.PodSecurityConfiguration{
-					AppName:         skiperatorAppName,
-					SecurityEnabled: false,
-				},
-			))
-		})
-
-		It("returns error when no SecurityConfig resource was found for a given pod created by a Skiperator Application", func() {
-			skiperatorAppName := skiperatorAppName
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "p",
-					Namespace: "ns",
-					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
-					},
-				},
-			}
-			cfg, err := v1.GetSecurityConfigForPod(
-				ctx,
-				utilities.GetMockKubernetesClient(
-					scheme,
-					&v1alpha1.Application{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      skiperatorAppName,
-							Namespace: pod.Namespace,
-							Labels: map[string]string{
-								v1.SecurityEnabledLabelName: v1.SecurityEnabledLabelValue,
-							},
-						},
-					},
-				),
-				pod,
-			)
-			Expect(err).To(MatchError(Equal(
-				fmt.Sprintf(
-					"the application is labelled with %s=%s but no SecurityConfig resource was found for Application",
-					v1.SecurityEnabledLabelName,
-					v1.SecurityEnabledLabelValue,
-				),
-			)))
+			Expect(err).To(MatchError(Equal("no SecurityConfig resource was found for the corresponding Application")))
 			Expect(cfg).To(BeNil())
 		})
 
@@ -230,21 +289,15 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Labels: map[string]string{
 						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
+					Annotations: map[string]string{
+						v1.AccesseratorVerifyAnnotationKey: v1.AccesseratorVerifyAnnotationValue,
+					},
 				},
 			}
-			cfg, err := v1.GetSecurityConfigForPod(
+			cfg, err := v1.GetPodSecurityConfiguration(
 				ctx,
 				utilities.GetMockKubernetesClient(
 					scheme,
-					&v1alpha1.Application{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      skiperatorAppName,
-							Namespace: pod.Namespace,
-							Labels: map[string]string{
-								v1.SecurityEnabledLabelName: v1.SecurityEnabledLabelValue,
-							},
-						},
-					},
 					&v1alpha.SecurityConfig{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "security-config",
@@ -270,7 +323,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(cfg).To(BeNil())
 		})
 
-		It("returns full PodSecurityConfiguration when pod is created by Skiperator Application with correct label and when a SecurityConfig referencing the same app exists", func() {
+		It("returns PodSecurityConfiguration with SecurityConfig when pod is annotated to verify and a SecurityConfig referencing the original Skiperator application exists", func() {
 			skiperatorAppName := skiperatorAppName
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -278,6 +331,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Namespace: "ns",
 					Labels: map[string]string{
 						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+					},
+					Annotations: map[string]string{
+						v1.AccesseratorVerifyAnnotationKey: v1.AccesseratorVerifyAnnotationValue,
 					},
 				},
 			}
@@ -288,98 +344,34 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Namespace: pod.Namespace,
 				},
 				Spec: v1alpha.SecurityConfigSpec{
-					Tokenx:         &v1alpha.TokenXSpec{Enabled: true},
 					ApplicationRef: skiperatorAppName,
 				},
 			}
 
-			cfg, err := v1.GetSecurityConfigForPod(
+			mockClient := utilities.GetMockKubernetesClient(scheme, &securityConfig)
+			Expect(mockClient.Get(ctx, client.ObjectKeyFromObject(&securityConfig), &securityConfig)).To(Succeed())
+			// Simulate the SecurityConfig becoming ready after being created.
+			securityConfig.Status.Ready = true
+			Expect(mockClient.Update(ctx, &securityConfig)).To(Succeed())
+
+			cfg, err := v1.GetPodSecurityConfiguration(
 				ctx,
-				utilities.GetMockKubernetesClient(
-					scheme,
-					&v1alpha1.Application{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      skiperatorAppName,
-							Namespace: pod.Namespace,
-							Labels: map[string]string{
-								v1.SecurityEnabledLabelName: v1.SecurityEnabledLabelValue,
-							},
-						},
-					},
-					&securityConfig,
-				),
+				mockClient,
 				pod,
 			)
 
-			texasContainer, getTexasErr := v1.GetTexasContainer(securityConfig)
-			Expect(getTexasErr).ToNot(HaveOccurred())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(*cfg).To(Equal(
 				v1.PodSecurityConfiguration{
-					SecurityConfig:  &securityConfig,
-					AppName:         skiperatorAppName,
-					SecurityEnabled: true,
-					TexasContainer:  *texasContainer,
+					SecurityConfig:                   securityConfig,
+					AppName:                          skiperatorAppName,
+					CreatedFromSkiperatorApplication: true,
+					AccesseratorServices:             []v1.AccesseratorService{},
 				},
 			))
 		})
-	})
 
-	Describe("isTexasContainerEqual", func() {
-		It("returns true when two texas containers are equal on the fields that are used", func() {
-			securityConfig := v1alpha.SecurityConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "security-config",
-					Namespace: "ns",
-				},
-				Spec: v1alpha.SecurityConfigSpec{
-					Tokenx: &v1alpha.TokenXSpec{
-						Enabled: true,
-					},
-					ApplicationRef: "my-app",
-				},
-			}
-			texasContainer, _ := v1.GetTexasContainer(securityConfig)
-			result := v1.IsTexasContainerEqual(
-				*texasContainer,
-				*texasContainer,
-			)
-			Expect(result).To(BeTrue())
-		})
-
-		It("returns false when two texas containers are not equal on the fields that are used", func() {
-			securityConfig := v1alpha.SecurityConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "security-config",
-					Namespace: "ns",
-				},
-				Spec: v1alpha.SecurityConfigSpec{
-					Tokenx: &v1alpha.TokenXSpec{
-						Enabled: true,
-					},
-					ApplicationRef: "my-app",
-				},
-			}
-			texasContainer, _ := v1.GetTexasContainer(securityConfig)
-			alteredTexasContainer := *texasContainer
-			alteredTexasContainer.Ports = append(
-				alteredTexasContainer.Ports,
-				corev1.ContainerPort{
-					Name:          "dummy-port",
-					ContainerPort: 1234,
-					Protocol:      "UDP",
-				},
-			)
-			result := v1.IsTexasContainerEqual(
-				*texasContainer,
-				alteredTexasContainer,
-			)
-			Expect(result).To(BeFalse())
-		})
-	})
-
-	Describe("validateTokenxCorrectlyConfigured", func() {
-		It("returns error when pod should have texas init container but it does not have texas init container", func() {
+		It("returns PodSecurityConfiguration with SecurityConfig and service definitions when pod is annotated to have service Texas", func() {
 			skiperatorAppName := skiperatorAppName
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -388,9 +380,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Labels: map[string]string{
 						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
-				},
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{},
+					Annotations: map[string]string{
+						v1.AccesseratorServicesAnnotation: "Texas",
+					},
 				},
 			}
 
@@ -400,129 +392,90 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Namespace: pod.Namespace,
 				},
 				Spec: v1alpha.SecurityConfigSpec{
-					Tokenx:         &v1alpha.TokenXSpec{Enabled: true},
 					ApplicationRef: skiperatorAppName,
 				},
 			}
 
-			texasContainer, getTexasErr := v1.GetTexasContainer(securityConfig)
-			Expect(getTexasErr).ToNot(HaveOccurred())
+			mockClient := utilities.GetMockKubernetesClient(scheme, &securityConfig)
+			Expect(mockClient.Get(ctx, client.ObjectKeyFromObject(&securityConfig), &securityConfig)).To(Succeed())
+			// Simulate the SecurityConfig becoming ready after being created.
+			securityConfig.Status.Ready = true
+			Expect(mockClient.Update(ctx, &securityConfig)).To(Succeed())
 
-			podSecurityConfig := v1.PodSecurityConfiguration{
-				SecurityConfig:  &securityConfig,
-				AppName:         skiperatorAppName,
-				SecurityEnabled: true,
-				TexasContainer:  *texasContainer,
-			}
-
-			validateTokenxErr := v1.ValidateTokenxCorrectlyConfigured(pod, &podSecurityConfig)
-			Expect(validateTokenxErr).To(
-				MatchError(
-					Equal(
-						fmt.Sprintf("TokenX is enabled but init container '%s' is missing", v1.TexasInitContainerName),
-					),
-				),
+			cfg, err := v1.GetPodSecurityConfiguration(
+				ctx,
+				mockClient,
+				pod,
 			)
+
+			Expect(err).ToNot(HaveOccurred())
+			texasContainer := v1.GetTexasContainer(securityConfig)
+			Expect(texasContainer).ToNot(BeNil())
+
+			Expect(cfg.SecurityConfig).To(Equal(securityConfig))
+			Expect(cfg.AppName).To(Equal(skiperatorAppName))
+			Expect(cfg.CreatedFromSkiperatorApplication).To(BeTrue())
+			Expect(cfg.AccesseratorServices).To(HaveLen(1))
+			Expect(cfg.AccesseratorServices[0].ServiceType).To(Equal(v1.Texas))
+			Expect(cfg.AccesseratorServices[0].Container).To(Equal(texasContainer))
+			Expect(cfg.AccesseratorServices[0].ValidateFunc).ToNot(BeNil())
+		})
+	})
+
+	Describe("ParseAccesseratorServices", func() {
+		It("returns [texas] when annotation is 'texas'", func() {
+			Expect(v1.ParseAccesseratorServices("texas")).To(Equal([]v1.ServiceType{v1.Texas}))
 		})
 
-		It("returns error when TokenX is enabled, texas init container is injected but texas environment variable is missing from main app container", func() {
-			skiperatorAppName := skiperatorAppName
-			securityConfig := v1alpha.SecurityConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "security-config",
-					Namespace: "ns",
-				},
-				Spec: v1alpha.SecurityConfigSpec{
-					Tokenx:         &v1alpha.TokenXSpec{Enabled: true},
-					ApplicationRef: skiperatorAppName,
-				},
-			}
-			texasContainer, getTexasErr := v1.GetTexasContainer(securityConfig)
-			Expect(getTexasErr).ToNot(HaveOccurred())
-
-			podSecurityConfig := v1.PodSecurityConfiguration{
-				SecurityConfig:  &securityConfig,
-				AppName:         skiperatorAppName,
-				SecurityEnabled: true,
-				TexasContainer:  *texasContainer,
-			}
-
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "p",
-					Namespace: securityConfig.Namespace,
-					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
-					},
-				},
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{*texasContainer},
-				},
-			}
-
-			validateTokenxErr := v1.ValidateTokenxCorrectlyConfigured(pod, &podSecurityConfig)
-			Expect(validateTokenxErr).To(
-				MatchError(
-					Equal(
-						fmt.Sprintf(
-							"TokenX is enabled but %s env var is missing for pod from skiperator app with name %s/%s",
-							pod.Namespace,
-							podSecurityConfig.AppName,
-							config.Get().TexasUrlEnvVarName,
-						),
-					),
-				),
-			)
+		It("returns [texas] when annotation is 'something ,texas, something else'", func() {
+			Expect(v1.ParseAccesseratorServices("something ,texas, something else")).To(Equal([]v1.ServiceType{v1.Texas}))
 		})
 
-		It("returns no error when TokenX is enabled, correct Texas container is injected and texas env var is injected in main app container", func() {
-			skiperatorAppName := skiperatorAppName
+		It("returns [texas] when annotation is 'texas, texxxas'", func() {
+			Expect(v1.ParseAccesseratorServices("texas, texxxas")).To(Equal([]v1.ServiceType{v1.Texas}))
+		})
+
+		It("returns [] when annotation is 'something, something else'", func() {
+			Expect(v1.ParseAccesseratorServices("something, something else")).To(BeEmpty())
+		})
+	})
+
+	Describe("GetServiceValidationFunc", func() {
+		It("errors when unknown service type is passed", func() {
+			_, err := v1.GetServiceValidationFunc(42, nil)
+			Expect(err).To(MatchError(Equal("unknown service type 'unknown'")))
+		})
+
+		It("returns a validation function that validates the Texas container when service type is texas", func() {
 			securityConfig := v1alpha.SecurityConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "security-config",
-					Namespace: "ns",
-				},
 				Spec: v1alpha.SecurityConfigSpec{
-					Tokenx:         &v1alpha.TokenXSpec{Enabled: true},
-					ApplicationRef: skiperatorAppName,
-				},
-			}
-			texasContainer, getTexasErr := v1.GetTexasContainer(securityConfig)
-			Expect(getTexasErr).ToNot(HaveOccurred())
-
-			podSecurityConfig := v1.PodSecurityConfiguration{
-				SecurityConfig:  &securityConfig,
-				AppName:         skiperatorAppName,
-				SecurityEnabled: true,
-				TexasContainer:  *texasContainer,
-			}
-
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "p",
-					Namespace: securityConfig.Namespace,
-					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+					ApplicationRef: "myapp",
+					Tokenx: &v1alpha.TokenXSpec{
+						Enabled: true,
 					},
 				},
+			}
+			texasContainer := v1.GetTexasContainer(securityConfig)
+			validationFunc, err := v1.GetServiceValidationFunc(v1.Texas, &texasContainer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(validationFunc).ToNot(BeNil())
+
+			// Validation should pass for a pod with the correct Texas init container
+			podWithTexas := &corev1.Pod{
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{*texasContainer},
 					Containers: []corev1.Container{
 						{
-							Name: podSecurityConfig.AppName,
+							Name:  "myapp",
+							Image: "image",
 							Env: []corev1.EnvVar{
-								{
-									Name:  config.Get().TexasUrlEnvVarName,
-									Value: v1.GetTexasUrlEnvVarValue(),
-								},
+								{Name: config.Get().TexasUrlEnvVarName, Value: v1.GetTexasUrlEnvVarValue()},
 							},
 						},
 					},
+					InitContainers: []corev1.Container{texasContainer},
 				},
 			}
-
-			validateTokenxErr := v1.ValidateTokenxCorrectlyConfigured(pod, &podSecurityConfig)
-			Expect(validateTokenxErr).ToNot(HaveOccurred())
+			Expect(validationFunc(*podWithTexas, securityConfig)).To(Succeed())
 		})
 	})
 })
