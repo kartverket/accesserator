@@ -316,12 +316,15 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 	exit 1
 
 .PHONY: mock-token
-mock-token: ensureflox ensurekubefwd ## Retrieves a JWT issued by mock-oauth2
-	@command -v jq >/dev/null 2>&1 || { echo -e "❌  jq is required (used to parse JSON). Please install jq and try again."; exit 1; }
+mock-token: ## Retrieves a JWT issued by mock-oauth2
+	@JQ_OUTPUT=$$($(MAKE) jq 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$JQ_OUTPUT"; exit 1; fi
+	@ENSURE_OUTPUT=$$($(MAKE) ensuremockoauth2isreachable 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$ENSURE_OUTPUT"; exit 1; fi
 	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
 		-d "grant_type=authorization_code" \
 		-d "code=code" \
-		-d "client_id=something" | jq -r '.access_token // empty'); \
+		-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
 	if [ -z "$$token" ]; then \
 		echo -e "❌  No access_token found in response"; \
 		exit 1; \
