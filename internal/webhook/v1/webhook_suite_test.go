@@ -185,12 +185,9 @@ func getWebhookEnabledNamespace(name string) *corev1.Namespace {
 	}
 }
 
-func getPod(objectKey client.ObjectKey, containerName string) *corev1.Pod {
+func getPod(objectMeta metav1.ObjectMeta, containerName string) *corev1.Pod {
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      objectKey.Name,
-			Namespace: objectKey.Namespace,
-		},
+		ObjectMeta: objectMeta,
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:  containerName,
@@ -201,7 +198,7 @@ func getPod(objectKey client.ObjectKey, containerName string) *corev1.Pod {
 }
 
 var _ = Describe("Pod mutating and validating webhook", func() {
-	It("injects a texas sidecar as an init container when pod is created from security enabled skiperator app and securityconfig enables tokenx", func() {
+	It("injects a Texas sidecar as an init container when pod is annotated correctly and securityconfig exists", func() {
 		ns := getWebhookEnabledNamespace("pod-webhook-create-ns")
 		skiperatorAppName := skiperatorAppName
 		securityConfigName := "security-config"
@@ -212,9 +209,6 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      skiperatorAppName,
 				Namespace: ns.GetName(),
-				Labels: map[string]string{
-					v1.SecurityEnabledLabelName: v1.SecurityEnabledLabelValue,
-				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, &skiperatorApp)).To(Succeed())
@@ -224,16 +218,20 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: v1alpha.SecurityConfigSpec{
-				Tokenx:         &v1alpha.TokenXSpec{Enabled: true},
 				ApplicationRef: skiperatorAppName,
 			},
 		}
 		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())
+		securityConfig.Status.Ready = true
+		Expect(k8sClient.Status().Update(ctx, &securityConfig)).To(Succeed())
 
 		pod := getPod(
-			client.ObjectKey{
+			metav1.ObjectMeta{
 				Name:      "pod-webhook-create",
 				Namespace: ns.Name,
+				Annotations: map[string]string{
+					v1.AccesseratorServicesAnnotation: "Texas",
+				},
 			},
 			skiperatorAppName,
 		)
@@ -252,42 +250,77 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 		Expect(mutatedPod.Spec.InitContainers).To(ContainElement(HaveField("Name", Equal(v1.TexasInitContainerName))))
 	})
 
-	It("does not inject a texas sidecar as an init container when pod is updated", func() {
+	It("does not inject a Texas sidecar as an init container when pod is updated to inject Texas", func() {
 		ns := getWebhookEnabledNamespace("pod-webhook-update-ns")
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
 		skiperatorAppName := skiperatorAppName
-		// Create Pod without Skiperator reference
+		securityConfigName := "security-config"
+
+		skiperatorApp := v1alpha1.Application{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      skiperatorAppName,
+				Namespace: ns.GetName(),
+			},
+		}
+		Expect(k8sClient.Create(ctx, &skiperatorApp)).To(Succeed())
+		securityConfig := v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      securityConfigName,
+				Namespace: ns.GetName(),
+			},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: skiperatorAppName,
+			},
+		}
+		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())
+		securityConfig.Status.Ready = true
+		Expect(k8sClient.Status().Update(ctx, &securityConfig)).To(Succeed())
+
+		// Create Pod with Skiperator reference
 		pod := getPod(
-			client.ObjectKey{
+			metav1.ObjectMeta{
 				Name:      "pod-webhook-update",
 				Namespace: ns.Name,
+				Annotations: map[string]string{
+					v1.AccesseratorVerifyAnnotationKey: v1.AccesseratorVerifyAnnotationValue,
+				},
+				Labels: map[string]string{
+					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+				},
 			},
 			skiperatorAppName,
 		)
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 
-		// Update Pod with Skiperator reference. This should NOT invoke injection of texas sidecar
+		// Update Pod to inject Texas. This should NOT invoke injection of Texas sidecar because the webhook should only react to creation events, not updates.
 		updatedPod := &corev1.Pod{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, updatedPod)).To(Succeed())
-		if updatedPod.Labels == nil {
-			updatedPod.Labels = make(map[string]string)
+		if updatedPod.Annotations == nil {
+			updatedPod.Annotations = make(map[string]string)
 		}
-		updatedPod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		updatedPod.Annotations[v1.AccesseratorServicesAnnotation] = "Texas"
 		Expect(k8sClient.Update(ctx, updatedPod)).To(Succeed())
 
+		// Re-fetch the pod to check the actual state after the pod is updated
+		fetchedPod := &corev1.Pod{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, fetchedPod)).To(Succeed())
+
 		// Ensure no new init containers are injected on update
-		Expect(updatedPod.Spec.InitContainers).To(BeNil())
+		Expect(fetchedPod.Spec.InitContainers).To(BeNil())
 	})
 
-	It("does not inject a texas sidecar as an init container when pod is deleted", func() {
+	It("does not inject a Texas sidecar as an init container when pod is deleted", func() {
 		ns := getWebhookEnabledNamespace("pod-webhook-delete-ns")
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
 		pod := getPod(
-			client.ObjectKey{
+			metav1.ObjectMeta{
 				Name:      "pod-webhook-delete",
 				Namespace: ns.Name,
+				Annotations: map[string]string{
+					v1.AccesseratorVerifyAnnotationValue: v1.AccesseratorVerifyAnnotationValue,
+				},
 			},
 			"c",
 		)
