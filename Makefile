@@ -548,20 +548,21 @@ $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{
 endef
 
 ### CUSTOM TARGETS ###
-ensureflox: ## Ensure Flox is installed and activated
-	@if ! command -v "flox" >/dev/null 2>&1; then \
-		echo -e "❌  Flox is not installed. Please install Flox (https://flox.dev/docs/install-flox/) and try again."; \
+ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running and that mock-oauth2 is reachable
+	@KUBEFWD_PIDS=$$(pgrep -f "kubefwd( |$$)" 2>/dev/null); \
+	if [ -z "$$KUBEFWD_PIDS" ]; then \
+		echo -e "❌  mock-oauth2 ingress is not configured."; \
+		echo -e "    Configure it with 'make mock-oauth2-ingress'"; \
 		exit 1; \
 	fi
-ifndef FLOX_ENV
-	echo -e "❌  Flox is not activated. Please activate flox with 'flox activate' and try again." && exit 1
-endif
-
-ensurekubefwd: ensureflox ## Ensure kubefwd is installed and running
-	@pgrep -f "kubefwd( |$$)" >/dev/null 2>&1 || { \
-		echo -e "❌  kubefwd is not running."; \
-		echo -e "    Start it in another terminal with:"; \
-		echo -e "      sudo kubefwd svc -n <namespace> --context $(KUBECONTEXT)"; \
+	@echo "Verifying mock-oauth2 is reachable via kubefwd..."
+	@HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" http://mock-oauth2:8080/accesserator/.well-known/openid-configuration); \
+	if [ "$$HTTP_STATUS" = "200" ]; then \
+		echo -e "✅  mock-oauth2 is reachable (HTTP 200)"; \
+	else \
+		echo -e "❌  mock-oauth2 returned HTTP $$HTTP_STATUS (expected 200)."; \
+		echo -e "    Make sure mock-oauth2 is running and that forwarding is configured."; \
+		echo -e "    This can be done with 'make mock-oauth2' and 'make mock-oauth2-ingress' respectively."; \
 		exit 1; \
-	}
+	fi
 
