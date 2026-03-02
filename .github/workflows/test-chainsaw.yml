@@ -21,7 +21,7 @@ jobs:
 
       - name: Setup Kind cluster and deploy accesserator
         run: |
-          make local deploy
+          make local deploy mock-oauth2-ingress
 
       - name: Run Chainsaw tests
         run: |
