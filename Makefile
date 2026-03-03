@@ -296,7 +296,7 @@ mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
 ##@ Helpers
 
 .PHONY: mock-oauth2-ingress
-mock-oauth2-ingress: ## Ensure mock-oauth2 is reachable via kubefwd, restarting it if necessary
+mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, restarting it if necessary
 	@KUBEFWD=$$(command -v kubefwd 2>/dev/null || echo "$(KUBEFWD)"); \
 	if [ ! -x "$$KUBEFWD" ]; then \
 		echo -e "❌  kubefwd not found. Install it or run 'make kubefwd'."; \
