@@ -64,6 +64,22 @@ isnotrunning: ## Check if accesserator is NOT running on your host machine (i.e.
 	@lsof -i :8081 > /dev/null || (echo "✅ accesserator is not running on your host. Ready to deploy." && exit 0 || echo "❌ accesserator is running on your host. Please stop it first." && exit 1)
 	@echo "✅ accesserator is not running."
 
+.PHONY: ensurerunningordeployed
+ensurerunningordeployed: ## Ensure accesserator is running on host OR deployed in cluster, but not both
+	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
+	$(MAKE) ensureaccesseratordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
+	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
+		echo "❌ Accesserator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "0" ] && [ "$$deployed" = "0" ]; then \
+		echo "❌ Accesserator is neither running on the host nor deployed in the cluster."; \
+		echo "   Start it in your IDE / with 'make run-local', or deploy it with 'make deploy'."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "1" ]; then echo "✅ Accesserator is running on the host."; fi; \
+	if [ "$$deployed" = "1" ]; then echo "✅ Accesserator is deployed in the cluster."; fi
+
 .PHONY: sourceenv
 sourceenv: ## Source environment variables from .env file
 	@set -a; [ -f .env ] && . .env; set +a
@@ -280,7 +296,7 @@ mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
 ##@ Helpers
 
 .PHONY: mock-oauth2-ingress
-mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, restarting kubefwd if necessary
+mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, restarting it if necessary
 	@echo -e "🔍  Checking if mock-oauth2 is running in the cluster..."; \
 	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=10s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) 2>/dev/null || { \
 		echo -e "❌  mock-oauth2 is not ready. Deploy it first with 'make mock-oauth2'."; \
@@ -292,46 +308,52 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 		echo -e "✅  mock-oauth2 is reachable on http://mock-oauth2.auth:8080"; \
 		exit 0; \
 	fi; \
-	echo -e "⚠️   mock-oauth2 is not reachable. Restarting kubefwd..."; \
-	echo -e "⏳  Stopping kubefwd..."; \
-	PKILL_OUTPUT=$$(sudo -E pkill -f "kubefwd" 2>&1 || true); \
-	if echo "$$PKILL_OUTPUT" | grep -q "not allowed"; then \
-		echo -e "❌  sudo is not permitted to run pkill on this machine: $$PKILL_OUTPUT"; \
-		exit 1; \
+	echo -e "⚠️   mock-oauth2 is not reachable (HTTP $$STATUS). Starting kubefwd..."; \
+	if pgrep -f "kubefwd" >/dev/null 2>&1; then \
+		echo -e "⏳  Stopping existing kubefwd..."; \
+		sudo -E pkill -f "kubefwd" || true; \
+		sleep 1; \
 	fi; \
-	echo -e "✅  kubefwd stopped"; \
-	sleep 1; \
-	echo -e "⏳  Starting kubefwd..."; \
-	KUBEFWD_OUTPUT=$$(sudo -E "$(KUBEFWD)" svc -n auth --context $(KUBECONTEXT) &> /tmp/kubefwd.log 2>&1 & echo $$?); \
-	if echo "$$KUBEFWD_OUTPUT" | grep -q "not allowed"; then \
-		echo -e "❌  sudo is not permitted to run kubefwd on this machine: $$KUBEFWD_OUTPUT"; \
-		exit 1; \
-	fi; \
-	echo -e "✅  kubefwd started"; \
+	LOG=/tmp/kubefwd.log; \
+	sudo -E "$(KUBEFWD)" svc -n auth --context $(KUBECONTEXT) 2>&1 | tee "$$LOG" > /dev/null & \
 	echo -e "⏳  Waiting for kubefwd to establish connections..."; \
 	for i in $$(seq 1 15); do \
 		sleep 2; \
-		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null); \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
 		if [ "$$STATUS" = "200" ]; then \
 			echo -e "✅  mock-oauth2 is now reachable on http://mock-oauth2.auth:8080"; \
 			exit 0; \
 		fi; \
 	done; \
-	echo -e "❌  mock-oauth2 is still not reachable after restarting kubefwd. Try to re-deploy mock-oauth2 with 'make mock-oauth2' or check /tmp/kubefwd.log for details."; \
+	echo -e "❌  mock-oauth2 is still not reachable. Check $$LOG for details."; \
 	exit 1
 
 .PHONY: mock-token
-mock-token: ## Retrieves a JWT issued by mock-oauth2
-	@JQ_OUTPUT=$$($(MAKE) jq 2>&1); \
-	if [ $$? -ne 0 ]; then echo "$$JQ_OUTPUT"; exit 1; fi
-	@ENSURE_OUTPUT=$$($(MAKE) ensuremockoauth2isreachable 2>&1); \
-	if [ $$? -ne 0 ]; then echo "$$ENSURE_OUTPUT"; exit 1; fi
-	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
-		-d "grant_type=authorization_code" \
-		-d "code=code" \
-		-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
+mock-token: jq kubectl ## Retrieves a JWT issued by mock-oauth2 (uses kubefwd if reachable, otherwise kubectl port-forward)
+	@"$(KUBECTL)" wait pod --for=condition=Ready --timeout=10s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) >/dev/null 2>&1 || { \
+		echo -e "❌  mock-oauth2 is not ready. Deploy it first with 'make mock-oauth2'." >&2; \
+		exit 1; \
+	}; \
+	if curl -s --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration >/dev/null 2>&1; then \
+		token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
+			-d "grant_type=authorization_code" \
+			-d "code=code" \
+			-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
+	else \
+		"$(KUBECTL)" port-forward -n auth svc/mock-oauth2 18080:8080 --context $(KUBECONTEXT) >/dev/null 2>&1 & \
+		PF_PID=$$!; \
+		for i in $$(seq 1 10); do \
+			sleep 1; \
+			curl -s --max-time 1 http://localhost:18080/accesserator/.well-known/openid-configuration >/dev/null 2>&1 && break; \
+		done; \
+		token=$$(curl -s -X POST "http://localhost:18080/accesserator/token" \
+			-d "grant_type=authorization_code" \
+			-d "code=code" \
+			-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
+		kill $$PF_PID 2>/dev/null; \
+	fi; \
 	if [ -z "$$token" ]; then \
-		echo -e "❌  No access_token found in response"; \
+		echo -e "❌  No access_token found in response" >&2; \
 		exit 1; \
 	fi; \
 	echo "$$token"
