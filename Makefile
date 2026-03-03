@@ -248,7 +248,7 @@ istio-gateways: istiohelm install-istio ## Install istio gateways
 	@echo "⛵️ Creating istio-gateways namespace..."
 	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
 	@echo "⬇️  Installing istio-gateways"
-	@helm install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	"$(HELM)" install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
 	@echo "✅  Istio gateways installed."
 
 .PHONY: cert-manager
