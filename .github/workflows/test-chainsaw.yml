@@ -19,6 +19,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install kubefwd
+        shell: bash
+        run: |
+          curl -L https://github.com/txn2/kubefwd/releases/download/v1.25.12/kubefwd_Linux_x86_64.tar.gz | tar xz
+          sudo mv kubefwd /usr/local/bin/
+
       - name: Setup Kind cluster and deploy accesserator
         run: |
           make local deploy mock-oauth2-ingress
