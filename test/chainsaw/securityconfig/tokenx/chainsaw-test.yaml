@@ -16,7 +16,7 @@ spec:
         - create:
             file: skiperator-application.yaml
         - create:
-            file: securityconfig.yaml
+            file: securityconfig-tokenx-disabled.yaml
         - error:
             file: jwker.yaml
         - error:
