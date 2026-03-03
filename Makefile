@@ -96,6 +96,11 @@ chainsaw-test-remote: chainsaw ensureaccesseratordeployed ## Run chainsaw tests 
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/chainsaw/securityconfig && \
         echo "✅ Tests succeeded" || (echo "❌ Tests failed" && exit 1)
 
+.PHONY: chainsaw-test-remote-single
+chainsaw-test-remote-single: chainsaw ensureaccesseratordeployed ## Run a specific chainsaw test against local kind cluster with accesserator running in the cluster. Example usage: make chainsaw-test-remote-single dir=<CHAINSAW_TEST_DIR>
+	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
+        echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
+
 .PHONY: chainsaw-test-host
 chainsaw-test-host: chainsaw install ensurelocal ensureaccesseratornotdeployed isrunning ## Run chainsaw tests against local kind cluster with accesserator running on host
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/chainsaw/securityconfig && \
