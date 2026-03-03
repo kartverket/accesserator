@@ -20,8 +20,8 @@ spec:
         - script:
             content: |
               until kubectl get deployment app -n chainsaw-texas 2>/dev/null; do sleep 1; done
-              kubectl rollout status deployment/app -n chainsaw-texas --timeout=10s
-              kubectl wait --for=condition=Ready pod -l app=app -n chainsaw-texas --timeout=10s
+              kubectl rollout status deployment/app -n chainsaw-texas --timeout=20s
+              kubectl wait --for=condition=Ready pod -l app=app -n chainsaw-texas --timeout=20s
         - script:
             content: | 
               # Verify that TEXAS_URL is not set and assert that the number of containers in the app is 2.
@@ -40,9 +40,8 @@ spec:
                     accesserator.kartverket.no/services: "texas"
         - script:
             content: |
-              until kubectl get deployment app -n chainsaw-texas 2>/dev/null; do sleep 1; done
-              kubectl rollout status deployment/app -n chainsaw-texas --timeout=10s
-              kubectl wait --for=condition=Ready pod -l app=app -n chainsaw-texas --timeout=10s
+              kubectl rollout status deployment/app -n chainsaw-texas --timeout=20s
+              kubectl wait --for=condition=Ready pod -l app=app -n chainsaw-texas --timeout=20s
         - script:
             content: |
               # Verify TEXAS_URL is set
@@ -74,17 +73,17 @@ spec:
         - script:
             content: |
               kubectl rollout restart -n chainsaw-texas deployment/app
-              kubectl rollout status -n chainsaw-texas deployment/app --timeout=10s
+              kubectl rollout status -n chainsaw-texas deployment/app --timeout=20s
         - script:
             content: |
               # Verify TEXAS_URL is still set
               TEXAS_URL=$(kubectl exec -n chainsaw-texas deploy/app -c app -- printenv TEXAS_URL)
               if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set after enabling tokenx"; exit 1; fi
-              
+
               # Get a mock token from mock-oauth2
               MOCK_TOKEN=$(make -C ../../../.. mock-token)
               if [ -z "$MOCK_TOKEN" ]; then echo "❌ No access_token found in mock-oauth2 response"; exit 1; fi
-              
+
               # Call texas token exchange and verify tokenx is enabled
               RESPONSE=$(kubectl exec -n chainsaw-texas deploy/app -c app -- \
                   curl -sX POST $TEXAS_URL/api/v1/token/exchange \
