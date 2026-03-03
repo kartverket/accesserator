@@ -294,7 +294,7 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 	fi; \
 	echo -e "⚠️   mock-oauth2 is not reachable. Restarting kubefwd..."; \
 	echo -e "⏳  Stopping kubefwd..."; \
-	PKILL_OUTPUT=$$(sudo pkill -f "kubefwd" 2>&1); \
+	PKILL_OUTPUT=$$(sudo -E pkill -f "kubefwd" 2>&1 || true); \
 	if echo "$$PKILL_OUTPUT" | grep -q "not allowed"; then \
 		echo -e "❌  sudo is not permitted to run pkill on this machine: $$PKILL_OUTPUT"; \
 		exit 1; \
@@ -302,7 +302,7 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 	echo -e "✅  kubefwd stopped"; \
 	sleep 1; \
 	echo -e "⏳  Starting kubefwd..."; \
-	KUBEFWD_OUTPUT=$$(sudo "$(KUBEFWD)" svc -n auth --context $(KUBECONTEXT) &> /tmp/kubefwd.log 2>&1 & echo $$?); \
+	KUBEFWD_OUTPUT=$$(sudo -E "$(KUBEFWD)" svc -n auth --context $(KUBECONTEXT) &> /tmp/kubefwd.log 2>&1 & echo $$?); \
 	if echo "$$KUBEFWD_OUTPUT" | grep -q "not allowed"; then \
 		echo -e "❌  sudo is not permitted to run kubefwd on this machine: $$KUBEFWD_OUTPUT"; \
 		exit 1; \
