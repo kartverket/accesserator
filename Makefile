@@ -329,31 +329,17 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 	exit 1
 
 .PHONY: mock-token
-mock-token: jq kubectl ## Retrieves a JWT issued by mock-oauth2 (uses kubefwd if reachable, otherwise kubectl port-forward)
-	@"$(KUBECTL)" wait pod --for=condition=Ready --timeout=10s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) >/dev/null 2>&1 || { \
-		echo -e "❌  mock-oauth2 is not ready. Deploy it first with 'make mock-oauth2'." >&2; \
-		exit 1; \
-	}; \
-	if curl -s --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration >/dev/null 2>&1; then \
-		token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
-			-d "grant_type=authorization_code" \
-			-d "code=code" \
-			-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
-	else \
-		"$(KUBECTL)" port-forward -n auth svc/mock-oauth2 18080:8080 --context $(KUBECONTEXT) >/dev/null 2>&1 & \
-		PF_PID=$$!; \
-		for i in $$(seq 1 10); do \
-			sleep 1; \
-			curl -s --max-time 1 http://localhost:18080/accesserator/.well-known/openid-configuration >/dev/null 2>&1 && break; \
-		done; \
-		token=$$(curl -s -X POST "http://localhost:18080/accesserator/token" \
-			-d "grant_type=authorization_code" \
-			-d "code=code" \
-			-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
-		kill $$PF_PID 2>/dev/null; \
-	fi; \
+mock-token: ## Retrieves a JWT issued by mock-oauth2
+	@JQ_OUTPUT=$$($(MAKE) jq 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$JQ_OUTPUT"; exit 1; fi
+	@ENSURE_OUTPUT=$$($(MAKE) ensuremockoauth2isreachable 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$ENSURE_OUTPUT"; exit 1; fi
+	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
+		-d "grant_type=authorization_code" \
+		-d "code=code" \
+		-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
 	if [ -z "$$token" ]; then \
-		echo -e "❌  No access_token found in response" >&2; \
+		echo -e "❌  No access_token found in response"; \
 		exit 1; \
 	fi; \
 	echo "$$token"
