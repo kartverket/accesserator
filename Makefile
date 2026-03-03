@@ -296,8 +296,13 @@ mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
 ##@ Helpers
 
 .PHONY: mock-oauth2-ingress
-mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, restarting it if necessary
-	@echo -e "🔍  Checking if mock-oauth2 is running in the cluster..."; \
+mock-oauth2-ingress: ## Ensure mock-oauth2 is reachable via kubefwd, restarting it if necessary
+	@KUBEFWD=$$(command -v kubefwd 2>/dev/null || echo "$(KUBEFWD)"); \
+	if [ ! -x "$$KUBEFWD" ]; then \
+		echo -e "❌  kubefwd not found. Install it or run 'make kubefwd'."; \
+		exit 1; \
+	fi; \
+	echo -e "🔍  Checking if mock-oauth2 is running in the cluster..."; \
 	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=10s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) 2>/dev/null || { \
 		echo -e "❌  mock-oauth2 is not ready. Deploy it first with 'make mock-oauth2'."; \
 		exit 1; \
@@ -309,13 +314,13 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 		exit 0; \
 	fi; \
 	echo -e "⚠️   mock-oauth2 is not reachable (HTTP $$STATUS). Starting kubefwd..."; \
-	if pgrep -f "kubefwd" >/dev/null 2>&1; then \
+	if pgrep -x "kubefwd" >/dev/null 2>&1; then \
 		echo -e "⏳  Stopping existing kubefwd..."; \
-		sudo -E pkill -f "kubefwd" || true; \
+		sudo -E pkill -x "kubefwd" || true; \
 		sleep 1; \
 	fi; \
 	LOG=/tmp/kubefwd.log; \
-	sudo -E "$(KUBEFWD)" svc -n auth --context $(KUBECONTEXT) 2>&1 | tee "$$LOG" > /dev/null & \
+	sudo -E "$$KUBEFWD" svc -n auth --context $(KUBECONTEXT) 2>&1 | tee "$$LOG" > /dev/null & \
 	echo -e "⏳  Waiting for kubefwd to establish connections..."; \
 	for i in $$(seq 1 15); do \
 		sleep 2; \
@@ -339,7 +344,7 @@ mock-token: ## Retrieves a JWT issued by mock-oauth2
 		-d "code=code" \
 		-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
 	if [ -z "$$token" ]; then \
-		echo -e "❌  No access_token found in response"; \
+		echo -e "❌  No access_token found in response" >&2; \
 		exit 1; \
 	fi; \
 	echo "$$token"
