@@ -287,7 +287,7 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 		exit 1; \
 	}; \
 	echo -e "✅  mock-oauth2 is ready"; \
-	STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null); \
+	STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
 	if [ "$$STATUS" = "200" ]; then \
 		echo -e "✅  mock-oauth2 is reachable on http://mock-oauth2.auth:8080"; \
 		exit 0; \
