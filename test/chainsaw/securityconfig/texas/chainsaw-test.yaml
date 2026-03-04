@@ -56,7 +56,7 @@ spec:
               echo "✅ TEXAS_URL=$TEXAS_URL"
 
               # Get a mock token from mock-oauth2
-              MOCK_TOKEN=$(make -C ../../../.. mock-token)
+              MOCK_TOKEN=$(make -s --no-print-directory -C ../../../.. mock-token)
               if [ -z "$MOCK_TOKEN" ]; then echo "❌ No access_token found in mock-oauth2 response"; exit 1; fi
               echo "✅ Got mock token (length: ${#MOCK_TOKEN})"
 
@@ -102,7 +102,7 @@ spec:
               echo "✅ TEXAS_URL=$TEXAS_URL"
 
               # Get a mock token from mock-oauth2
-              MOCK_TOKEN=$(make -C ../../../.. mock-token)
+              MOCK_TOKEN=$(make -s --no-print-directory -C ../../../.. mock-token)
               if [ -z "$MOCK_TOKEN" ]; then echo "❌ No access_token found in mock-oauth2 response"; exit 1; fi
               echo "✅ Got mock token (length: ${#MOCK_TOKEN})"
 
