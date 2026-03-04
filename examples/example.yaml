@@ -16,7 +16,7 @@ spec:
   port: 8080
   podSettings:
     annotations:
-      accesserator.kartverket.no/verify: "true"
+      accesserator.kartverket.no/verify-securityconfig: "true"
       accesserator.kartverket.no/services: "texas"
   replicas: 1
   accessPolicy:
@@ -44,7 +44,7 @@ spec:
   port: 8080
   podSettings:
     annotations:
-      accesserator.kartverket.no/verify: "true"
+      accesserator.kartverket.no/verify-securityconfig: "true"
       accesserator.kartverket.no/services: "texas"
   replicas: 1
   accessPolicy:
