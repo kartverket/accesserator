@@ -159,7 +159,18 @@ endif
 deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomize docker-build ## Deploy accesserator and all the required resources for accesserator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
-	"$(KUBECTL)" create secret generic accesserator-env --from-env-file=.env -n accesserator-system --context $(KUBECONTEXT)
+	@if [ ! -f .env ]; then \
+		echo "❌ .env file not found. Create one before deploying."; \
+		exit 1; \
+	fi
+	@if "$(KUBECTL)" get secret accesserator-env -n accesserator-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
+		echo "⏳ Updating existing accesserator-env secret..."; \
+		"$(KUBECTL)" create secret generic accesserator-env --from-env-file=.env -n accesserator-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
+		"$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; \
+	else \
+		echo "⏳ Creating accesserator-env secret..."; \
+		"$(KUBECTL)" create secret generic accesserator-env --from-env-file=.env -n accesserator-system --context $(KUBECONTEXT); \
+	fi
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 
@@ -175,7 +186,7 @@ webhooks: kustomize ## Extract webhook certificate details
 	@/bin/bash ./scripts/get-webhook-certs.sh
 
 .PHONY: install
-install: kustomize generate ## Install CRDs, Webhook configurations and ClusterRoles into the K8s cluster specified in ~/.kube/config.
+install: kustomize generate ## Install CRDs, Webhook configurations and ClusterRoles into the local kind cluster.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No CRDs to install; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
@@ -184,7 +195,7 @@ install: kustomize generate ## Install CRDs, Webhook configurations and ClusterR
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi
 
 .PHONY: uninstall
-uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations and ClusterRoles from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations and ClusterRoles from the local kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No CRDs to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
@@ -339,7 +350,12 @@ ensurelocal: kind kubectl ## Ensure local environment is set up with necessary t
 
 .PHONY: ensureaccesseratornotdeployed
 ensureaccesseratornotdeployed: kubectl ## Ensure accesserator is NOT deployed in the kind cluster
-	"$(KUBECTL)" -n accesserator-system get deployment accesserator >/dev/null 2>&1 && (echo "❌ Accesserator IS deployed to the cluster" && exit 1) || (echo "✅ Accesserator IS NOT deployed to the cluster" && exit 0)
+	@if "$(KUBECTL)" -n accesserator-system get deployment accesserator >/dev/null 2>&1; then \
+		echo "❌ Accesserator IS deployed to the cluster"; \
+		exit 1; \
+	else \
+		echo "✅ Accesserator IS NOT deployed to the cluster"; \
+	fi
 
 .PHONY: ensureaccesseratordeployed
 ensureaccesseratordeployed: kubectl ensurelocal isnotrunning ## Ensure accesserator is deployed in the kind cluster
