@@ -1,10 +1,10 @@
 package v1
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	"golang.org/x/net/context"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
