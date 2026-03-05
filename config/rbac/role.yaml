@@ -5,13 +5,6 @@ metadata:
   name: accesserator
 rules:
 - apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-- apiGroups:
   - accesserator.kartverket.no
   resources:
   - securityconfigs
@@ -37,6 +30,13 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
 - apiGroups:
   - nais.io
   resources:

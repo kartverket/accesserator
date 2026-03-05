@@ -8,6 +8,7 @@ import (
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -78,15 +79,28 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 	}
 	if !podSecurityConfig.CreatedFromSkiperatorApplication {
 		// Only mutate Pods that are created from Skiperator Applications.
+		podlog.Info("Pod is not created from Skiperator Application, skipping mutation", "skiperatorAppName", types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      podSecurityConfig.AppName,
+		})
 		return nil
 	}
 
 	if len(podSecurityConfig.AccesseratorServices) > 0 {
 		for _, svc := range podSecurityConfig.AccesseratorServices {
+			podlog.Info("Mutating Pod from Skiperator app", "app", types.NamespacedName{
+				Namespace: pod.Namespace,
+				Name:      podSecurityConfig.AppName,
+			}, "serviceType", svc.ServiceType.String())
 			if mutateErr := svc.MutateFunc(pod, podSecurityConfig.SecurityConfig); mutateErr != nil {
 				return mutateErr
 			}
 		}
+	} else {
+		podlog.Info("No Accesserator services to mutate for Pod", "pod", types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Name,
+		})
 	}
 
 	return nil
@@ -123,13 +137,28 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 	}
 	if !podSecurityConfig.CreatedFromSkiperatorApplication {
 		// Only validate Pods that are created from Skiperator Applications.
+		podlog.Info("Pod is not created from Skiperator Application, skipping validation", "pod", types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Name,
+		})
 		return nil, nil
 	}
 
-	for _, svc := range podSecurityConfig.AccesseratorServices {
-		if validateErr := svc.ValidateFunc(*pod, podSecurityConfig.SecurityConfig); validateErr != nil {
-			return nil, validateErr
+	if len(podSecurityConfig.AccesseratorServices) > 0 {
+		for _, svc := range podSecurityConfig.AccesseratorServices {
+			podlog.Info("Validating Pod", "pod", types.NamespacedName{
+				Namespace: pod.Namespace,
+				Name:      pod.Name,
+			}, "serviceType", svc.ServiceType.String())
+			if validateErr := svc.ValidateFunc(*pod, podSecurityConfig.SecurityConfig); validateErr != nil {
+				return nil, validateErr
+			}
 		}
+	} else {
+		podlog.Info("No Accesserator services to validate for Pod", "pod", types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Name,
+		})
 	}
 
 	return nil, nil
@@ -163,25 +192,20 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 	verifyAnnotation, hasVerify := pod.Annotations[AccesseratorVerifyAnnotationKey]
 	servicesAnnotation, hasServices := pod.Annotations[AccesseratorServicesAnnotation]
 
-	if !hasVerify && !hasServices {
+	shouldFetchSecurityConfig := (hasVerify && verifyAnnotation == AccesseratorVerifyAnnotationValue) || hasServices
+	if !shouldFetchSecurityConfig {
 		return &PodSecurityConfiguration{
 			AppName:                          appName,
 			CreatedFromSkiperatorApplication: true,
 		}, nil
 	}
 
-	shouldFetchSecurityConfig := (hasVerify && verifyAnnotation == AccesseratorVerifyAnnotationValue) || hasServices
-
-	var securityConfig v1alpha.SecurityConfig
-	if shouldFetchSecurityConfig {
-		retrieved, err := GetSecurityConfigForApplication(ctx, k8sClient, client.ObjectKey{
-			Namespace: pod.Namespace,
-			Name:      appName,
-		})
-		if err != nil {
-			return nil, err
-		}
-		securityConfig = *retrieved
+	securityConfig, err := GetSecurityConfigForApplication(ctx, k8sClient, client.ObjectKey{
+		Namespace: pod.Namespace,
+		Name:      appName,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	var serviceTypes []ServiceType
@@ -191,19 +215,19 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 
 	if len(serviceTypes) == 0 {
 		return &PodSecurityConfiguration{
-			SecurityConfig:                   securityConfig,
+			SecurityConfig:                   *securityConfig,
 			AppName:                          appName,
 			CreatedFromSkiperatorApplication: true,
 		}, nil
 	}
 
-	accesseratorServices, err := BuildAccesseratorServices(serviceTypes, securityConfig)
+	accesseratorServices, err := BuildAccesseratorServices(serviceTypes, *securityConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PodSecurityConfiguration{
-		SecurityConfig:                   securityConfig,
+		SecurityConfig:                   *securityConfig,
 		AppName:                          appName,
 		CreatedFromSkiperatorApplication: true,
 		AccesseratorServices:             accesseratorServices,
