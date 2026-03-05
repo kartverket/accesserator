@@ -13,9 +13,11 @@ import (
 )
 
 var _ = Describe("pod_webhook.go unit tests", func() {
+
+	const applicationRef = "myapp"
+
 	Describe("GetTexasContainer", func() {
 		It("builds a Texas init container with tokenx enabled then tokenx is enabled in SecurityConfig", func() {
-			applicationRef := "myapp"
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -47,7 +49,6 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 	Describe("GetTexasEnvVars", func() {
 		It("returns env vars with tokenx disabled and no integration secrets when tokenx is not configured in SecurityConfig", func() {
-			applicationRef := "myapp"
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -59,7 +60,6 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 
 		It("returns env vars with tokenx disabled and no integration secrets when tokenx is disabled in SecurityConfig", func() {
-			applicationRef := "myapp"
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -74,7 +74,6 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 
 		It("returns env vars with tokenx enabled and the expected integration secret ref when tokenx is enabled in SecurityConfig", func() {
-			applicationRef := "myapp"
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -104,7 +103,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Tokenx: &v1alpha.TokenXSpec{
 						Enabled: true,
 					},
-					ApplicationRef: "myapp",
+					ApplicationRef: applicationRef,
 				}}
 			a := v1.GetTexasContainer(securityConfig)
 			b := v1.GetTexasContainer(securityConfig)
@@ -119,7 +118,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		It("returns an error when the pod already has a texas init container", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: "myapp",
+					ApplicationRef: applicationRef,
 				},
 			}
 			pod := &corev1.Pod{
@@ -133,16 +132,15 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 
 		It("mutates the pod with the Texas init container when no init container with the same name exists", func() {
-			appName := "myapp"
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: appName,
+					ApplicationRef: applicationRef,
 				},
 			}
 			pod := corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: appName},
+						{Name: applicationRef},
 					},
 				},
 			}
@@ -154,12 +152,11 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 	Describe("MutatePodWithTexasURLEnvVar", func() {
 		It("returns an error when the target container already has the Texas URL env var", func() {
-			appName := "myapp"
 			pod := corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name: appName,
+							Name: applicationRef,
 							Env: []corev1.EnvVar{
 								{Name: config.Get().TexasUrlEnvVarName, Value: v1.GetTexasUrlEnvVarValue()},
 							},
@@ -167,19 +164,18 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			Expect(v1.MutatePodWithTexasURLEnvVar(&pod, appName)).To(MatchError(fmt.Sprintf("container %s already has env var %s", appName, config.Get().TexasUrlEnvVarName)))
+			Expect(v1.MutatePodWithTexasURLEnvVar(&pod, applicationRef)).To(MatchError(fmt.Sprintf("container %s already has env var %s", applicationRef, config.Get().TexasUrlEnvVarName)))
 		})
 
 		It("mutates the pod with the Texas URL env var when the target container does not already have it", func() {
-			appName := "myapp"
 			pod := corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: appName},
+						{Name: applicationRef},
 					},
 				},
 			}
-			Expect(v1.MutatePodWithTexasURLEnvVar(&pod, appName)).To(Succeed())
+			Expect(v1.MutatePodWithTexasURLEnvVar(&pod, applicationRef)).To(Succeed())
 			Expect(pod.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: config.Get().TexasUrlEnvVarName, Value: v1.GetTexasUrlEnvVarValue()}))
 		})
 	})
@@ -188,7 +184,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		It("returns an error when the Texas init container is missing", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: "myapp",
+					ApplicationRef: applicationRef,
 				},
 			}
 			texasInitContainer := v1.GetTexasContainer(securityConfig)
@@ -212,7 +208,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		It("returns an error when the Texas init container is present but not correctly configured", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: "myapp",
+					ApplicationRef: applicationRef,
 				},
 			}
 			texasInitContainer := v1.GetTexasContainer(securityConfig)
@@ -238,7 +234,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		It("succeeds when the Texas init container is present and correctly configured", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: "myapp",
+					ApplicationRef: applicationRef,
 				},
 			}
 			texasInitContainer := v1.GetTexasContainer(securityConfig)
@@ -253,7 +249,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 	Describe("ValidateTexasURLEnvVar", func() {
 		It("returns an error when the Texas URL env var is missing", func() {
-			applicationRef := "myapp"
+			applicationRef := applicationRef
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -280,7 +276,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 
 		It("returns an error when the Texas URL env var is present but has the wrong value", func() {
-			applicationRef := "myapp"
+			applicationRef := applicationRef
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -312,7 +308,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 
 		It("succeeds when the Texas URL env var is present and has the correct value", func() {
-			applicationRef := "myapp"
+			applicationRef := applicationRef
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
