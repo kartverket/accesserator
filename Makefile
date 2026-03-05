@@ -64,22 +64,6 @@ isnotrunning: ## Check if accesserator is NOT running on your host machine (i.e.
 	@lsof -i :8081 > /dev/null || (echo "✅ accesserator is not running on your host. Ready to deploy." && exit 0 || echo "❌ accesserator is running on your host. Please stop it first." && exit 1)
 	@echo "✅ accesserator is not running."
 
-.PHONY: ensurerunningordeployed
-ensurerunningordeployed: ## Ensure accesserator is running on host OR deployed in cluster, but not both
-	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
-	$(MAKE) ensureaccesseratordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
-	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
-		echo "❌ Accesserator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
-		exit 1; \
-	fi; \
-	if [ "$$running" = "0" ] && [ "$$deployed" = "0" ]; then \
-		echo "❌ Accesserator is neither running on the host nor deployed in the cluster."; \
-		echo "   Start it in your IDE / with 'make run-local', or deploy it with 'make deploy'."; \
-		exit 1; \
-	fi; \
-	if [ "$$running" = "1" ]; then echo "✅ Accesserator is running on the host."; fi; \
-	if [ "$$deployed" = "1" ]; then echo "✅ Accesserator is deployed in the cluster."; fi
-
 .PHONY: sourceenv
 sourceenv: ## Source environment variables from .env file
 	@set -a; [ -f .env ] && . .env; set +a
@@ -360,6 +344,22 @@ ensureaccesseratornotdeployed: kubectl ## Ensure accesserator is NOT deployed in
 .PHONY: ensureaccesseratordeployed
 ensureaccesseratordeployed: kubectl ensurelocal isnotrunning ## Ensure accesserator is deployed in the kind cluster
 	@/bin/bash ./scripts/ensure-accesserator-deployed.sh || (echo "❌ Accesserator resources are not deployed correctly to the cluster. To fix it, run 'make deploy'." && exit 1)
+
+.PHONY: ensurerunningordeployed
+ensurerunningordeployed: ## Ensure accesserator is running on host OR deployed in cluster, but not both
+	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
+	$(MAKE) ensureaccesseratordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
+	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
+		echo "❌ Accesserator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "0" ] && [ "$$deployed" = "0" ]; then \
+		echo "❌ Accesserator is neither running on the host nor deployed in the cluster."; \
+		echo "   Start it in your IDE / with 'make run-local', or deploy it with 'make deploy'."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "1" ]; then echo "✅ Accesserator is running on the host."; fi; \
+	if [ "$$deployed" = "1" ]; then echo "✅ Accesserator is deployed an running in the local cluster."; fi
 
 ##@ Dependencies
 
