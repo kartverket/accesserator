@@ -163,25 +163,20 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 	verifyAnnotation, hasVerify := pod.Annotations[AccesseratorVerifyAnnotationKey]
 	servicesAnnotation, hasServices := pod.Annotations[AccesseratorServicesAnnotation]
 
-	if !hasVerify && !hasServices {
+	shouldFetchSecurityConfig := (hasVerify && verifyAnnotation == AccesseratorVerifyAnnotationValue) || hasServices
+	if !shouldFetchSecurityConfig {
 		return &PodSecurityConfiguration{
 			AppName:                          appName,
 			CreatedFromSkiperatorApplication: true,
 		}, nil
 	}
 
-	shouldFetchSecurityConfig := (hasVerify && verifyAnnotation == AccesseratorVerifyAnnotationValue) || hasServices
-
-	var securityConfig v1alpha.SecurityConfig
-	if shouldFetchSecurityConfig {
-		retrieved, err := GetSecurityConfigForApplication(ctx, k8sClient, client.ObjectKey{
-			Namespace: pod.Namespace,
-			Name:      appName,
-		})
-		if err != nil {
-			return nil, err
-		}
-		securityConfig = *retrieved
+	securityConfig, err := GetSecurityConfigForApplication(ctx, k8sClient, client.ObjectKey{
+		Namespace: pod.Namespace,
+		Name:      appName,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	var serviceTypes []ServiceType
@@ -191,19 +186,19 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 
 	if len(serviceTypes) == 0 {
 		return &PodSecurityConfiguration{
-			SecurityConfig:                   securityConfig,
+			SecurityConfig:                   *securityConfig,
 			AppName:                          appName,
 			CreatedFromSkiperatorApplication: true,
 		}, nil
 	}
 
-	accesseratorServices, err := BuildAccesseratorServices(serviceTypes, securityConfig)
+	accesseratorServices, err := BuildAccesseratorServices(serviceTypes, *securityConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PodSecurityConfiguration{
-		SecurityConfig:                   securityConfig,
+		SecurityConfig:                   *securityConfig,
 		AppName:                          appName,
 		CreatedFromSkiperatorApplication: true,
 		AccesseratorServices:             accesseratorServices,
