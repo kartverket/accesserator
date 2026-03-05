@@ -45,7 +45,6 @@ spec:
   podSettings:
     annotations:
       accesserator.kartverket.no/verify-securityconfig: "true"
-      accesserator.kartverket.no/services: "texas"
   replicas: 1
   accessPolicy:
     inbound:
