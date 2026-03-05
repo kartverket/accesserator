@@ -1,38 +1,24 @@
 # Accesserator
 
-Accesserator is a Kubernetes operator that introduces the `SecurityConfig` CRD and uses it to configure security capabilities and make them available for [Skiperator](https://github.com/kartverket/skiperator) applications.
+Accesserator is a Kubernetes operator that lets users configure security capabilities and 
+make them available for [Skiperator](https://github.com/kartverket/skiperator) applications through a custom resource called `SecurityConfig`. 
+To make the security capabilities easily available for the pod created by the Skiperator application, accesserator injects a sidecar container called 
+[texas](https://github.com/nais/texas) into the application pod. Texas is a sidecar container that provides an API for applications to request different token-related operations, 
+such as retrieval of access tokens, token exchange and token introspection. The API-documentation for the texas sidecar container can be found in [here](https://editor.swagger.io/?url=https://raw.githubusercontent.com/nais/texas/refs/heads/master/doc/openapi-spec.json).
 
-## 🔍 What Accesserator does
-A `SecurityConfig` defines which security capabilities should be created and made available for a Skiperator application referenced by `applicationRef`. 
-Accesserator does this by injecting a sidecar container, called **texas** into the application pod that implements the desired security capabilities.
-Texas is an API that can perform various token-related activities, and the documentation of the API can be viewed [here](https://editor.swagger.io/?url=https://raw.githubusercontent.com/nais/texas/refs/heads/master/doc/openapi-spec.json).
-Texas is configurable through the `SecurityConfig` spec, which can be viewed [here](api-docs.md).
-- `spec.tokenx.enabled` indicates whether the token exchange (TokenX) capability should be configured for the referenced application. If this is set to `true`,
-the Skiperator application will be able to exchange tokens for the application referred to by `applicationRef` as the intended audience, **as long as the [access policies](https://skip.kartverket.no/docs/applikasjon-utrulling/skiperator/api-docs#applicationspecaccesspolicy) in the Skiperator `Application` manifest allow it**.
+The injection of `texas` is controlled through a pod annotation called `accesserator.kartverket.no/services`, which can be set in the Skiperator `Application` 
+through the field `spec.podSettings.annotations`. If the annotation is set to `accesserator.kartverket.no/services: texas`, 
+accesserator will inject the `texas` sidecar into the application pod and configure it according to the `SecurityConfig` that references the application. 
+The accepted fields of `SecurityConfig`  can be found in the [API reference](api-docs.md) below.
 
-> [!IMPORTANT]
-> In order for the Skiperator application pod to get a Texas sidecar container, the pod must be annotated with `accesserator.kartverket.no/services: texas`. 
-> This can be achieved in the `Application` manifest through the field `spec.podSettings.annotations`.
-> If you do not want texas, but you still want accesserator to verify that you have configured a `SercurityConfig` for your application,
-> you can set the annotation `accesserator.kartverket.no/verify: true`. This will make accesserator verify that you have ONE `SecurityConfig` for your application, and deny the pod creation if this is not the case.
+> [!TIP]
+> If you do not want the `texas` sidecar, but you still want accesserator to verify that you have configured a `SercurityConfig` for your application, 
+> you can set the annotation `accesserator.kartverket.no/verify-securityconfig: true`. This will make accesserator verify that you have ONE `SecurityConfig` for your application, 
+> and deny the pod creation if this is not the case.
 
-## 🔧 Example
-See `examples/example.yaml` for a complete example with a namespace, Skiperator `Application`, and corresponding `SecurityConfig`.
-
-A minimal `SecurityConfig` example:
-
-```yaml
-apiVersion: accesserator.kartverket.no/v1alpha
-kind: SecurityConfig
-metadata:
-  name: security-config-app
-  namespace: test
-spec:
-  tokenx:
-    enabled: true
-  applicationRef: app
-```
+## 🔧 Examples
+In the [examples](examples/) directory, you can find examples on how to configure different security capabilities with accesserator.
 
 ## 🧪 Local development
 
-Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to run and test Accesserator locally.
+Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to run and test accesserator locally.
