@@ -3,7 +3,7 @@
 
 To run Accesserator locally, you need to have go >= 1.25.7 installed on your machine. 
 You also need some other tools to set up and interact with the local Kubernetes cluster. All these 
-dependencies are bundled together with [Flox environment](https://flox.dev/), which is a tool that provides a consistent development environment across different machines. 
+dependencies are bundled together with a [Flox environment](https://flox.dev/), which is a tool that provides a consistent development environment across different machines. 
 You can install Flox by following the instructions on their [website](https://flox.dev/docs/install-flox/install).
 
 To activate the Flox environment for this project, run the following command in the terminal:
@@ -70,4 +70,8 @@ make deploy
 You can then run the end-to-end tests with
 ```bash
 make chainsaw-test-remote
+```
+or run a single test with
+```bash
+make chainsaw-test-remote-single dir=<TEST FOLDER>
 ```

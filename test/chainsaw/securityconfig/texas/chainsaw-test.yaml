@@ -1,0 +1,126 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: texas
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-texas
+      labels:
+        accesserator-webhooks: enabled
+        istio.io/rev: default
+  steps:
+    - try:
+        - create:
+            file: skiperator-application-app.yaml
+        - create:
+            file: securityconfig-app-tokenx-disabled.yaml
+        - create:
+            file: skiperator-application-another-app.yaml
+        - create:
+            file: securityconfig-another-app-tokenx-enabled.yaml
+        - error:
+            file: pod-with-texas-without-tokenx.yaml
+        - error:
+            file: pod-with-texas-with-tokenx.yaml
+        - assert:
+            file: pod-without-texas.yaml
+        - script:
+            content: | 
+              # Verify that TEXAS_URL is not set and assert that the number of containers in the app is 2.
+              kubectl exec -n chainsaw-texas deploy/app -c app -- printenv TEXAS_URL && exit 1 || exit 0
+        - patch:
+            resource:
+              apiVersion: skiperator.kartverket.no/v1alpha1
+              kind: Application
+              metadata:
+                name: app
+              spec:
+                podSettings:
+                  annotations:
+                    accesserator.kartverket.no/services: "texas"
+        - error:
+            file: pod-with-texas-with-tokenx.yaml
+        - error:
+            file: pod-without-texas.yaml
+        - assert:
+            file: pod-with-texas-without-tokenx.yaml
+        - script:
+            content: |
+              # Verify TEXAS_URL is set
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas deploy/app -c app -- printenv TEXAS_URL)
+              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set"; exit 1; fi
+              echo "✅ TEXAS_URL=$TEXAS_URL"
+
+              # Get a mock token from mock-oauth2
+              MOCK_TOKEN=$(make -s --no-print-directory -C ../../../.. mock-token)
+              if [ -z "$MOCK_TOKEN" ]; then echo "❌ No access_token found in mock-oauth2 response"; exit 1; fi
+              echo "✅ Got mock token (length: ${#MOCK_TOKEN})"
+
+              # Write request body to a temp file to avoid shell interpolation of special characters
+              printf '{"identity_provider":"tokenx","target":"kind-accesserator:chainsaw-texas:another-app","user_token":"%s"}' "$MOCK_TOKEN" > /tmp/token-exchange-body.json
+              echo "Request body: $(cat /tmp/token-exchange-body.json)"
+
+              # Call texas token exchange and verify tokenx is disabled
+              RESPONSE=$(kubectl exec -n chainsaw-texas deploy/app -c app -- \
+                curl -sX POST $TEXAS_URL/api/v1/token/exchange \
+                  -H "Content-Type: application/json" \
+                  -d "{\"identity_provider\":\"tokenx\",\"target\":\"kind-accesserator:chainsaw-texas:another-app\",\"user_token\":\"$MOCK_TOKEN\"}")
+              ERROR=$(echo "$RESPONSE" | jq -r '.error // empty')
+              if [ "$ERROR" != "invalid_request" ]; then echo "❌ Expected invalid_request error, got: $ERROR"; exit 1; fi
+              ERROR_DESC=$(echo "$RESPONSE" | jq -r '.error_description // empty')
+              if [ "$ERROR_DESC" != "identity provider 'tokenx' is not enabled" ]; then echo "❌ Unexpected error_description: $ERROR_DESC"; exit 1; fi
+              echo "✅ Texas correctly reports tokenx is not enabled"
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config-app
+              spec:
+                tokenx:
+                  enabled: true
+        - script:
+            content: |
+              kubectl rollout restart deploy/app -n chainsaw-texas
+              # Wait for the app deployment to be ready again after the restart
+              kubectl wait --for=condition=available --timeout=20s deploy/app -n chainsaw-texas
+        - error:
+            file: pod-with-texas-without-tokenx.yaml
+        - error:
+            file: pod-without-texas.yaml
+        - assert:
+            file: pod-with-texas-with-tokenx.yaml
+        - script:
+            content: |
+              # Verify TEXAS_URL is still set
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas deploy/app -c app -- printenv TEXAS_URL)
+              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set after enabling tokenx"; exit 1; fi
+              echo "✅ TEXAS_URL=$TEXAS_URL"
+
+              # Get a mock token from mock-oauth2
+              MOCK_TOKEN=$(make -s --no-print-directory -C ../../../.. mock-token)
+              if [ -z "$MOCK_TOKEN" ]; then echo "❌ No access_token found in mock-oauth2 response"; exit 1; fi
+              echo "✅ Got mock token (length: ${#MOCK_TOKEN})"
+
+              # Write request body to a temp file to avoid shell interpolation of special characters
+              printf '{"identity_provider":"tokenx","target":"kind-accesserator:chainsaw-texas:another-app","user_token":"%s"}' "$MOCK_TOKEN" > /tmp/token-exchange-body.json
+              echo "Request body: $(cat /tmp/token-exchange-body.json)"
+
+              # Call texas token exchange and verify tokenx is enabled
+              RESPONSE=$(kubectl exec -n chainsaw-texas deploy/app -c app -- \
+                  curl -sX POST $TEXAS_URL/api/v1/token/exchange \
+                  -H "Content-Type: application/json" \
+                  -d "{\"identity_provider\":\"tokenx\",\"target\":\"kind-accesserator:chainsaw-texas:another-app\",\"user_token\":\"$MOCK_TOKEN\"}" \
+                  -w "\n%{http_code}")
+              echo "Response: $RESPONSE"
+              HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+              BODY=$(echo "$RESPONSE" | awk 'NR>1{print prev} {prev=$0}')
+              if [ "$HTTP_CODE" != "200" ]; then echo "❌ Expected HTTP 200, got: $HTTP_CODE. Body: $BODY"; exit 1; fi
+              ACCESS_TOKEN=$(echo "$BODY" | jq -r '.access_token // empty')
+              if [ -z "$ACCESS_TOKEN" ]; then echo "❌ access_token is empty. Body: $BODY"; exit 1; fi
+              if ! echo "$ACCESS_TOKEN" | grep -q "^ey"; then echo "❌ access_token does not start with 'ey': $ACCESS_TOKEN"; exit 1; fi
+              echo "✅ Texas correctly returned a valid access_token with tokenx enabled"

@@ -3,10 +3,10 @@ kind: Application
 metadata:
   name: app
 spec:
-  image: nginxinc/nginx-unprivileged:latest
+  image: nginxinc/nginx-unprivileged@sha256:0ac6770a4747ee05799deba85731496e001bbfdcd204a27f364090fa9ad77157
   port: 8080
   accessPolicy:
-    outbound:
+    inbound:
       rules:
         - application: mock-oauth2
           namespace: auth

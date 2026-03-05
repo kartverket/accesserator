@@ -96,13 +96,18 @@ chainsaw-test-remote: chainsaw ensureaccesseratordeployed ## Run chainsaw tests 
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/chainsaw/securityconfig && \
         echo "✅ Tests succeeded" || (echo "❌ Tests failed" && exit 1)
 
+.PHONY: chainsaw-test-remote-single
+chainsaw-test-remote-single: chainsaw ensureaccesseratordeployed ## Run a specific chainsaw test against local kind cluster with accesserator running in the cluster. Example usage: make chainsaw-test-remote-single dir=<CHAINSAW_TEST_DIR>
+	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
+        echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
+
 .PHONY: chainsaw-test-host
 chainsaw-test-host: chainsaw install ensurelocal ensureaccesseratornotdeployed isrunning ## Run chainsaw tests against local kind cluster with accesserator running on host
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/chainsaw/securityconfig && \
         echo "✅ Tests succeeded" || (echo "❌ Tests failed" && exit 1)
 
 .PHONY: chainsaw-test-host-single
-chainsaw-test-host-single: chainsaw install ensurelocal ensureaccesseratornotdeployed isrunning ## Run a specific chainsaw test against local kind cluster with accesserator running on host. Example usage: chainsaw-test-host-single dir=<CHAINSAW_TEST_DIR>
+chainsaw-test-host-single: chainsaw install ensurelocal ensureaccesseratornotdeployed isrunning ## Run a specific chainsaw test against local kind cluster with accesserator running on host. Example usage: make chainsaw-test-host-single dir=<CHAINSAW_TEST_DIR>
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
     	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
 
@@ -243,7 +248,7 @@ istio-gateways: istiohelm install-istio ## Install istio gateways
 	@echo "⛵️ Creating istio-gateways namespace..."
 	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
 	@echo "⬇️  Installing istio-gateways"
-	@helm install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	"$(HELM)" install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
 	@echo "✅  Istio gateways installed."
 
 .PHONY: cert-manager
@@ -274,15 +279,56 @@ mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
 
 ##@ Helpers
 
+.PHONY: mock-oauth2-ingress
+mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, restarting it if necessary
+	@KUBEFWD=$$(command -v kubefwd 2>/dev/null || echo "$(KUBEFWD)"); \
+	if [ ! -x "$$KUBEFWD" ]; then \
+		echo -e "❌  kubefwd not found. Install it or run 'make kubefwd'."; \
+		exit 1; \
+	fi; \
+	echo -e "🔍  Checking if mock-oauth2 is running in the cluster..."; \
+	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=10s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) 2>/dev/null || { \
+		echo -e "❌  mock-oauth2 is not ready. Deploy it first with 'make mock-oauth2'."; \
+		exit 1; \
+	}; \
+	echo -e "✅  mock-oauth2 is ready"; \
+	STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
+	if [ "$$STATUS" = "200" ]; then \
+		echo -e "✅  mock-oauth2 is reachable on http://mock-oauth2.auth:8080"; \
+		exit 0; \
+	fi; \
+	echo -e "⚠️   mock-oauth2 is not reachable (HTTP $$STATUS). Starting kubefwd..."; \
+	if pgrep -x "kubefwd" >/dev/null 2>&1; then \
+		echo -e "⏳  Stopping existing kubefwd..."; \
+		sudo -E pkill -x "kubefwd" || true; \
+		sleep 1; \
+	fi; \
+	LOG=/tmp/kubefwd.log; \
+	sudo -E "$$KUBEFWD" svc -n auth --context $(KUBECONTEXT) 2>&1 | tee "$$LOG" > /dev/null & \
+	echo -e "⏳  Waiting for kubefwd to establish connections..."; \
+	for i in $$(seq 1 15); do \
+		sleep 2; \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
+		if [ "$$STATUS" = "200" ]; then \
+			echo -e "✅  mock-oauth2 is now reachable on http://mock-oauth2.auth:8080"; \
+			exit 0; \
+		fi; \
+	done; \
+	echo -e "❌  mock-oauth2 is still not reachable. Check $$LOG for details."; \
+	exit 1
+
 .PHONY: mock-token
-mock-token: ensureflox ensurekubefwd ## Retrieves a JWT issued by mock-oauth2
-	@command -v jq >/dev/null 2>&1 || { echo -e "❌  jq is required (used to parse JSON). Please install jq and try again."; exit 1; }
+mock-token: ## Retrieves a JWT issued by mock-oauth2
+	@JQ_OUTPUT=$$($(MAKE) jq 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$JQ_OUTPUT"; exit 1; fi
+	@ENSURE_OUTPUT=$$($(MAKE) ensuremockoauth2isreachable 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$ENSURE_OUTPUT"; exit 1; fi
 	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
 		-d "grant_type=authorization_code" \
 		-d "code=code" \
-		-d "client_id=something" | jq -r '.access_token // empty'); \
+		-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
 	if [ -z "$$token" ]; then \
-		echo -e "❌  No access_token found in response"; \
+		echo -e "❌  No access_token found in response" >&2; \
 		exit 1; \
 	fi; \
 	echo "$$token"
@@ -298,6 +344,22 @@ ensureaccesseratornotdeployed: kubectl ## Ensure accesserator is NOT deployed in
 .PHONY: ensureaccesseratordeployed
 ensureaccesseratordeployed: kubectl ensurelocal isnotrunning ## Ensure accesserator is deployed in the kind cluster
 	@/bin/bash ./scripts/ensure-accesserator-deployed.sh || (echo "❌ Accesserator resources are not deployed correctly to the cluster. To fix it, run 'make deploy'." && exit 1)
+
+.PHONY: ensurerunningordeployed
+ensurerunningordeployed: ## Ensure accesserator is running on host OR deployed in cluster, but not both
+	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
+	$(MAKE) ensureaccesseratordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
+	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
+		echo "❌ Accesserator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "0" ] && [ "$$deployed" = "0" ]; then \
+		echo "❌ Accesserator is neither running on the host nor deployed in the cluster."; \
+		echo "   Start it in your IDE / with 'make run-local', or deploy it with 'make deploy'."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "1" ]; then echo "✅ Accesserator is running on the host."; fi; \
+	if [ "$$deployed" = "1" ]; then echo "✅ Accesserator is deployed an running in the local cluster."; fi
 
 ##@ Dependencies
 
@@ -323,6 +385,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 HELM ?= $(LOCALBIN)/helm
+KUBEFWD ?= $(LOCALBIN)/kubefwd
+JQ ?= $(LOCALBIN)/jq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.7.1
@@ -332,6 +396,8 @@ KUBECTL_VERSION ?= v1.34.2
 KIND_VERSION ?= v0.30.0
 GOLANGCI_LINT_VERSION ?= v2.10.1
 HELM_VERSION ?= v4.0.0
+KUBEFWD_VERSION ?= 1.25.12
+JQ_VERSION ?= 1.8.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -353,10 +419,62 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
-.PHONY: kind
+.PHONY: jq
+jq: $(JQ) ## Download jq locally if necessary.
+$(JQ): $(LOCALBIN)
+	@set -e; \
+	if [ -x "$(JQ)" ]; then \
+		echo "✅ jq already exists at $(JQ)"; \
+		exit 0; \
+	fi; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$arch" in \
+		x86_64|amd64) arch=amd64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "❌ Unsupported architecture: $$arch" >&2; exit 1 ;; \
+	esac; \
+	case "$$os" in \
+		linux) binary="jq-linux-$${arch}" ;; \
+		darwin) binary="jq-macos-$${arch}" ;; \
+		*) echo "❌ Unsupported OS: $$os" >&2; exit 1 ;; \
+	esac; \
+	url="https://github.com/jqlang/jq/releases/download/jq-$(JQ_VERSION)/$${binary}"; \
+	echo "Downloading jq $(JQ_VERSION) from $$url"; \
+	curl -L -o "$(JQ)" "$$url"; \
+	chmod +x "$(JQ)"; \
+	echo "✅ jq installed at $(JQ)"
 kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
+
+.PHONY: kubefwd
+kubefwd: $(KUBEFWD) ## Download kubefwd locally if necessary.
+$(KUBEFWD): $(LOCALBIN)
+	@set -e; \
+	if [ -x "$(KUBEFWD)" ]; then \
+		echo "✅ kubefwd already exists at $(KUBEFWD)"; \
+		exit 0; \
+	fi; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$arch" in \
+		x86_64|amd64) arch=x86_64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "❌ Unsupported architecture: $$arch" >&2; exit 1 ;; \
+	esac; \
+	case "$$os" in \
+		linux) os_name=Linux ;; \
+		darwin) os_name=Darwin ;; \
+		*) echo "❌ Unsupported OS: $$os" >&2; exit 1 ;; \
+	esac; \
+	url="https://github.com/txn2/kubefwd/releases/download/v$(KUBEFWD_VERSION)/kubefwd_$${os_name}_$${arch}.tar.gz"; \
+	echo "Downloading kubefwd $(KUBEFWD_VERSION) from $$url"; \
+	curl -L -o kubefwd.tar.gz "$$url"; \
+	tar -xzf kubefwd.tar.gz -C "$(LOCALBIN)" kubefwd; \
+	chmod +x "$(KUBEFWD)"; \
+	rm kubefwd.tar.gz; \
+	echo "✅ kubefwd installed at $(KUBEFWD)"
 
 .PHONY: helm
 helm: $(HELM) ## Download helm locally if necessary.
@@ -448,20 +566,21 @@ $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{
 endef
 
 ### CUSTOM TARGETS ###
-ensureflox: ## Ensure Flox is installed and activated
-	@if ! command -v "flox" >/dev/null 2>&1; then \
-		echo -e "❌  Flox is not installed. Please install Flox (https://flox.dev/docs/install-flox/) and try again."; \
+ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running and that mock-oauth2 is reachable
+	@KUBEFWD_PIDS=$$(pgrep -f "kubefwd( |$$)" 2>/dev/null); \
+	if [ -z "$$KUBEFWD_PIDS" ]; then \
+		echo -e "❌  mock-oauth2 ingress is not configured."; \
+		echo -e "    Configure it with 'make mock-oauth2-ingress'"; \
 		exit 1; \
 	fi
-ifndef FLOX_ENV
-	echo -e "❌  Flox is not activated. Please activate flox with 'flox activate' and try again." && exit 1
-endif
-
-ensurekubefwd: ensureflox ## Ensure kubefwd is installed and running
-	@pgrep -f "kubefwd( |$$)" >/dev/null 2>&1 || { \
-		echo -e "❌  kubefwd is not running."; \
-		echo -e "    Start it in another terminal with:"; \
-		echo -e "      sudo kubefwd svc -n <namespace> --context $(KUBECONTEXT)"; \
+	@echo "Verifying mock-oauth2 is reachable via kubefwd..."
+	@HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" http://mock-oauth2:8080/accesserator/.well-known/openid-configuration); \
+	if [ "$$HTTP_STATUS" = "200" ]; then \
+		echo -e "✅  mock-oauth2 is reachable (HTTP 200)"; \
+	else \
+		echo -e "❌  mock-oauth2 returned HTTP $$HTTP_STATUS (expected 200)."; \
+		echo -e "    Make sure mock-oauth2 is running and that forwarding is configured."; \
+		echo -e "    This can be done with 'make mock-oauth2' and 'make mock-oauth2-ingress' respectively."; \
 		exit 1; \
-	}
+	fi
 

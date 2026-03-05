@@ -3,15 +3,11 @@ package v1
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"slices"
+	"strings"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/accesserator/pkg/config"
-	"github.com/kartverket/accesserator/pkg/utilities"
-	"github.com/kartverket/skiperator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -20,20 +16,36 @@ import (
 
 const (
 	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
-	SecurityEnabledLabelName      = "skiperator/security"
-	SecurityEnabledLabelValue     = "enabled"
 
-	TexasInitContainerName = "texas"
-	TexasPortName          = "http"
+	AccesseratorServicesAnnotation    = "accesserator.kartverket.no/services"
+	AccesseratorVerifyAnnotationKey   = "accesserator.kartverket.no/verify-securityconfig"
+	AccesseratorVerifyAnnotationValue = "true"
 
-	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
-	AzureEnabledEnvVarName        = "AZURE_ENABLED"
-	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
-	TokenXEnabledEnvVarName       = "TOKEN_X_ENABLED"
+	Texas ServiceType = iota
 )
 
+// ServiceType identifies a security sidecar service managed by Accesserator.
+type ServiceType int
+
+func (serviceType ServiceType) String() string {
+	switch serviceType {
+	case Texas:
+		return TexasInitContainerName
+	default:
+		return "unknown"
+	}
+}
+
+// AccesseratorService pairs a resolved sidecar container with its pod-mutation
+// and validation logic.
+type AccesseratorService struct {
+	ServiceType  ServiceType
+	Container    corev1.Container
+	MutateFunc   func(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) error
+	ValidateFunc func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error
+}
+
 // nolint:unused
-// log is for logging in this package.
 var podlog = logf.Log.WithName("pod-webhook")
 
 // SetupPodWebhookWithManager registers the webhook for Pod in the manager.
@@ -46,8 +58,7 @@ func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
 
 // +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create,versions=v1,name=mpod-v1.kb.io,admissionReviewVersions=v1
 
-// PodCustomDefaulter struct is responsible for setting default values on the custom resource of the
-// Kind Pod when those are created or updated.
+// PodCustomDefaulter is responsible for mutating Pods before they are persisted.
 //
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
@@ -61,27 +72,19 @@ var _ admission.Defaulter[*corev1.Pod] = &PodCustomDefaulter{}
 func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error {
 	podlog.Info("Defaulting for Pod")
 
-	securityConfigForPod, err := GetSecurityConfigForPod(ctx, d.Client, pod)
+	podSecurityConfig, err := GetPodSecurityConfiguration(ctx, d.Client, pod)
 	if err != nil {
 		return err
 	}
-	if !securityConfigForPod.SecurityEnabled {
+	if !podSecurityConfig.CreatedFromSkiperatorApplication {
+		// Only mutate Pods that are created from Skiperator Applications.
 		return nil
 	}
 
-	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
-		// TokenX is enabled for this Application
-		// We inject an init container with texas in the pod
-		podlog.Info("Tokenx is enabled, injecting texas init container")
-		pod.Spec.InitContainers = append(pod.Spec.InitContainers, securityConfigForPod.TexasContainer)
-
-		podlog.Info("Injecting texas url")
-		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name == securityConfigForPod.AppName {
-				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
-					Name:  config.Get().TexasUrlEnvVarName,
-					Value: GetTexasUrlEnvVarValue(),
-				})
+	if len(podSecurityConfig.AccesseratorServices) > 0 {
+		for _, svc := range podSecurityConfig.AccesseratorServices {
+			if mutateErr := svc.MutateFunc(pod, podSecurityConfig.SecurityConfig); mutateErr != nil {
+				return mutateErr
 			}
 		}
 	}
@@ -91,273 +94,197 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 
 // +kubebuilder:webhook:path=/validate--v1-pod,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create,versions=v1,name=vpod-v1.kb.io,admissionReviewVersions=v1
 
-// PodCustomValidator struct is responsible for validating the Pod resource
-// when it is created, updated, or deleted.
+// PodCustomValidator is responsible for validating Pods on create and update.
 type PodCustomValidator struct {
 	Client client.Client
 }
 
 var _ admission.Validator[*corev1.Pod] = &PodCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
 func (v *PodCustomValidator) ValidateCreate(ctx context.Context, pod *corev1.Pod) (admission.Warnings, error) {
 	return validatePod(ctx, v.Client, pod)
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Pod.
 func (v *PodCustomValidator) ValidateUpdate(ctx context.Context, _, newPod *corev1.Pod) (admission.Warnings, error) {
 	return validatePod(ctx, v.Client, newPod)
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Pod.
 func (v *PodCustomValidator) ValidateDelete(_ context.Context, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validation for Pod upon deletion", "name", pod.GetName())
-
-	// Nothing to do
-
 	return nil, nil
 }
 
-type PodSecurityConfiguration struct {
-	SecurityConfig  *v1alpha.SecurityConfig
-	AppName         string
-	SecurityEnabled bool
-	TexasContainer  corev1.Container
-}
-
-// GetSecurityConfigForPod extracts the SecurityConfig for a given pod and determines if security is enabled.
-// Returns PodSecurityConfiguration with SecurityEnabled=false if security is not enabled or not applicable.
-// Returns an error if validation fails (e.g., missing SecurityConfig when security label is present).
-func GetSecurityConfigForPod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
-	if pod.Labels == nil {
-		return &PodSecurityConfiguration{SecurityEnabled: false}, nil
-	}
-	appName, appNameExists := pod.Labels[SkiperatorApplicationRefLabel]
-	if !appNameExists {
-		return &PodSecurityConfiguration{SecurityEnabled: false}, nil
-	}
-
-	if crudClient == nil {
-		return nil, fmt.Errorf("webhook client is not configured")
-	}
-
-	var skiperatorApplication v1alpha1.Application
-	podlog.Info("Fetching Application resource", "name", appName)
-	if err := crudClient.Get(ctx, types.NamespacedName{
-		Name:      appName,
-		Namespace: pod.Namespace,
-	}, &skiperatorApplication); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("no Application found with the name %s/%s: %w", pod.Namespace, appName, err)
-		}
-		return nil, fmt.Errorf("failed to fetch Application resource named %s/%s: %w", pod.Namespace, appName, err)
-	}
-
-	if skiperatorApplication.Labels[SecurityEnabledLabelName] != SecurityEnabledLabelValue {
-		return &PodSecurityConfiguration{
-			AppName:         appName,
-			SecurityEnabled: false,
-		}, nil
-	}
-
-	var securityConfigList v1alpha.SecurityConfigList
-	podlog.Info("Fetching SecurityConfig resources")
-	if err := crudClient.List(ctx, &securityConfigList, client.InNamespace(pod.Namespace)); err != nil {
-		return nil, fmt.Errorf("failed to fetch SecurityConfig resources: %w", err)
-	}
-
-	var securityConfigForApplication []v1alpha.SecurityConfig
-	for _, securityConfig := range securityConfigList.Items {
-		if securityConfig.Spec.ApplicationRef == appName {
-			securityConfigForApplication = append(securityConfigForApplication, securityConfig)
-		}
-	}
-
-	if len(securityConfigForApplication) < 1 {
-		msg := fmt.Sprintf(
-			"the application is labelled with %s=%s but no SecurityConfig resource was found for Application",
-			SecurityEnabledLabelName,
-			SecurityEnabledLabelValue,
-		)
-		podlog.Info(msg, "name", appName)
-		return nil, fmt.Errorf("%s", msg)
-	}
-
-	if len(securityConfigForApplication) > 1 {
-		msg := "multiple SecurityConfig resources found for Application"
-		podlog.Info(msg, "name", appName)
-		return nil, fmt.Errorf("%s", msg)
-	}
-
-	securityConfig := &securityConfigForApplication[0]
-
-	if securityConfig == nil {
-		msg := "SecurityConfig resource for Application was nil"
-		podlog.Info(msg, "name", appName)
-		return nil, fmt.Errorf("%s", msg)
-	}
-
-	texasContainer, err := GetTexasContainer(*securityConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct Texas container: %w", err)
-	}
-
-	return &PodSecurityConfiguration{
-		SecurityConfig:  securityConfig,
-		AppName:         appName,
-		SecurityEnabled: true,
-		TexasContainer:  *texasContainer,
-	}, nil
-}
-
-func GetTexasContainer(securityConfig v1alpha.SecurityConfig) (*corev1.Container, error) {
-	if securityConfig.Spec.Tokenx == nil || !securityConfig.Spec.Tokenx.Enabled {
-		return nil, fmt.Errorf("a texas container should not be created if tokenx is not enabled")
-	}
-
-	texasImageUrl := fmt.Sprintf(
-		"%s:%s",
-		config.Get().TexasImageName,
-		config.Get().TexasImageTag,
-	)
-	expectedJwkerSecretName := utilities.GetJwkerSecretName(
-		utilities.GetJwkerName(securityConfig.Spec.ApplicationRef),
-	)
-
-	return &corev1.Container{
-		Name:  TexasInitContainerName,
-		Image: texasImageUrl,
-		Ports: []corev1.ContainerPort{
-			{
-				ContainerPort: config.Get().TexasPort,
-				Name:          TexasPortName,
-				Protocol:      corev1.ProtocolTCP,
-			},
-		},
-		// NOTE: RestartPolicy Always is only available for init containers in Kubernetes v1.33+
-		// https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior
-		RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
-		SecurityContext: &corev1.SecurityContext{
-			AllowPrivilegeEscalation: utilities.Ptr(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{
-					"ALL",
-				},
-				Add: []corev1.Capability{
-					"NET_BIND_SERVICE",
-				},
-			},
-			Privileged:             utilities.Ptr(false),
-			ReadOnlyRootFilesystem: utilities.Ptr(true),
-			RunAsGroup:             utilities.Ptr(int64(150)),
-			RunAsNonRoot:           utilities.Ptr(true),
-			RunAsUser:              utilities.Ptr(int64(150)),
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		Env: []corev1.EnvVar{
-			{
-				Name:  TokenXEnabledEnvVarName,
-				Value: "true",
-			},
-			{
-				Name:  MaskinportenEnabledEnvVarName,
-				Value: "false",
-			},
-			{
-				Name:  AzureEnabledEnvVarName,
-				Value: "false",
-			},
-			{
-				Name:  IdportenEnabledEnvVarName,
-				Value: "false",
-			},
-		},
-		EnvFrom: []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: expectedJwkerSecretName}}}},
-	}, nil
-}
-
-func validatePod(ctx context.Context, crudClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
+func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
 
-	securityConfigForPod, getSecurityConfigForPodErr := GetSecurityConfigForPod(ctx, crudClient, pod)
-	if getSecurityConfigForPodErr != nil {
-		podlog.Error(getSecurityConfigForPodErr, "Failed to validate for Pod")
-		return nil, getSecurityConfigForPodErr
+	podSecurityConfig, err := GetPodSecurityConfiguration(ctx, k8sClient, pod)
+	if err != nil {
+		return nil, err
 	}
-	if !securityConfigForPod.SecurityEnabled {
+	if !podSecurityConfig.CreatedFromSkiperatorApplication {
+		// Only validate Pods that are created from Skiperator Applications.
 		return nil, nil
 	}
 
-	if securityConfigForPod.SecurityConfig.Spec.Tokenx != nil && securityConfigForPod.SecurityConfig.Spec.Tokenx.Enabled {
-		validateTokenXConfErr := ValidateTokenxCorrectlyConfigured(pod, securityConfigForPod)
-		if validateTokenXConfErr != nil {
-			podlog.Error(validateTokenXConfErr, "Failed to validate for Pod")
-			return nil, validateTokenXConfErr
+	for _, svc := range podSecurityConfig.AccesseratorServices {
+		if validateErr := svc.ValidateFunc(*pod, podSecurityConfig.SecurityConfig); validateErr != nil {
+			return nil, validateErr
 		}
 	}
 
 	return nil, nil
 }
 
-func ValidateTokenxCorrectlyConfigured(pod *corev1.Pod, securityConfigForPod *PodSecurityConfiguration) error {
-	// Validate that the Texas init container exists
-	hasTexasInitContainer := false
-	for _, initContainer := range pod.Spec.InitContainers {
-		if initContainer.Name == TexasInitContainerName {
-			hasTexasInitContainer = true
-			if !IsTexasContainerEqual(
-				securityConfigForPod.TexasContainer,
-				initContainer,
-			) {
-				return fmt.Errorf("texas init container is not as expected given the SecurityConfig")
-			}
-			break
-		}
-	}
-	if !hasTexasInitContainer {
-		podlog.Info("TokenX is enabled but texas init container is missing")
-		return fmt.Errorf("TokenX is enabled but init container '%s' is missing", TexasInitContainerName)
-	}
-
-	// Validate that the application container has the TEXAS_URL env variable
-	hasTexasUrlEnvVar := false
-	for _, container := range pod.Spec.Containers {
-		if container.Name == securityConfigForPod.AppName {
-			for _, envVar := range container.Env {
-				if envVar.Name == config.Get().TexasUrlEnvVarName && envVar.Value == GetTexasUrlEnvVarValue() {
-					hasTexasUrlEnvVar = true
-					break
-				}
-			}
-			break
-		}
-	}
-	if !hasTexasUrlEnvVar {
-		errMsg := fmt.Sprintf(
-			"TokenX is enabled but %s env var is missing for pod from skiperator app with name %s/%s",
-			pod.Namespace,
-			securityConfigForPod.AppName,
-			config.Get().TexasUrlEnvVarName,
-		)
-		podlog.Info(errMsg)
-		return fmt.Errorf("%s", errMsg)
-	}
-	return nil
+// PodSecurityConfiguration holds all resolved security context for a Pod,
+// used by both the mutating and validating webhooks.
+type PodSecurityConfiguration struct {
+	SecurityConfig                   v1alpha.SecurityConfig
+	AppName                          string
+	CreatedFromSkiperatorApplication bool
+	AccesseratorServices             []AccesseratorService
 }
 
-func IsTexasContainerEqual(expected, actual corev1.Container) bool {
-	return expected.Name == actual.Name &&
-		expected.Image == actual.Image &&
-		reflect.DeepEqual(expected.RestartPolicy, actual.RestartPolicy) &&
-		reflect.DeepEqual(expected.Env, actual.Env) &&
-		reflect.DeepEqual(expected.EnvFrom, actual.EnvFrom) &&
-		reflect.DeepEqual(expected.Ports, actual.Ports) &&
-		reflect.DeepEqual(expected.SecurityContext, actual.SecurityContext) &&
-		reflect.DeepEqual(expected.TerminationMessagePath, actual.TerminationMessagePath) &&
-		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy)
+// GetPodSecurityConfiguration resolves the full security configuration for a Pod.
+// It returns a non-nil PodSecurityConfiguration in all non-error cases.
+func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (*PodSecurityConfiguration, error) {
+	if pod.Labels == nil {
+		return &PodSecurityConfiguration{CreatedFromSkiperatorApplication: false}, nil
+	}
+
+	appName, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	if !isSkiperatorPod {
+		return &PodSecurityConfiguration{CreatedFromSkiperatorApplication: false}, nil
+	}
+
+	if k8sClient == nil {
+		return nil, fmt.Errorf("webhook client is not configured")
+	}
+
+	verifyAnnotation, hasVerify := pod.Annotations[AccesseratorVerifyAnnotationKey]
+	servicesAnnotation, hasServices := pod.Annotations[AccesseratorServicesAnnotation]
+
+	if !hasVerify && !hasServices {
+		return &PodSecurityConfiguration{
+			AppName:                          appName,
+			CreatedFromSkiperatorApplication: true,
+		}, nil
+	}
+
+	shouldFetchSecurityConfig := (hasVerify && verifyAnnotation == AccesseratorVerifyAnnotationValue) || hasServices
+
+	var securityConfig v1alpha.SecurityConfig
+	if shouldFetchSecurityConfig {
+		retrieved, err := GetSecurityConfigForApplication(ctx, k8sClient, client.ObjectKey{
+			Namespace: pod.Namespace,
+			Name:      appName,
+		})
+		if err != nil {
+			return nil, err
+		}
+		securityConfig = *retrieved
+	}
+
+	var serviceTypes []ServiceType
+	if hasServices {
+		serviceTypes = ParseAccesseratorServices(servicesAnnotation)
+	}
+
+	if len(serviceTypes) == 0 {
+		return &PodSecurityConfiguration{
+			SecurityConfig:                   securityConfig,
+			AppName:                          appName,
+			CreatedFromSkiperatorApplication: true,
+		}, nil
+	}
+
+	accesseratorServices, err := BuildAccesseratorServices(serviceTypes, securityConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PodSecurityConfiguration{
+		SecurityConfig:                   securityConfig,
+		AppName:                          appName,
+		CreatedFromSkiperatorApplication: true,
+		AccesseratorServices:             accesseratorServices,
+	}, nil
 }
 
-func GetTexasUrlEnvVarValue() string {
-	return fmt.Sprintf("http://localhost:%d", config.Get().TexasPort)
+// BuildAccesseratorServices builds the full AccesseratorService slice for the given service types.
+func BuildAccesseratorServices(serviceTypes []ServiceType, securityConfig v1alpha.SecurityConfig) ([]AccesseratorService, error) {
+	services := make([]AccesseratorService, 0, len(serviceTypes))
+	for _, serviceType := range serviceTypes {
+		container, err := GetServiceContainer(serviceType, securityConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get container for service type %s: %w", serviceType, err)
+		}
+
+		mutateFunc, err := GetServiceMutationFunc(serviceType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mutation func for service type %s: %w", serviceType, err)
+		}
+
+		validateFunc, err := GetServiceValidationFunc(serviceType, *container)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get validation func for service type %s: %w", serviceType, err)
+		}
+
+		services = append(services, AccesseratorService{
+			ServiceType:  serviceType,
+			Container:    *container,
+			MutateFunc:   mutateFunc,
+			ValidateFunc: validateFunc,
+		})
+	}
+	return services, nil
+}
+
+// ParseAccesseratorServices parses the comma-separated services annotation value into
+// a slice of recognised ServiceTypes, ignoring unknown values.
+func ParseAccesseratorServices(annotationValue string) []ServiceType {
+	var services []ServiceType
+	for _, s := range strings.Split(annotationValue, ",") {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case Texas.String():
+			if !slices.Contains(services, Texas) {
+				services = append(services, Texas)
+			}
+		}
+	}
+	return services
+}
+
+// GetServiceContainer returns the resolved sidecar container for the given service type.
+func GetServiceContainer(st ServiceType, securityConfig v1alpha.SecurityConfig) (*corev1.Container, error) {
+	switch st {
+	case Texas:
+		c := GetTexasContainer(securityConfig)
+		return &c, nil
+	default:
+		return nil, fmt.Errorf("unknown service type '%s'", st)
+	}
+}
+
+// GetServiceValidationFunc returns the pod-validation function for the given service type.
+func GetServiceValidationFunc(st ServiceType, sidecarContainer corev1.Container) (func(corev1.Pod, v1alpha.SecurityConfig) error, error) {
+	switch st {
+	case Texas:
+		return func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
+			return ValidateTexasOnPod(pod, securityConfig, sidecarContainer)
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown service type '%s'", st)
+	}
+}
+
+// GetServiceMutationFunc returns the pod-mutation function for the given service type.
+func GetServiceMutationFunc(st ServiceType) (func(*corev1.Pod, v1alpha.SecurityConfig) error, error) {
+	switch st {
+	case Texas:
+		return func(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
+			return MutateTexasOnPod(pod, securityConfig)
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown service type '%s'", st)
+	}
 }
