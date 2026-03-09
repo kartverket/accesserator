@@ -6,20 +6,39 @@ import (
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/skiperator/api/v1alpha1/podtypes"
+	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const (
+	InlineClient MaskinportenConfigType = iota
+	ClientRef
+	SecretRef
+)
+
+type MaskinportenConfigType int
 
 type Scope struct {
 	SecurityConfig         v1alpha.SecurityConfig
 	TokenXConfig           TokenXConfig
+	MaskinportenConfig     MaskinportenConfig
 	Descendants            []Descendant[client.Object]
 	InvalidConfig          bool
 	ValidationErrorMessage *string
 }
 
 type TokenXConfig struct {
-	Enabled      bool
-	AccessPolicy *podtypes.AccessPolicy
+	Enabled        bool
+	ApplicationRef string
+	AccessPolicy   *podtypes.AccessPolicy
+}
+
+type MaskinportenConfig struct {
+	Enabled    bool
+	Type       MaskinportenConfigType
+	ClientSpec *naisiov1.MaskinportenClientSpec
+	ClientRef  *v1alpha.MaskinportenClientRef
+	SecretData *map[string][]byte
 }
 
 type Descendant[T client.Object] struct {
