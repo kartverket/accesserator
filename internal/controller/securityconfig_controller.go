@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -12,11 +13,14 @@ import (
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +50,9 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
 		Owns(&naisiov1.Jwker{}).
+		Owns(&naisiov1.MaskinportenClient{}).
 		Owns(&networkv1.NetworkPolicy{}).
+		Owns(&corev1.Secret{}).
 		Watches(&v1alpha1.Application{}, eventhandler.HandleSkiperatorApplicationEvent(r.Client)).
 		Named("securityconfig").
 		Complete(r)
@@ -57,8 +63,9 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=accesserator.kartverket.no,resources=securityconfigs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch
-// +kubebuilder:rbac:groups=nais.io,resources=jwkers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=nais.io,resources=jwkers,maskinportenclients,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rlog := log.GetLogger(ctx)
@@ -109,9 +116,16 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Name:      utilities.GetJwkerName(securityConfig.Spec.ApplicationRef),
 		Namespace: securityConfig.Namespace,
 	}
-
 	tokenxEgressObjectMeta := metav1.ObjectMeta{
 		Name:      utilities.GetTokenxEgressName(securityConfig.Name, config.Get().TokenxName),
+		Namespace: securityConfig.Namespace,
+	}
+	maskinportenClientObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetMaskinportenClientName(securityConfig.Name),
+		Namespace: securityConfig.Namespace,
+	}
+	maskinportenSecretObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetMaskinportenSecretName(securityConfig.Name),
 		Namespace: securityConfig.Namespace,
 	}
 
@@ -121,7 +135,7 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 					ResourceKind:    "Jwker",
 					ResourceName:    jwkerObjectMeta.Name,
-					DesiredResource: utilities.Ptr(jwker.GetDesired(jwkerObjectMeta, *scope)),
+					DesiredResource: utilities.Ptr(jwker.GetDesired(jwkerObjectMeta, scope.TokenXConfig)),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *naisiov1.Jwker) bool {
 						return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
@@ -137,13 +151,54 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				Func: reconciliation.ResourceReconciler[*networkv1.NetworkPolicy]{
 					ResourceKind:    "NetworkPolicy",
 					ResourceName:    tokenxEgressObjectMeta.Name,
-					DesiredResource: utilities.Ptr(egress.GetDesired(tokenxEgressObjectMeta, *scope)),
+					DesiredResource: utilities.Ptr(egress.GetDesired(tokenxEgressObjectMeta, scope.TokenXConfig)),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *networkv1.NetworkPolicy) bool {
 						return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
 					},
 					UpdateFields: func(current, desired *networkv1.NetworkPolicy) {
 						current.Spec = desired.Spec
+					},
+				},
+			},
+		},
+		ControllerResourceAdapter[*naisiov1.MaskinportenClient]{
+			reconciliation.ReconcilerAdapter[*naisiov1.MaskinportenClient]{
+				Func: reconciliation.ResourceReconciler[*naisiov1.MaskinportenClient]{
+					ResourceKind:    "MaskinportenClient",
+					ResourceName:    maskinportenSecretObjectMeta.Name,
+					DesiredResource: utilities.Ptr(maskinportenclient.GetDesired(maskinportenClientObjectMeta, scope.MaskinportenConfig)),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *naisiov1.MaskinportenClient) bool {
+						return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
+					},
+					UpdateFields: func(current, desired *naisiov1.MaskinportenClient) {
+						current.Spec = desired.Spec
+					},
+				},
+			},
+		},
+		ControllerResourceAdapter[*corev1.Secret]{
+			reconciliation.ReconcilerAdapter[*corev1.Secret]{
+				Func: reconciliation.ResourceReconciler[*corev1.Secret]{
+					ResourceKind:    "Secret",
+					ResourceName:    maskinportenSecretObjectMeta.Name,
+					DesiredResource: utilities.Ptr(maskinportensecret.GetDesired(maskinportenSecretObjectMeta, scope.MaskinportenConfig)),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *corev1.Secret) bool {
+						if len(current.Data) != len(desired.Data) {
+							return true
+						}
+						for key, desiredVal := range desired.Data {
+							if !bytes.Equal(current.Data[key], desiredVal) {
+								return true
+							}
+						}
+						return false
+					},
+					UpdateFields: func(current, desired *corev1.Secret) {
+						current.Data = desired.Data
+						current.Type = desired.Type
 					},
 				},
 			},
