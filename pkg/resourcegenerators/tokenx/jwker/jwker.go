@@ -9,15 +9,15 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetDesired(objectMeta v1.ObjectMeta, scope state.Scope) *naisiov1.Jwker {
-	if !scope.TokenXConfig.Enabled {
+func GetDesired(objectMeta v1.ObjectMeta, tokenxConfig state.TokenXConfig) *naisiov1.Jwker {
+	if !tokenxConfig.Enabled {
 		return nil
 	}
 	return &naisiov1.Jwker{
 		ObjectMeta: objectMeta,
 		Spec: naisiov1.JwkerSpec{
 			SecretName:   utilities.GetJwkerSecretName(objectMeta.Name),
-			AccessPolicy: getNaisIoV1AccessPolicy(scope.TokenXConfig.AccessPolicy, scope.SecurityConfig.Namespace),
+			AccessPolicy: getNaisIoV1AccessPolicy(tokenxConfig.AccessPolicy, objectMeta.Namespace),
 		},
 	}
 }
