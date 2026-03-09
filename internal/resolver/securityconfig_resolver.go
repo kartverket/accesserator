@@ -6,47 +6,23 @@ import (
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/state"
-	"github.com/kartverket/skiperator/api/v1alpha1"
-	"github.com/kartverket/skiperator/api/v1alpha1/podtypes"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.Scope, error) {
-	tokenXEnabled := securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled
-	if !tokenXEnabled {
-		return &state.Scope{
-			SecurityConfig: securityConfig,
-			TokenXConfig: state.TokenXConfig{
-				Enabled: tokenXEnabled,
-			},
-		}, nil
+	tokenxConfig, tokenxConfigResolveErr := ResolveTokenXConfig(ctx, k8sClient, securityConfig)
+	if tokenxConfigResolveErr != nil {
+		return nil, fmt.Errorf("failed to resolve TokenX config: %w", tokenxConfigResolveErr)
 	}
 
-	var skiperatorApplication v1alpha1.Application
-	if exists := k8sClient.Get(ctx, types.NamespacedName{
-		Name:      securityConfig.Spec.ApplicationRef,
-		Namespace: securityConfig.Namespace,
-	}, &skiperatorApplication); exists != nil {
-		return nil, fmt.Errorf(
-			"failed to fetch Application resource named %s: %w",
-			securityConfig.Spec.ApplicationRef,
-			exists,
-		)
-	}
-
-	var skiperatorAccessPolicy *podtypes.AccessPolicy
-	if skiperatorApplication.Spec.AccessPolicy != nil {
-		skiperatorAccessPolicy = skiperatorApplication.Spec.AccessPolicy
-	} else {
-		skiperatorAccessPolicy = nil
+	maskinportenConfig, maskinportenConfigResolveErr := ResolveMaskinportenConfig(ctx, k8sClient, securityConfig)
+	if maskinportenConfigResolveErr != nil {
+		return nil, fmt.Errorf("failed to resolve Maskinporten config: %w", maskinportenConfigResolveErr)
 	}
 
 	return &state.Scope{
-		SecurityConfig: securityConfig,
-		TokenXConfig: state.TokenXConfig{
-			Enabled:      tokenXEnabled,
-			AccessPolicy: skiperatorAccessPolicy,
-		},
+		SecurityConfig:     securityConfig,
+		TokenXConfig:       *tokenxConfig,
+		MaskinportenConfig: *maskinportenConfig,
 	}, nil
 }
