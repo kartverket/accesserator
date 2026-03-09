@@ -53,6 +53,7 @@ type SecurityConfigStatus struct {
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 	Phase              Phase              `json:"phase,omitempty"`
 	Message            string             `json:"message,omitempty"`
+	JwkerSecretName    string             `json:"jwkerSecretName,omitempty"`
 	Ready              bool               `json:"ready"`
 }
 
