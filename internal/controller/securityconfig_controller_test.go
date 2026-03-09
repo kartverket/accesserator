@@ -151,7 +151,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}).Should(Equal(accesseratorv1alpha.PhasePending))
 
 			By("Marking the Jwker resource as finished reconciling")
-			jwker.Status.SynchronizationState = controller.JwkerSynchronizationStateReady
+			jwker.Status.SynchronizationState = utilities.JwkerSynchronizationStateReady
 			Expect(k8sClient.Status().Update(ctx, jwker)).To(Succeed())
 
 			By("Reconciling again to let SecurityConfig transition to PhaseReady")
