@@ -16,8 +16,6 @@ import (
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 )
 
 func newTestSecurityConfigForStatusManager() *v1alpha.SecurityConfig {
@@ -45,7 +43,7 @@ func newTestSecurityConfigForStatusManager() *v1alpha.SecurityConfig {
 
 func newScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
-	_ = accesseratorv1alpha.AddToScheme(scheme)
+	_ = v1alpha.AddToScheme(scheme)
 	return scheme
 }
 
@@ -271,7 +269,7 @@ var _ = Describe("UpdateSecurityConfigStatus", func() {
 		statusmanager.UpdateSecurityConfigStatus(ctx, k8sClient, fakeRecorder, scope, original, []reconciliation.ControllerResource{})
 
 		close(fakeRecorder.Events)
-		var recordedEvents []string
+		recordedEvents := make([]string, 0, len(fakeRecorder.Events))
 		for event := range fakeRecorder.Events {
 			recordedEvents = append(recordedEvents, event)
 		}
@@ -307,7 +305,7 @@ var _ = Describe("UpdateSecurityConfigStatus", func() {
 		statusmanager.UpdateSecurityConfigStatus(ctx, k8sClient, fakeRecorder, scope, original, resources)
 
 		close(fakeRecorder.Events)
-		var recordedEvents []string
+		recordedEvents := make([]string, 0, len(fakeRecorder.Events))
 		for event := range fakeRecorder.Events {
 			recordedEvents = append(recordedEvents, event)
 		}
@@ -340,7 +338,7 @@ var _ = Describe("UpdateSecurityConfigStatus", func() {
 		statusmanager.UpdateSecurityConfigStatus(ctx, k8sClient, fakeRecorder, scope, original, []reconciliation.ControllerResource{})
 
 		close(fakeRecorder.Events)
-		var recordedEvents []string
+		recordedEvents := make([]string, 0, len(fakeRecorder.Events))
 		for event := range fakeRecorder.Events {
 			recordedEvents = append(recordedEvents, event)
 		}
