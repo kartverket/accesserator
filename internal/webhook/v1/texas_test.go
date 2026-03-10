@@ -25,6 +25,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						Enabled: true,
 					},
 				},
+				Status: v1alpha.SecurityConfigStatus{
+					JwkerSecretName: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+				},
 			}
 			c := v1.GetTexasContainer(securityConfig)
 			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s", config.Get().TexasImageName, config.Get().TexasImageTag)))
@@ -38,7 +41,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					corev1.EnvFromSource{
 						SecretRef: &corev1.SecretEnvSource{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+								Name: securityConfig.Status.JwkerSecretName,
 							},
 						},
 					},
@@ -81,6 +84,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						Enabled: true,
 					},
 				},
+				Status: v1alpha.SecurityConfigStatus{
+					JwkerSecretName: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+				},
 			}
 			envVars := v1.GetTexasEnvVars(securityConfig)
 			Expect(envVars.TokenXEnabled).To(Equal("true"))
@@ -88,7 +94,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				corev1.EnvFromSource{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+							Name: securityConfig.Status.JwkerSecretName,
 						},
 					},
 				},
