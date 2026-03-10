@@ -124,6 +124,8 @@ spec:
                   - type
                   type: object
                 type: array
+              jwkerSecretName:
+                type: string
               message:
                 type: string
               observedGeneration:

@@ -21,6 +21,8 @@ spec:
             file: jwker.yaml
         - error:
             file: netpol.yaml
+        - error:
+            file: securityconfig-with-updated-status.yaml
         - patch:
             resource:
               apiVersion: accesserator.kartverket.no/v1alpha
@@ -30,6 +32,8 @@ spec:
               spec:
                 tokenx:
                   enabled: true
+        - assert:
+            file: securityconfig-with-updated-status.yaml
         - assert:
             file: jwker.yaml
         - assert:

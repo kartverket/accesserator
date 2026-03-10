@@ -1,9 +1,11 @@
 package utilities
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +36,14 @@ func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 	default:
 		return ctrl.Result{RequeueAfter: 0 * time.Second}
 	}
+}
+
+func GetJwker(ctx context.Context, k8sClient client.Client, objectKey client.ObjectKey) (*naisiov1.Jwker, error) {
+	var jwker naisiov1.Jwker
+	if err := k8sClient.Get(ctx, objectKey, &jwker); err != nil {
+		return nil, err
+	}
+	return &jwker, nil
 }
 
 func GetJwkerName(applicationRef string) string {

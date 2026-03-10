@@ -1,6 +1,7 @@
 package utilities
 
 const (
-	JwkerSecretNameSuffix = "jwker-secret"
-	EgressNameSuffix      = "egress"
+	JwkerSecretNameSuffix          = "jwker-secret"
+	EgressNameSuffix               = "egress"
+	JwkerSynchronizationStateReady = "RolloutComplete"
 )
