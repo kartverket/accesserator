@@ -189,7 +189,7 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: jwker-system
+              kubernetes.io/metadata.name: tokenx-tokendings
           podSelector:
             matchLabels:
               app: tokendings

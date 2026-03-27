@@ -4,23 +4,23 @@ set -eo pipefail
 KUBECONTEXT=${KUBECONTEXT:-"kind-accesserator"}
 KUBECTL_BIN="${KUBECTL_BIN:-./bin/kubectl}"
 
-echo "🤞  Creating namespace: jwker-system"
+echo "🤞  Creating namespace: tokenx-tokendings"
 
 # Attempt to create the namespace and capture both stdout and stderr
 # NOTE: `set -e` would abort the script on a non-zero exit code here (e.g. AlreadyExists),
 # so we temporarily disable it to handle the error explicitly.
 set +e
-output=$("${KUBECTL_BIN}" create namespace "jwker-system" --context "$KUBECONTEXT" 2>&1)
+output=$("${KUBECTL_BIN}" create namespace "tokenx-tokendings" --context "$KUBECONTEXT" 2>&1)
 exit_code=$?
 set -e
 
 # Check the exit code and output
 if [ $exit_code -eq 0 ]; then
-    echo "✅  Namespace 'jwker-system' created successfully"
+    echo "✅  Namespace 'tokenx-tokendings' created successfully"
 elif echo "$output" | grep -qiE "already exists|AlreadyExists"; then
-    echo "✅  Namespace 'jwker-system' already exists, continuing..."
+    echo "✅  Namespace 'tokenx-tokendings' already exists, continuing..."
 else
-    echo -e "❌  Error creating 'jwker-system' namespace:"
+    echo -e "❌  Error creating 'tokenx-tokendings' namespace:"
     echo "$output"
     exit 1
 fi
@@ -31,7 +31,7 @@ apiVersion: skiperator.kartverket.no/v1alpha1
 kind: Application
 metadata:
   name: jwker
-  namespace: jwker-system
+  namespace: tokenx-tokendings
 spec:
   image: ghcr.io/nais/jwker:2025-01-07-145102-876d62d@sha256:8f6db2eff60db7c24c8d9df510e5f3aa3cee4df4b168ef8084094975f468b549
   port: 8080
@@ -40,7 +40,7 @@ spec:
     - name: JWKER_CLIENT_ID
       value: dfb2cec9-3b6d-456b-a14f-649236247e3d
     - name: TOKENDINGS_URL
-      value: http://tokendings.jwker-system:7456
+      value: http://tokendings.tokenx-tokendings:7456
     - name: CLUSTER_NAME
       value: kind-accesserator
     - name: JWKER_PRIVATE_JWK
@@ -51,13 +51,13 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: jwker-egress
-  namespace: jwker-system
+  namespace: tokenx-tokendings
 spec:
   egress:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: jwker-system
+              kubernetes.io/metadata.name: tokenx-tokendings
           podSelector:
             matchLabels:
               app: tokendings
@@ -76,7 +76,7 @@ metadata:
   labels:
     app: jwker
   name: jwker
-  namespace: jwker-system
+  namespace: tokenx-tokendings
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -84,7 +84,7 @@ metadata:
   labels:
     app: jwker
   name: jwker
-  namespace: jwker-system
+  namespace: tokenx-tokendings
 rules:
   - apiGroups:
       - "*"
@@ -105,7 +105,7 @@ metadata:
   labels:
     app: jwker
   name: jwker
-  namespace: jwker-system
+  namespace: tokenx-tokendings
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -113,7 +113,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: jwker
-    namespace: jwker-system
+    namespace: tokenx-tokendings
 EOF
 )"
 
