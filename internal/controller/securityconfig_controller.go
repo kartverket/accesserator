@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"reflect"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/eventhandler"
@@ -15,11 +16,13 @@ import (
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -63,9 +66,10 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=accesserator.kartverket.no,resources=securityconfigs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch
-// +kubebuilder:rbac:groups=nais.io,resources=jwkers,maskinportenclients,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=nais.io,resources=jwkers;maskinportenclients,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.istio.io,resources=serviceentries,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rlog := log.GetLogger(ctx)
@@ -121,11 +125,15 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Namespace: securityConfig.Namespace,
 	}
 	maskinportenClientObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.GetMaskinportenClientName(securityConfig.Name),
+		Name:      utilities.GetMaskinportenClientName(securityConfig.Spec.ApplicationRef),
 		Namespace: securityConfig.Namespace,
 	}
 	maskinportenSecretObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.GetMaskinportenSecretName(securityConfig.Name),
+		Name:      utilities.GetMaskinportenSecretFromSecretRefName(securityConfig.Name),
+		Namespace: securityConfig.Namespace,
+	}
+	maskinportenServiceEntryObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetMaskinportenServiceEntryName(securityConfig.Name),
 		Namespace: securityConfig.Namespace,
 	}
 
@@ -199,6 +207,28 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 					UpdateFields: func(current, desired *corev1.Secret) {
 						current.Data = desired.Data
 						current.Type = desired.Type
+					},
+				},
+			},
+		},
+		ControllerResourceAdapter[*istionetworkingv1.ServiceEntry]{
+			reconciliation.ReconcilerAdapter[*istionetworkingv1.ServiceEntry]{
+				Func: reconciliation.ResourceReconciler[*istionetworkingv1.ServiceEntry]{
+					ResourceKind:    "ServiceEntry",
+					ResourceName:    maskinportenSecretObjectMeta.Name,
+					DesiredResource: utilities.Ptr(maskinportenserviceentry.GetDesired(maskinportenServiceEntryObjectMeta, scope.MaskinportenConfig.Enabled)),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *istionetworkingv1.ServiceEntry) bool {
+						return !reflect.DeepEqual(current.Spec.GetExportTo(), desired.Spec.GetExportTo()) ||
+							!reflect.DeepEqual(current.Spec.GetHosts(), desired.Spec.GetHosts()) ||
+							!reflect.DeepEqual(current.Spec.GetPorts(), desired.Spec.GetPorts()) ||
+							!reflect.DeepEqual(current.Spec.GetResolution(), desired.Spec.GetResolution())
+					},
+					UpdateFields: func(current, desired *istionetworkingv1.ServiceEntry) {
+						current.Spec.ExportTo = desired.Spec.ExportTo
+						current.Spec.Hosts = desired.Spec.Hosts
+						current.Spec.Ports = desired.Spec.Ports
+						current.Spec.Resolution = desired.Spec.Resolution
 					},
 				},
 			},
