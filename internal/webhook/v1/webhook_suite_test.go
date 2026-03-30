@@ -65,6 +65,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
+	err = os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")
+	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")

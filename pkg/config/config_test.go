@@ -15,10 +15,12 @@ const (
 	defaultTexasImageTag      = "latest"
 	defaultTexasPort          = int32(3000)
 	defaultTexasUrlEnvVarName = "TEXAS_URL"
+	defaultRunsInProduction   = "false"
 )
 
 func setAllEnvVars(t *testing.T) {
 	t.Helper()
+	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAME", defaultTokenxName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
@@ -36,6 +38,9 @@ func TestLoad_AllRequiredSet(t *testing.T) {
 	}
 
 	c := config.Get()
+	if c.RunsInProduction == nil || *c.RunsInProduction != false {
+		t.Errorf("RunsInProduction = %v, want pointer to false", c.RunsInProduction)
+	}
 	if c.ClusterName != defaultClusterName {
 		t.Errorf("ClusterName = %q, want %q", c.ClusterName, defaultClusterName)
 	}
@@ -48,6 +53,7 @@ func TestLoad_AllRequiredSet(t *testing.T) {
 }
 
 func TestLoad_Defaults(t *testing.T) {
+	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
@@ -57,6 +63,9 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 
 	c := config.Get()
+	if c.RunsInProduction == nil || *c.RunsInProduction != false {
+		t.Errorf("RunsInProduction = %v, want pointer to false", c.RunsInProduction)
+	}
 	if c.TokenxName != defaultTokenxName {
 		t.Errorf("TokenxName = %q, want default %q", c.TokenxName, defaultTokenxName)
 	}
@@ -71,7 +80,22 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 }
 
+func TestLoad_MissingRunsInProduction(t *testing.T) {
+	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
+	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
+	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing ACCESSERATOR_RUNS_IN_PRODUCTION, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_RUNS_IN_PRODUCTION") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_RUNS_IN_PRODUCTION", got)
+	}
+}
+
 func TestLoad_MissingClusterName(t *testing.T) {
+	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
 
@@ -85,6 +109,7 @@ func TestLoad_MissingClusterName(t *testing.T) {
 }
 
 func TestLoad_MissingTokenxNamespace(t *testing.T) {
+	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
 
@@ -98,6 +123,7 @@ func TestLoad_MissingTokenxNamespace(t *testing.T) {
 }
 
 func TestLoad_MissingTexasImageTag(t *testing.T) {
+	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 
@@ -120,6 +146,7 @@ func TestLoad_AllRequiredMissing(t *testing.T) {
 		"ACCESSERATOR_CLUSTER_NAME",
 		"ACCESSERATOR_TOKENX_NAMESPACE",
 		"ACCESSERATOR_TEXAS_IMAGE_TAG",
+		"ACCESSERATOR_RUNS_IN_PRODUCTION",
 	} {
 		if !contains(got, key) {
 			t.Errorf("error = %q, want it to mention %s", got, key)
@@ -138,6 +165,7 @@ func TestLoad_InvalidPort(t *testing.T) {
 }
 
 func TestLoad_CustomValues(t *testing.T) {
+	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "true")
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", "prod-cluster")
 	t.Setenv("ACCESSERATOR_TOKENX_NAME", "custom-tokendings")
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "custom-ns")
@@ -151,6 +179,9 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 
 	c := config.Get()
+	if c.RunsInProduction == nil || *c.RunsInProduction != true {
+		t.Errorf("RunsInProduction = %v, want %v", *c.RunsInProduction, true)
+	}
 	if c.ClusterName != "prod-cluster" {
 		t.Errorf("ClusterName = %q, want %q", c.ClusterName, "prod-cluster")
 	}
