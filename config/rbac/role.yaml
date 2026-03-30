@@ -5,6 +5,18 @@ metadata:
   name: accesserator
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - accesserator.kartverket.no
   resources:
   - securityconfigs
@@ -41,6 +53,19 @@ rules:
   - nais.io
   resources:
   - jwkers
+  - maskinportenclients
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - serviceentries
   verbs:
   - create
   - delete
