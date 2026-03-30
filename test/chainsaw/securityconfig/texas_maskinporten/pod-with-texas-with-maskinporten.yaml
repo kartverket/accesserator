@@ -20,16 +20,16 @@ spec:
     - name: istio-proxy
     - env:
         - name: TOKEN_X_ENABLED
-          value: "true"
-        - name: MASKINPORTEN_ENABLED
           value: "false"
+        - name: MASKINPORTEN_ENABLED
+          value: "true"
         - name: AZURE_ENABLED
           value: "false"
         - name: IDPORTEN_ENABLED
           value: "false"
       envFrom:
         - secretRef:
-            name: app-jwker-secret
+            name: security-config-maskinporten
       image: ghcr.io/nais/texas:2025-12-12-090328-adc830c
       imagePullPolicy: IfNotPresent
       name: texas
