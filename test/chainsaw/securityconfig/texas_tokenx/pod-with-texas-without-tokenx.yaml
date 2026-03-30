@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    accesserator.kartverket.no/verify-securityconfig: "true"
+  labels:
+    app: app
+    app.kubernetes.io/managed-by: skiperator
+    application.skiperator.no/app: app
+    application.skiperator.no/app-name: app
+    skiperator.kartverket.no/controller: application
+spec:
+  containers:
+    - env:
+        - name: TEXAS_URL
+          value: http://localhost:3000
+      name: app
+  initContainers:
+    - name: istio-init
+    - name: istio-proxy
+    - env:
+        - name: TOKEN_X_ENABLED
+          value: "false"
+        - name: MASKINPORTEN_ENABLED
+          value: "false"
+        - name: AZURE_ENABLED
+          value: "false"
+        - name: IDPORTEN_ENABLED
+          value: "false"
+      image: ghcr.io/nais/texas:2025-12-12-090328-adc830c
+      imagePullPolicy: IfNotPresent
+      name: texas
+      ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+      resources: {}
+      restartPolicy: Always
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          add:
+            - NET_BIND_SERVICE
+          drop:
+            - ALL
+        privileged: false
+        readOnlyRootFilesystem: true
+        runAsGroup: 150
+        runAsNonRoot: true
+        runAsUser: 150
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+status:
+  containerStatuses:
+    - name: app
+      ready: true
+  initContainerStatuses:
+    - name: istio-init
+      ready: true
+    - name: istio-proxy
+      ready: true
+    - name: texas
+      ready: true
+  phase: Running
