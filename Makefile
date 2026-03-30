@@ -177,17 +177,22 @@ deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomi
 .PHONY: deploy-mock-controller
 deploy-mock-controller: mock-controller-namespace docker-build-mock-controller ## Deploy mock-controller and all the required resources for accesserator to run properly to the kind cluster
 	"$(KIND)" load docker-image ${MOCK_CONTROLLER_IMG} --name $(KIND_CLUSTER_NAME)
-	@if [ ! -f hack/mock_controller/.env ]; then \
-		echo "❌ hack/mock_controller/.env file not found. Create one before deploying."; \
+	@ENV_FILE=hack/mock_controller/.env; \
+	if [ ! -f "$$ENV_FILE" ]; then \
+		echo "⚠️  hack/mock_controller/.env not found. Falling back to hack/mock_controller/.env.example (dummy values)."; \
+		ENV_FILE=hack/mock_controller/.env.example; \
+	fi; \
+	if [ ! -f "$$ENV_FILE" ]; then \
+		echo "❌ Neither hack/mock_controller/.env nor hack/mock_controller/.env.example found."; \
 		exit 1; \
-	fi
-	@if "$(KUBECTL)" get secret mock-controller-env -n mock-controller-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
+	fi; \
+	if "$(KUBECTL)" get secret mock-controller-env -n mock-controller-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
 		echo "⏳ Updating existing mock-controller-env secret..."; \
-		"$(KUBECTL)" create secret generic mock-controller-env --from-env-file=hack/mock_controller/.env -n mock-controller-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
+		"$(KUBECTL)" create secret generic mock-controller-env --from-env-file="$$ENV_FILE" -n mock-controller-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
 		"$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; \
 	else \
 		echo "⏳ Creating mock-controller-env secret..."; \
-		"$(KUBECTL)" create secret generic mock-controller-env --from-env-file=hack/mock_controller/.env -n mock-controller-system --context $(KUBECONTEXT); \
+		"$(KUBECTL)" create secret generic mock-controller-env --from-env-file="$$ENV_FILE" -n mock-controller-system --context $(KUBECONTEXT); \
 	fi
 	@echo -e "🤞  Installing mock-controller..."
 	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-mock-controller.sh
