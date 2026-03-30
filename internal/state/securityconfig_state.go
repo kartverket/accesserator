@@ -2,7 +2,6 @@ package state
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/skiperator/api/v1alpha1/podtypes"
@@ -67,9 +66,11 @@ func (s *Scope) ReplaceDescendant(
 	resourceKind, resourceName string,
 ) {
 	if s != nil {
+		expectedID := GetID(resourceKind, resourceName)
 		for i, d := range s.Descendants {
-			if reflect.TypeOf(d) == reflect.TypeOf(obj) && d.ID == obj.GetName() {
+			if d.ID == expectedID {
 				s.Descendants[i] = Descendant[client.Object]{
+					ID:             expectedID,
 					Object:         obj,
 					ErrorMessage:   errorMessage,
 					SuccessMessage: successMessage,
