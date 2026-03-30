@@ -59,7 +59,7 @@ type TokenXSpec struct {
 // Exactly one of `client`, `clientRef`, or `secretRef` must be specified.
 //
 // +kubebuilder:object:generate=true
-// +kubebuilder:validation:XValidation:rule="[has(self.client), has(self.clientRef), has(self.secretRef)].filter(x, x).size() == 1",message="Exactly one of client, clientRef, or secretRef must be specified"
+// +kubebuilder:validation:XValidation:rule="!self.enabled || [has(self.client), has(self.clientRef), has(self.secretRef)].filter(x, x).size() == 1",message="Exactly one of client, clientRef, or secretRef must be specified when enabled is true"
 type MaskinportenSpec struct {
 	// Enabled indicates whether Maskinporten should be configured for the application.
 	//
