@@ -148,7 +148,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 		It("returns StateReady and sets JwkerSecretName when Jwker is ready", func() {
 			const secretName = "my-app-jwker-secret"
-			jwker := newTestJwker("default", "my-app", utilities.JwkerSynchronizationStateReady, secretName)
+			jwker := newTestJwker("default", "my-app", utilities.SynchronizationStateReady, secretName)
 			k8sClient = newK8sClientWithObjects(jwker)
 
 			scope := &state.Scope{

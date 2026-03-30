@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
@@ -21,6 +22,7 @@ const (
 	StateInvalid ReconciliationState = iota
 	StatePending
 	StateWaitingForJwker
+	StateWaitingForMaskinportenClient
 	StateFailed
 	StateReady
 )
@@ -112,10 +114,48 @@ func DetermineReconciliationState(
 				getJwkerErr,
 			)
 		}
-		if jwkerResource.Status.SynchronizationState != utilities.JwkerSynchronizationStateReady {
+		if jwkerResource.Status.SynchronizationState != utilities.SynchronizationStateReady {
 			return utilities.Ptr(StateWaitingForJwker), nil
 		}
 		scope.SecurityConfig.Status.JwkerSecretName = jwkerResource.Status.SynchronizationSecretName
+		return utilities.Ptr(StateReady), nil
+	case scope.MaskinportenConfig.Enabled:
+		maskinportenConfigType, err := resolver.DetermineMaskinportenConfigType(scope.SecurityConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine MaskinportenConfig type: %w", err)
+		}
+
+		// If MaksinportenConfigType is secretRef, the integration secret is utilities.GetMaskinportenSecretFromSecretRefName(<SecurityConfig.Name>),
+		// otherwise we need to fetch if from the MaskinportenClient status
+		if *maskinportenConfigType == state.SecretRef {
+			scope.SecurityConfig.Status.MaskinportenSectretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
+			return utilities.Ptr(StateReady), nil
+		}
+
+		var maskinportenClientName string
+		if *maskinportenConfigType == state.InlineClient {
+			maskinportenClientName = utilities.GetMaskinportenClientName(scope.SecurityConfig.Spec.ApplicationRef)
+		} else if *maskinportenConfigType == state.ClientRef {
+			maskinportenClientName = scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name
+		}
+
+		maskinportenClientObjectKey := client.ObjectKey{
+			Namespace: scope.SecurityConfig.Namespace,
+			Name:      maskinportenClientName,
+		}
+		maskinportenClient, getMaksinportenClientErr := utilities.GetMaskinportenClient(ctx, k8sClient, maskinportenClientObjectKey)
+		if getMaksinportenClientErr != nil {
+			return nil, fmt.Errorf("failed to get MaskinportenClient %s/%s: %w",
+				maskinportenClientObjectKey.Namespace,
+				maskinportenClientObjectKey.Name,
+				getMaksinportenClientErr,
+			)
+		}
+		if maskinportenClient.Status.SynchronizationState != utilities.SynchronizationStateReady {
+			return utilities.Ptr(StateWaitingForMaskinportenClient), nil
+		}
+
+		scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
 		return utilities.Ptr(StateReady), nil
 	default:
 		return utilities.Ptr(StateReady), nil
@@ -126,7 +166,7 @@ func determinePhase(reconciliationState ReconciliationState) v1alpha.Phase {
 	switch reconciliationState {
 	case StateInvalid:
 		return v1alpha.PhaseInvalid
-	case StatePending, StateWaitingForJwker:
+	case StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient:
 		return v1alpha.PhasePending
 	case StateFailed:
 		return v1alpha.PhaseFailed
@@ -138,7 +178,7 @@ func determinePhase(reconciliationState ReconciliationState) v1alpha.Phase {
 
 func determineReadiness(reconciliationState ReconciliationState) bool {
 	switch reconciliationState {
-	case StateInvalid, StatePending, StateWaitingForJwker, StateFailed:
+	case StateInvalid, StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient, StateFailed:
 		return false
 	case StateReady:
 		return true
@@ -154,6 +194,8 @@ func statusMessage(reconciliationState ReconciliationState, validationErrorMessa
 		return "SecurityConfig pending due to missing Descendants."
 	case StateWaitingForJwker:
 		return "SecurityConfig pending, waiting for Jwker to be ready."
+	case StateWaitingForMaskinportenClient:
+		return "SecurityConfig pending, waiting for MaskinportenClient to be ready."
 	case StateFailed:
 		return "SecurityConfig failed."
 	case StateReady:
