@@ -19,7 +19,7 @@ spec:
   applicationRef: app
 ```
 
-## Inject `texas`
+## Exchange tokens with `texas`
 You can use `texas` to perform the token exchange. The following manifest snippet shows how to configure a Skiperator application to have the `texas` sidecar injected. 
 The sidecar will be configured given the `SecurityConfig` referencing the application.
 
@@ -38,17 +38,15 @@ spec:
 
 The result is a pod where the main app container can call the API of the `texas` sidecar to perform token exchange.
 
-## Exchange tokens with `texas`
+### Example: Exchange tokens with `texas`
 Check if a local cluster with all the necessary dependencies is configured, 
 that accesserator is running on your machine or as a deployment in the local cluster and that an ingress is set up to access the mock-oauth2 server.
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-make -C "$REPO_ROOT" ensurelocal
-make -C "$REPO_ROOT" ensurerunningordeployed
-make -C "$REPO_ROOT" mock-oauth2-ingress
+make -C "$REPO_ROOT" ensurelocal ensurerunningordeployed mock-oauth2-ingress
 ```
 
-Apply the example resources, which include two SKiperator applications where `app` uses the `texas` sidecar to exchange tokens for accessing `another-app` on behalf of the end user.
+Apply the example resources, which include two Skiperator applications where `app` uses the `texas` sidecar to exchange tokens for accessing `another-app` on behalf of the end user.
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 KUBECTL="$REPO_ROOT/bin/kubectl"
