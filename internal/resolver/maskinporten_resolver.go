@@ -18,14 +18,6 @@ const (
 	MaskinportenJwksUriEnvVar       = "MASKINPORTEN_JWKS_URI"
 	MaskinportenClientIdEnvVar      = "MASKINPORTEN_CLIENT_ID"
 	MaskinportenClientJwkEnvVar     = "MASKINPORTEN_CLIENT_JWK"
-
-	MaskinportenProdIssuer        = "https://maskinporten.no"
-	MaskinportenProdTokenEndpoint = "https://maskinporten.no/token"
-	MaskinportenProdJwksUri       = "https://maskinporten.no/jwk"
-
-	MaskinportenTestIssuer        = "https://test.maskinporten.no"
-	MaskinportenTestTokenEndpoint = "https://test.maskinporten.no/token"
-	MaskinportenTestJwksUri       = "https://test.maskinporten.no/jwk"
 )
 
 func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.MaskinportenConfig, error) {
@@ -46,7 +38,9 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 			Type:    *maskinportenConfigType,
 			ClientSpec: &naisiov1.MaskinportenClientSpec{
 				ClientName: securityConfig.Spec.Maskinporten.Client.ClientName,
-				Scopes:     securityConfig.Spec.Maskinporten.Client.Scopes,
+				Scopes: naisiov1.MaskinportenScope{
+					ConsumedScopes: securityConfig.Spec.Maskinporten.Client.Scopes.ConsumedScopes,
+				},
 				SecretName: utilities.GetMaskinportenSecretName(securityConfig.Name),
 			},
 		}, nil
@@ -91,14 +85,14 @@ func GetMaskinportenSecretData(ctx context.Context, k8sClient client.Client, sec
 		MaskinportenClientJwkEnvVar: clientJwkData,
 	}
 	if *config.Get().RunsInProduction {
-		secretData[MaskinportenIssuerEnvVar] = []byte(MaskinportenProdIssuer)
-		secretData[MaskinportenTokenEndpointEnvVar] = []byte(MaskinportenProdTokenEndpoint)
-		secretData[MaskinportenJwksUriEnvVar] = []byte(MaskinportenProdJwksUri)
+		secretData[MaskinportenIssuerEnvVar] = []byte(utilities.MaskinportenProdIssuer)
+		secretData[MaskinportenTokenEndpointEnvVar] = []byte(utilities.MaskinportenProdTokenEndpoint)
+		secretData[MaskinportenJwksUriEnvVar] = []byte(utilities.MaskinportenProdJwksUri)
 		return &secretData, nil
 	}
-	secretData[MaskinportenIssuerEnvVar] = []byte(MaskinportenTestIssuer)
-	secretData[MaskinportenTokenEndpointEnvVar] = []byte(MaskinportenTestTokenEndpoint)
-	secretData[MaskinportenJwksUriEnvVar] = []byte(MaskinportenTestJwksUri)
+	secretData[MaskinportenIssuerEnvVar] = []byte(utilities.MaskinportenTestIssuer)
+	secretData[MaskinportenTokenEndpointEnvVar] = []byte(utilities.MaskinportenTestTokenEndpoint)
+	secretData[MaskinportenJwksUriEnvVar] = []byte(utilities.MaskinportenTestJwksUri)
 	return &secretData, nil
 }
 
