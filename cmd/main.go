@@ -25,6 +25,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -57,6 +58,7 @@ func init() {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(accesseratorv1alpha.AddToScheme(scheme))
 	utilruntime.Must(naisiov1.AddToScheme(scheme))
+	utilruntime.Must(istionetworkingv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
