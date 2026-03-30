@@ -46,7 +46,11 @@ var (
 
 func main() {
 	flag.Var(&flagURLs, "url", "URL to a CRD YAML (repeatable)")
-	flag.Var(&flagKinds, "kind", "only write the CRD for this kind name (repeatable); required when a URL contains multiple CRDs")
+	flag.Var(
+		&flagKinds,
+		"kind",
+		"only write the CRD for this kind name (repeatable); required when a URL contains multiple CRDs",
+	)
 	flag.Parse()
 
 	if len(flagURLs) == 0 {
