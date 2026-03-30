@@ -1,5 +1,6 @@
 # Image URL to use all building/pushing image targets
 IMG ?= accesserator:latest
+MOCK_CONTROLLER_IMG ?= mock-controller:latest
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -64,12 +65,24 @@ isnotrunning: ## Check if accesserator is NOT running on your host machine (i.e.
 	@lsof -i :8081 > /dev/null || (echo "✅ accesserator is not running on your host. Ready to deploy." && exit 0 || echo "❌ accesserator is running on your host. Please stop it first." && exit 1)
 	@echo "✅ accesserator is not running."
 
+.PHONY: ismockcontrollerrunning
+ismockcontrollerrunning: ## Check if mock-controller is running on your host machine (i.e. from IDE or with 'go run')
+	@echo "Checking if mock-controller is running..."
+	@lsof -i :8083 > /dev/null || (echo "❌ mock-controller is not running. Please start it first either in your IDE or with 'go run ./hack/mock_controller/main.go'." && exit 1)
+	@echo "✅ mock-controller is running."
+
+.PHONY: ismockcontrollernotrunning
+ismockcontrollernotrunning: ## Check if mock-controller is NOT running on your host machine
+	@echo "Checking if mock-controller is not running..."
+	@! lsof -i :8083 > /dev/null 2>&1 || (echo "❌ mock-controller is running on your host. Please stop it first." && exit 1)
+	@echo "✅ mock-controller is not running on your host. Ready to deploy."
+
 .PHONY: sourceenv
 sourceenv: ## Source environment variables from .env file
 	@set -a; [ -f .env ] && . .env; set +a
 
 .PHONY: local
-local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker ztoperator generate install ## Set up entire local development environment with external dependencies
+local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker ztoperator deploy-mock-controller generate install ## Set up entire local development environment with external dependencies
 
 .PHONY: clean
 clean: kind ## Clean up local environment by deleting kind cluster
@@ -132,22 +145,9 @@ build: generate fmt vet ## Build manager binary.
 docker-build: ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
 
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name accesserator-builder
-	$(CONTAINER_TOOL) buildx use accesserator-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm accesserator-builder
-	rm Dockerfile.cross
+.PHONY: docker-build-mock-controller
+docker-build-mock-controller: ## Build docker image for mock-controller.
+	$(CONTAINER_TOOL) build -t ${MOCK_CONTROLLER_IMG} -f hack/mock_controller/Dockerfile .
 
 ##@ Deployment
 
@@ -174,12 +174,36 @@ deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomi
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 
+.PHONY: deploy-mock-controller
+deploy-mock-controller: mock-controller-namespace docker-build-mock-controller ## Deploy mock-controller and all the required resources for accesserator to run properly to the kind cluster
+	"$(KIND)" load docker-image ${MOCK_CONTROLLER_IMG} --name $(KIND_CLUSTER_NAME)
+	@if [ ! -f hack/mock_controller/.env ]; then \
+		echo "❌ hack/mock_controller/.env file not found. Create one before deploying."; \
+		exit 1; \
+	fi
+	@if "$(KUBECTL)" get secret mock-controller-env -n mock-controller-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
+		echo "⏳ Updating existing mock-controller-env secret..."; \
+		"$(KUBECTL)" create secret generic mock-controller-env --from-env-file=hack/mock_controller/.env -n mock-controller-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
+		"$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; \
+	else \
+		echo "⏳ Creating mock-controller-env secret..."; \
+		"$(KUBECTL)" create secret generic mock-controller-env --from-env-file=hack/mock_controller/.env -n mock-controller-system --context $(KUBECONTEXT); \
+	fi
+	@echo -e "🤞  Installing mock-controller..."
+	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-mock-controller.sh
+	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n mock-controller-system -l app=mock-controller --context $(KUBECONTEXT) || (echo -e "❌  Error deploying mock-controller." && exit 1)
+	@echo -e "✅  mock-controller installed in namespace 'mock-controller-system'!"
+
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy accesserator and all the resources deployed by accesserator to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/manager 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
+
+.PHONY: undeploy-mock-controller
+undeploy-mock-controller: kubectl ## Undeploy mock-controller and all the resources deployed by mock-controller to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	"$(KUBECTL)" delete deployment mock-controller -n mock-controller-system --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found)
 
 .PHONY: webhooks
 webhooks: kustomize ## Extract webhook certificate details
@@ -215,6 +239,10 @@ cluster: kind ## Create Kind cluster with kube context kind-accesserator
 .PHONY: accesserator-namespace
 accesserator-namespace: kubectl ## Create accesserator-system namespace in the cluster
 	@/bin/bash ./scripts/create-accesserator-namespace.sh
+
+.PHONY: mock-controller-namespace
+mock-controller-namespace: kubectl ## Create mock-controller-system namespace in the cluster
+	@/bin/bash ./scripts/create-mock-controller-namespace.sh
 
 ##@ Operators
 
@@ -376,6 +404,30 @@ ensurerunningordeployed: ## Ensure accesserator is running on host OR deployed i
 	fi; \
 	if [ "$$running" = "1" ]; then echo "✅ Accesserator is running on the host."; fi; \
 	if [ "$$deployed" = "1" ]; then echo "✅ Accesserator is deployed an running in the local cluster."; fi
+
+.PHONY: ensuremockcontrollernotdeployed
+ensuremockcontrollernotdeployed: kubectl ## Ensure mock-controller is NOT deployed in the kind cluster
+	@if "$(KUBECTL)" -n mock-controller-system get deployment mock-controller >/dev/null 2>&1; then \
+		echo "❌ mock-controller IS deployed to the cluster"; \
+		exit 1; \
+	else \
+		echo "✅ mock-controller IS NOT deployed to the cluster"; \
+	fi
+
+.PHONY: ensuremockcontrollerdeployed
+ensuremockcontrollerdeployed: kubectl ismockcontrollernotrunning ## Ensure mock-controller is deployed and ready in the kind cluster
+	@echo "🔎 Checking mock-controller deployment in mock-controller-system..."; \
+	"$(KUBECTL)" get deployment -n mock-controller-system mock-controller >/dev/null 2>&1 || { \
+		echo "❌ mock-controller deployment not found. Deploy it first with 'make deploy-mock-controller'."; \
+		exit 1; \
+	}; \
+	READY=$$($(KUBECTL) get deployment -n mock-controller-system mock-controller -o jsonpath='{.status.readyReplicas}' 2>/dev/null); \
+	DESIRED=$$($(KUBECTL) get deployment -n mock-controller-system mock-controller -o jsonpath='{.spec.replicas}' 2>/dev/null); \
+	if [ "$${READY:-0}" != "$$DESIRED" ]; then \
+		echo "❌ mock-controller deployment not ready (ready=$${READY:-0}, desired=$$DESIRED). Run 'make deploy-mock-controller' to fix it."; \
+		exit 1; \
+	fi; \
+	echo "✅ mock-controller is deployed and ready (replicas=$$DESIRED)."
 
 ##@ Dependencies
 
