@@ -133,10 +133,13 @@ func DetermineReconciliationState(
 		}
 
 		var maskinportenClientName string
-		if *maskinportenConfigType == state.InlineClient {
+		switch *maskinportenConfigType {
+		case state.InlineClient:
 			maskinportenClientName = utilities.GetMaskinportenClientName(scope.SecurityConfig.Spec.ApplicationRef)
-		} else if *maskinportenConfigType == state.ClientRef {
+		case state.ClientRef:
 			maskinportenClientName = scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name
+		default:
+			return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", *maskinportenConfigType)
 		}
 
 		maskinportenClientObjectKey := client.ObjectKey{
