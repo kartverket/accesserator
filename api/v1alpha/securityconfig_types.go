@@ -30,6 +30,12 @@ type SecurityConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Tokenx *TokenXSpec `json:"tokenx,omitempty"`
 
+	// Maskinporten specifies whether to configure the maskinporten API consumer capability for an application referred to by `applicationRef`.
+	// The configuration can either be provided inline via the `client` field,
+	// by referencing an existing MaskinportenClient resource via the `clientRef` field,
+	// or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.
+	//
+	// +kubebuilder:validation:Optional
 	Maskinporten *MaskinportenSpec `json:"maskinporten,omitempty"`
 
 	// ApplicationRef is a reference to the name of the SKIP application for which this SecurityConfig applies.
@@ -86,10 +92,24 @@ type MaskinportenSpec struct {
 type MaskinportenClientSpec struct {
 	// ClientName is the client name to be registered at DigDir.
 	// It is shown during login for user-centric flows, and is otherwise a human-readable way to differentiate between clients at DigDir's self-service portal.
+	//
+	// +kubebuilder:validation:Required
 	ClientName string `json:"clientName"`
 
-	// Scopes is a object of used end exposed scopes by application
-	Scopes naisiov1.MaskinportenScope `json:"scopes"`
+	// Scopes is an object of consumed scopes.
+	//
+	// +kubebuilder:validation:Optional
+	Scopes MaskinportenScope `json:"scopes"`
+}
+
+// MaskinportenScope defines consumed scopes for the application.
+//
+// +kubebuilder:object:generate=true
+type MaskinportenScope struct {
+	// `consumes` is a list of scopes that your client can request access to.
+	//
+	// +kubebuilder:validation:Required
+	ConsumedScopes []naisiov1.ConsumedScope `json:"consumes,omitempty"`
 }
 
 // MaskinportenClientRef defines a reference to an existing MaskinportenClient by name.
@@ -136,12 +156,13 @@ type SecretKeySelector struct {
 
 // SecurityConfigStatus defines the observed state of SecurityConfig.
 type SecurityConfigStatus struct {
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
-	Phase              Phase              `json:"phase,omitempty"`
-	Message            string             `json:"message,omitempty"`
-	JwkerSecretName    string             `json:"jwkerSecretName,omitempty"`
-	Ready              bool               `json:"ready"`
+	ObservedGeneration      int64              `json:"observedGeneration,omitempty"`
+	Conditions              []metav1.Condition `json:"conditions,omitempty"`
+	Phase                   Phase              `json:"phase,omitempty"`
+	Message                 string             `json:"message,omitempty"`
+	JwkerSecretName         string             `json:"jwkerSecretName,omitempty"`
+	MaskinportenSectretName string             `json:"maskinportenSecretName,omitempty"`
+	Ready                   bool               `json:"ready"`
 }
 
 type Phase string
