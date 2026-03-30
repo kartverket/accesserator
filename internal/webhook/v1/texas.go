@@ -84,9 +84,21 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 			},
 		})
 	}
+
+	maskinportenEnabled := "false"
+	if securityConfig.Spec.Maskinporten != nil && securityConfig.Spec.Maskinporten.Enabled {
+		maskinportenEnabled = "true"
+		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: securityConfig.Status.MaskinportenSectretName,
+				},
+			},
+		})
+	}
 	return TexasEnvVars{
 		TokenXEnabled:          tokenxEnabled,
-		MaskinportenEnabled:    "false",
+		MaskinportenEnabled:    maskinportenEnabled,
 		AzureEnabled:           "false",
 		IdportenEnabled:        "false",
 		IntegrationSecretsRefs: integrationSecrets,
