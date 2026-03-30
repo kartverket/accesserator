@@ -3,6 +3,7 @@ package utilities
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"time"
 
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
@@ -59,12 +60,33 @@ func GetTokenxEgressName(securityConfigName string, tokenxConfigName string) str
 	return fmt.Sprintf("%s-%s-%s", securityConfigName, tokenxConfigName, EgressNameSuffix)
 }
 
-func GetMaskinportenClientName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenClientNameSuffix)
+func GetMaskinportenClientName(applicationRef string) string {
+	return fmt.Sprintf("%s-%s", applicationRef, MaskinportenNameSuffix)
 }
 
 func GetMaskinportenSecretName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenSecretSuffix)
+	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
+}
+
+func GetMaskinportenSecretFromSecretRefName(securityConfigName string) string {
+	return fmt.Sprintf(
+		"%s-%s-%s",
+		securityConfigName,
+		MaskinportenNameSuffix,
+		ShortHash(securityConfigName),
+	)
+}
+
+// ShortHash returns the first 8 hex characters of an FNV-32a hash of s.
+// Useful for producing short, stable, Kubernetes-safe name suffixes.
+func ShortHash(s string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return fmt.Sprintf("%08x", h.Sum32())
+}
+
+func GetMaskinportenServiceEntryName(securityConfigName string) string {
+	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
 }
 
 func GetMockKubernetesClient(scheme *runtime.Scheme, objects ...client.Object) client.Client {
@@ -113,10 +135,19 @@ func GetSecretDataByKey(
 	return secretData, nil
 }
 
-func GetMaskinportenClient(ctx context.Context, k8sClient client.Client, key client.ObjectKey) (*naisiov1.MaskinportenClient, error) {
+func GetMaskinportenClient(
+	ctx context.Context,
+	k8sClient client.Client,
+	key client.ObjectKey,
+) (*naisiov1.MaskinportenClient, error) {
 	var maskinportenClient naisiov1.MaskinportenClient
 	if err := k8sClient.Get(ctx, key, &maskinportenClient); err != nil {
-		return nil, fmt.Errorf("failed to get MaskinportenClient %s/%s: %w", key.Name, key.Namespace, err)
+		return nil, fmt.Errorf(
+			"failed to get MaskinportenClient %s/%s: %w",
+			key.Name,
+			key.Namespace,
+			err,
+		)
 	}
 	return &maskinportenClient, nil
 }
