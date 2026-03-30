@@ -23,7 +23,7 @@ spec:
 apiVersion: accesserator.kartverket.no/v1alpha
 kind: SecurityConfig
 metadata:
-  name: security-config-app
+  name: security-config
   namespace: maskinporten-example
 spec:
   maskinporten:
