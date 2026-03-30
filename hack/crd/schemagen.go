@@ -11,3 +11,9 @@ package crd
 
 // Jwker CRD
 //go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/refs/heads/main/config/crd/bases/nais.io_jwkers.yaml
+
+// MaskinportenClient CRD
+//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/refs/heads/main/config/crd/bases/nais.io_maskinportenclients.yaml
+
+// Istio ServiceEntry CRD
+//go:generate urlcrd -outdir=./bases -kind=ServiceEntry -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.28.0/kubernetes/customresourcedefinitions.gen.yaml
