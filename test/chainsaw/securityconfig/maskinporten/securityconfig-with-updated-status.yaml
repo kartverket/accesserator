@@ -1,0 +1,19 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+spec:
+  applicationRef: app
+  maskinporten:
+    enabled: true
+    client:
+      clientName: app
+      scopes:
+        consumes:
+          - name: demo311834282:write
+          - name: demo311834282:read
+status:
+  maskinportenSecretName: security-config-maskinporten
+  message: SecurityConfig ready.
+  phase: Ready
+  ready: true

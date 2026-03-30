@@ -1,0 +1,50 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: maskinporten
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        accesserator-webhooks: enabled
+  steps:
+    - try:
+        - create:
+            file: skiperator-application.yaml
+        - create:
+            file: securityconfig-maskinporten-disabled.yaml
+        - error:
+            file: maskinporten-client.yaml
+        - error:
+            file: maskinporten-secret.yaml
+        - error:
+            file: service-entry.yaml
+        - error:
+            file: securityconfig-with-updated-status.yaml
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                maskinporten:
+                  enabled: true
+                  client:
+                    clientName: app
+                    scopes:
+                      consumes:
+                        - name: demo311834282:write
+                        - name: demo311834282:read
+                applicationRef: app
+        - assert:
+            file: securityconfig-with-updated-status.yaml
+        - assert:
+            file: maskinporten-client.yaml
+        - assert:
+            file: maskinporten-secret.yaml
+        - assert:
+            file: service-entry.yaml
