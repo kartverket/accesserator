@@ -52,7 +52,7 @@ var _ = Describe("BuildSecurityConfigCondition", func() {
 
 		Expect(condition.Type).To(Equal("SecurityConfig-test-security-config"))
 		Expect(condition.Status).To(Equal(metav1.ConditionUnknown))
-		Expect(condition.Reason).To(Equal("ReconciliationPending"))
+		Expect(condition.Reason).To(Equal(statusmanager.ReconciliationPending))
 		Expect(condition.LastTransitionTime.IsZero()).To(BeFalse())
 	})
 
@@ -61,7 +61,16 @@ var _ = Describe("BuildSecurityConfigCondition", func() {
 
 		Expect(condition.Type).To(Equal("SecurityConfig-test-security-config"))
 		Expect(condition.Status).To(Equal(metav1.ConditionUnknown))
-		Expect(condition.Reason).To(Equal("ReconciliationPending"))
+		Expect(condition.Reason).To(Equal(statusmanager.ReconciliationPending))
+		Expect(condition.LastTransitionTime.IsZero()).To(BeFalse())
+	})
+
+	It("returns an Unknown condition when state is WaitingForMaskinportenClient", func() {
+		condition := statusmanager.BuildSecurityConfigCondition(sc, statusmanager.StateWaitingForMaskinportenClient, utilities.Ptr("ignored"), []metav1.Condition{})
+
+		Expect(condition.Type).To(Equal("SecurityConfig-test-security-config"))
+		Expect(condition.Status).To(Equal(metav1.ConditionUnknown))
+		Expect(condition.Reason).To(Equal(statusmanager.ReconciliationPending))
 		Expect(condition.LastTransitionTime.IsZero()).To(BeFalse())
 	})
 
