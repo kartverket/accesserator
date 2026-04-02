@@ -46,6 +46,9 @@ spec:
               applicationRef:
                 description: ApplicationRef is a reference to the name of the SKIP
                   application for which this SecurityConfig applies.
+                maxLength: 253
+                minLength: 1
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                 type: string
               maskinporten:
                 description: |-
@@ -94,6 +97,9 @@ spec:
                     properties:
                       name:
                         description: Name of the referenced MaskinportenClient.
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                     required:
                     - name
@@ -115,9 +121,15 @@ spec:
                           key:
                             description: Key is the key within the secret whose value
                               should be used.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$
                             type: string
                           name:
                             description: Name is the name of the Kubernetes secret.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                             type: string
                         required:
                         - key
@@ -130,9 +142,15 @@ spec:
                           key:
                             description: Key is the key within the secret whose value
                               should be used.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$
                             type: string
                           name:
                             description: Name is the name of the Kubernetes secret.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                             type: string
                         required:
                         - key
@@ -146,6 +164,9 @@ spec:
                 - enabled
                 type: object
                 x-kubernetes-validations:
+                - message: At most one of client, clientRef, or secretRef may be specified
+                  rule: '[has(self.client), has(self.clientRef), has(self.secretRef)].filter(x,
+                    x).size() <= 1'
                 - message: Exactly one of client, clientRef, or secretRef must be
                     specified when enabled is true
                   rule: '!self.enabled || [has(self.client), has(self.clientRef),

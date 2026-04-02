@@ -41,7 +41,7 @@ type SecurityConfigSpec struct {
 	// ApplicationRef is a reference to the name of the SKIP application for which this SecurityConfig applies.
 	//
 	// +kubebuilder:validation:Required
-	ApplicationRef string `json:"applicationRef,omitempty"`
+	ApplicationRef ResourceName `json:"applicationRef"`
 }
 
 // TokenXSpec defines the configuration for token exchange.
@@ -56,9 +56,11 @@ type TokenXSpec struct {
 
 // MaskinportenSpec defines the configuration for Maskinporten.
 //
-// Exactly one of `client`, `clientRef`, or `secretRef` must be specified.
+// At most one of `client`, `clientRef`, or `secretRef` may be specified.
+// Exactly one must be specified when `enabled` is true.
 //
 // +kubebuilder:object:generate=true
+// +kubebuilder:validation:XValidation:rule="[has(self.client), has(self.clientRef), has(self.secretRef)].filter(x, x).size() <= 1",message="At most one of client, clientRef, or secretRef may be specified"
 // +kubebuilder:validation:XValidation:rule="!self.enabled || [has(self.client), has(self.clientRef), has(self.secretRef)].filter(x, x).size() == 1",message="Exactly one of client, clientRef, or secretRef must be specified when enabled is true"
 type MaskinportenSpec struct {
 	// Enabled indicates whether Maskinporten should be configured for the application.
@@ -99,7 +101,7 @@ type MaskinportenClientSpec struct {
 	// Scopes is an object of consumed scopes.
 	//
 	// +kubebuilder:validation:Optional
-	Scopes MaskinportenScope `json:"scopes"`
+	Scopes *MaskinportenScope `json:"scopes,omitempty"`
 }
 
 // MaskinportenScope defines consumed scopes for the application.
@@ -109,7 +111,7 @@ type MaskinportenScope struct {
 	// `consumes` is a list of scopes that your client can request access to.
 	//
 	// +kubebuilder:validation:Required
-	ConsumedScopes []naisiov1.ConsumedScope `json:"consumes,omitempty"`
+	ConsumedScopes []naisiov1.ConsumedScope `json:"consumes"`
 }
 
 // MaskinportenClientRef defines a reference to an existing MaskinportenClient by name.
@@ -119,8 +121,15 @@ type MaskinportenClientRef struct {
 	// Name of the referenced MaskinportenClient.
 	//
 	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	Name ResourceName `json:"name"`
 }
+
+// ResourceName is a type for Kubernetes resource names.
+//
+// +kubebuilder:validation:MaxLength=253
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+type ResourceName string
 
 // SecretRef defines where to source each required Maskinporten environment variable from.
 // Each field points to a key in a Kubernetes secret, allowing the values to come from
@@ -146,11 +155,14 @@ type SecretKeySelector struct {
 	// Name is the name of the Kubernetes secret.
 	//
 	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	Name ResourceName `json:"name"`
 
 	// Key is the key within the secret whose value should be used.
 	//
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$`
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:MinLength=1
 	Key string `json:"key"`
 }
 
