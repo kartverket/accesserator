@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
@@ -120,26 +119,21 @@ func DetermineReconciliationState(
 		scope.SecurityConfig.Status.JwkerSecretName = jwkerResource.Status.SynchronizationSecretName
 		return utilities.Ptr(StateReady), nil
 	case scope.MaskinportenConfig.Enabled:
-		maskinportenConfigType, err := resolver.DetermineMaskinportenConfigType(scope.SecurityConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine MaskinportenConfig type: %w", err)
-		}
-
 		// If MaksinportenConfigType is secretRef, the integration secret is utilities.GetMaskinportenSecretFromSecretRefName(<SecurityConfig.Name>),
 		// otherwise we need to fetch if from the MaskinportenClient status
-		if *maskinportenConfigType == state.SecretRef {
+		if scope.MaskinportenConfig.Type == state.SecretRef {
 			scope.SecurityConfig.Status.MaskinportenSectretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
 			return utilities.Ptr(StateReady), nil
 		}
 
 		var maskinportenClientName string
-		switch *maskinportenConfigType {
+		switch scope.MaskinportenConfig.Type {
 		case state.InlineClient:
 			maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
 		case state.ClientRef:
 			maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
 		default:
-			return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", *maskinportenConfigType)
+			return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
 		}
 
 		maskinportenClientObjectKey := client.ObjectKey{
@@ -148,7 +142,7 @@ func DetermineReconciliationState(
 		}
 		maskinportenClient, getMaksinportenClientErr := utilities.GetMaskinportenClient(ctx, k8sClient, maskinportenClientObjectKey)
 		if getMaksinportenClientErr != nil {
-			return nil, fmt.Errorf("failed to get MaskinportenClient %s/%s: %w",
+			return nil, fmt.Errorf("failed to get MaskinportenClient resource %s/%s: %w",
 				maskinportenClientObjectKey.Namespace,
 				maskinportenClientObjectKey.Name,
 				getMaksinportenClientErr,
