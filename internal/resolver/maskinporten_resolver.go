@@ -33,13 +33,17 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 	}
 	switch *maskinportenConfigType {
 	case state.InlineClient:
+		var consumedScopes []naisiov1.ConsumedScope
+		if securityConfig.Spec.Maskinporten.Client.Scopes != nil {
+			consumedScopes = securityConfig.Spec.Maskinporten.Client.Scopes.ConsumedScopes
+		}
 		return &state.MaskinportenConfig{
 			Enabled: true,
 			Type:    *maskinportenConfigType,
 			ClientSpec: &naisiov1.MaskinportenClientSpec{
 				ClientName: securityConfig.Spec.Maskinporten.Client.ClientName,
 				Scopes: naisiov1.MaskinportenScope{
-					ConsumedScopes: securityConfig.Spec.Maskinporten.Client.Scopes.ConsumedScopes,
+					ConsumedScopes: consumedScopes,
 				},
 				SecretName: utilities.GetMaskinportenSecretName(securityConfig.Name),
 			},
