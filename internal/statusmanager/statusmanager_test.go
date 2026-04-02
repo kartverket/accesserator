@@ -53,6 +53,19 @@ func newTestJwker(namespace, appName, synchronizationState, secretName string) *
 	}
 }
 
+func newTestMaskinportenClient(namespace, appName, synchronizationState, secretName string) *naisiov1.MaskinportenClient {
+	return &naisiov1.MaskinportenClient{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      utilities.GetMaskinportenClientName(appName),
+			Namespace: namespace,
+		},
+		Status: naisiov1.DigdiratorStatus{
+			SynchronizationState:      synchronizationState,
+			SynchronizationSecretName: secretName,
+		},
+	}
+}
+
 func newK8sClientWithObjects(objects ...client.Object) client.Client {
 	scheme := runtime.NewScheme()
 	_ = accesseratorv1alpha.AddToScheme(scheme)

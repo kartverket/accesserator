@@ -220,7 +220,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: v1alpha.SecurityConfigSpec{
-				ApplicationRef: skiperatorAppName,
+				ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 			},
 		}
 		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())
@@ -272,7 +272,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: v1alpha.SecurityConfigSpec{
-				ApplicationRef: skiperatorAppName,
+				ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 			},
 		}
 		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())

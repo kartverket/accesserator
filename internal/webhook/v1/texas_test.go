@@ -7,6 +7,7 @@ import (
 	v1 "github.com/kartverket/accesserator/internal/webhook/v1"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
+	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -14,7 +15,10 @@ import (
 
 var _ = Describe("pod_webhook.go unit tests", func() {
 
-	const applicationRef = "myapp"
+	const (
+		applicationRef     = "myapp"
+		securityConfigName = "myconfig"
+	)
 
 	Describe("GetTexasContainer", func() {
 		It("builds a Texas init container with tokenx enabled then tokenx is enabled in SecurityConfig", func() {
@@ -42,6 +46,98 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						SecretRef: &corev1.SecretEnvSource{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: securityConfig.Status.JwkerSecretName,
+							},
+						},
+					},
+				),
+			)
+		})
+
+		It("builds a Texas init container with maskinporten enabled then maskinporten is enabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Maskinporten: &v1alpha.MaskinportenSpec{
+						Enabled: true,
+						Client: &v1alpha.MaskinportenClientSpec{
+							ClientName: securityConfigName,
+							Scopes: &v1alpha.MaskinportenScope{
+								ConsumedScopes: []naisiov1.ConsumedScope{
+									{Name: "scope1"},
+									{Name: "scope2"},
+								},
+							},
+						},
+					},
+				},
+				Status: v1alpha.SecurityConfigStatus{
+					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+				},
+			}
+			c := v1.GetTexasContainer(securityConfig)
+			Expect(c.Env).NotTo(BeEmpty())
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.MaskinportenEnabledEnvVarName, Value: "true"}))
+			Expect(c.EnvFrom).NotTo(BeEmpty())
+			Expect(c.EnvFrom).To(
+				ContainElement(
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: securityConfig.Status.MaskinportenSectretName,
+							},
+						},
+					},
+				),
+			)
+		})
+
+		It("builds a texas init container with both tokenx and maskinporten enabled when they are enabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Tokenx: &v1alpha.TokenXSpec{
+						Enabled: true,
+					},
+					Maskinporten: &v1alpha.MaskinportenSpec{
+						Enabled: true,
+						Client: &v1alpha.MaskinportenClientSpec{
+							ClientName: securityConfigName,
+							Scopes: &v1alpha.MaskinportenScope{
+								ConsumedScopes: []naisiov1.ConsumedScope{
+									{Name: "scope1"},
+									{Name: "scope2"},
+								},
+							},
+						},
+					},
+				},
+				Status: v1alpha.SecurityConfigStatus{
+					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+				},
+			}
+			c := v1.GetTexasContainer(securityConfig)
+			Expect(c.Env).NotTo(BeEmpty())
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.TokenXEnabledEnvVarName, Value: "true"}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.MaskinportenEnabledEnvVarName, Value: "true"}))
+			Expect(c.EnvFrom).NotTo(BeEmpty())
+			Expect(c.EnvFrom).To(
+				ContainElement(
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: securityConfig.Status.JwkerSecretName,
+							},
+						},
+					},
+				),
+			)
+			Expect(c.EnvFrom).To(
+				ContainElement(
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: securityConfig.Status.MaskinportenSectretName,
 							},
 						},
 					},
@@ -100,6 +196,161 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				},
 			))
 		})
+
+		It("returns env vars with maskinporten disabled and no integration secrets when maskinporten is not configured in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+				},
+			}
+			envVars := v1.GetTexasEnvVars(securityConfig)
+			Expect(envVars.MaskinportenEnabled).To(Equal("false"))
+			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
+		})
+
+		It("returns env vars with maskinporten disabled and no integration secrets when maskinporten is disabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Maskinporten: &v1alpha.MaskinportenSpec{
+						Enabled: false,
+					},
+				},
+			}
+			envVars := v1.GetTexasEnvVars(securityConfig)
+			Expect(envVars.MaskinportenEnabled).To(Equal("false"))
+			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
+		})
+
+		It("returns env vars with maskinporten enabled and the expected integration secret ref when maskinporten is enabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Maskinporten: &v1alpha.MaskinportenSpec{
+						Enabled: true,
+						Client: &v1alpha.MaskinportenClientSpec{
+							ClientName: securityConfigName,
+							Scopes: &v1alpha.MaskinportenScope{
+								ConsumedScopes: []naisiov1.ConsumedScope{
+									{Name: "scope1"},
+									{Name: "scope2"},
+								},
+							},
+						},
+					},
+				},
+				Status: v1alpha.SecurityConfigStatus{
+					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+				},
+			}
+			envVars := v1.GetTexasEnvVars(securityConfig)
+			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
+			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
+				corev1.EnvFromSource{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: securityConfig.Status.MaskinportenSectretName,
+						},
+					},
+				},
+			))
+		})
+
+		It("returns env vars with maskinporten and tokenx enabled and the expected integration secret refs when both are enabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Tokenx: &v1alpha.TokenXSpec{
+						Enabled: true,
+					},
+					Maskinporten: &v1alpha.MaskinportenSpec{
+						Enabled: true,
+						Client: &v1alpha.MaskinportenClientSpec{
+							ClientName: securityConfigName,
+							Scopes: &v1alpha.MaskinportenScope{
+								ConsumedScopes: []naisiov1.ConsumedScope{
+									{Name: "scope1"},
+									{Name: "scope2"},
+								},
+							},
+						},
+					},
+				},
+				Status: v1alpha.SecurityConfigStatus{
+					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+				},
+			}
+			envVars := v1.GetTexasEnvVars(securityConfig)
+			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
+			Expect(envVars.TokenXEnabled).To(Equal("true"))
+			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
+				corev1.EnvFromSource{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: securityConfig.Status.MaskinportenSectretName,
+						},
+					},
+				},
+			))
+			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
+				corev1.EnvFromSource{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: securityConfig.Status.JwkerSecretName,
+						},
+					},
+				},
+			))
+		})
+
+		It("returns env vars with maskinporten enabled and tokenx disabled and the expected integration secret ref for only for maskinporten", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Tokenx: &v1alpha.TokenXSpec{
+						Enabled: false,
+					},
+					Maskinporten: &v1alpha.MaskinportenSpec{
+						Enabled: true,
+						Client: &v1alpha.MaskinportenClientSpec{
+							ClientName: securityConfigName,
+							Scopes: &v1alpha.MaskinportenScope{
+								ConsumedScopes: []naisiov1.ConsumedScope{
+									{Name: "scope1"},
+									{Name: "scope2"},
+								},
+							},
+						},
+					},
+				},
+				Status: v1alpha.SecurityConfigStatus{
+					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+				},
+			}
+			envVars := v1.GetTexasEnvVars(securityConfig)
+			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
+			Expect(envVars.TokenXEnabled).To(Equal("false"))
+			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
+				corev1.EnvFromSource{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: securityConfig.Status.MaskinportenSectretName,
+						},
+					},
+				},
+			))
+			Expect(envVars.IntegrationSecretsRefs).ToNot(ContainElement(
+				corev1.EnvFromSource{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: securityConfig.Status.JwkerSecretName,
+						},
+					},
+				},
+			))
+		})
 	})
 
 	Describe("IsTexasContainerEqual", func() {
@@ -108,6 +359,18 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				Spec: v1alpha.SecurityConfigSpec{
 					Tokenx: &v1alpha.TokenXSpec{
 						Enabled: true,
+					},
+					Maskinporten: &v1alpha.MaskinportenSpec{
+						Enabled: true,
+						Client: &v1alpha.MaskinportenClientSpec{
+							ClientName: securityConfigName,
+							Scopes: &v1alpha.MaskinportenScope{
+								ConsumedScopes: []naisiov1.ConsumedScope{
+									{Name: "scope1"},
+									{Name: "scope2"},
+								},
+							},
+						},
 					},
 					ApplicationRef: applicationRef,
 				}}
@@ -258,7 +521,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			applicationRef := applicationRef
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: applicationRef,
+					ApplicationRef: v1alpha.ResourceName(applicationRef),
 				},
 			}
 			pod := corev1.Pod{
@@ -285,7 +548,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			applicationRef := applicationRef
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: applicationRef,
+					ApplicationRef: v1alpha.ResourceName(applicationRef),
 				},
 			}
 			pod := corev1.Pod{
@@ -317,7 +580,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			applicationRef := applicationRef
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: applicationRef,
+					ApplicationRef: v1alpha.ResourceName(applicationRef),
 				},
 			}
 			pod := corev1.Pod{
