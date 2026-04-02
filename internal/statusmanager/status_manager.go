@@ -103,7 +103,7 @@ func DetermineReconciliationState(
 	case scope.TokenXConfig.Enabled:
 		jwkerObjectKey := client.ObjectKey{
 			Namespace: scope.SecurityConfig.Namespace,
-			Name:      utilities.GetJwkerName(scope.SecurityConfig.Spec.ApplicationRef),
+			Name:      utilities.GetJwkerName(string(scope.SecurityConfig.Spec.ApplicationRef)),
 		}
 		jwkerResource, getJwkerErr := utilities.GetJwker(ctx, k8sClient, jwkerObjectKey)
 		if getJwkerErr != nil {
