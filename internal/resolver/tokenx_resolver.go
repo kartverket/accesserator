@@ -22,7 +22,7 @@ func ResolveTokenXConfig(ctx context.Context, k8sClient client.Client, securityC
 
 	var skiperatorApplication v1alpha1.Application
 	if exists := k8sClient.Get(ctx, types.NamespacedName{
-		Name:      securityConfig.Spec.ApplicationRef,
+		Name:      string(securityConfig.Spec.ApplicationRef),
 		Namespace: securityConfig.Namespace,
 	}, &skiperatorApplication); exists != nil {
 		return nil, fmt.Errorf(
@@ -41,7 +41,7 @@ func ResolveTokenXConfig(ctx context.Context, k8sClient client.Client, securityC
 
 	return &state.TokenXConfig{
 		Enabled:        tokenXEnabled,
-		ApplicationRef: securityConfig.Spec.ApplicationRef,
+		ApplicationRef: string(securityConfig.Spec.ApplicationRef),
 		AccessPolicy:   skiperatorAccessPolicy,
 	}, nil
 }

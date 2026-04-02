@@ -117,7 +117,7 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	jwkerObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.GetJwkerName(securityConfig.Spec.ApplicationRef),
+		Name:      utilities.GetJwkerName(string(securityConfig.Spec.ApplicationRef)),
 		Namespace: securityConfig.Namespace,
 	}
 	tokenxEgressObjectMeta := metav1.ObjectMeta{
@@ -125,7 +125,7 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Namespace: securityConfig.Namespace,
 	}
 	maskinportenClientObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.GetMaskinportenClientName(securityConfig.Spec.ApplicationRef),
+		Name:      utilities.GetMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
 		Namespace: securityConfig.Namespace,
 	}
 	maskinportenSecretObjectMeta := metav1.ObjectMeta{

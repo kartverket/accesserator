@@ -135,9 +135,9 @@ func DetermineReconciliationState(
 		var maskinportenClientName string
 		switch *maskinportenConfigType {
 		case state.InlineClient:
-			maskinportenClientName = utilities.GetMaskinportenClientName(scope.SecurityConfig.Spec.ApplicationRef)
+			maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
 		case state.ClientRef:
-			maskinportenClientName = scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name
+			maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
 		default:
 			return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", *maskinportenConfigType)
 		}

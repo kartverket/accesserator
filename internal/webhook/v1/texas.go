@@ -129,7 +129,7 @@ func MutateTexasOnPod(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) er
 	if err := MutatePodWithTexasInitContainer(pod, sidecarContainer); err != nil {
 		return fmt.Errorf("error mutating pod with Texas init container: %w", err)
 	}
-	if err := MutatePodWithTexasURLEnvVar(pod, securityConfig.Spec.ApplicationRef); err != nil {
+	if err := MutatePodWithTexasURLEnvVar(pod, string(securityConfig.Spec.ApplicationRef)); err != nil {
 		return fmt.Errorf("error mutating pod with Texas URL env var: %w", err)
 	}
 	return nil
@@ -193,7 +193,7 @@ func ValidateTexasInitContainer(pod corev1.Pod, sidecarContainer corev1.Containe
 func ValidateTexasURLEnvVar(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
 	expectedValue := GetTexasUrlEnvVarValue()
 	for _, container := range pod.Spec.Containers {
-		if container.Name == securityConfig.Spec.ApplicationRef {
+		if container.Name == string(securityConfig.Spec.ApplicationRef) {
 			for _, env := range container.Env {
 				if env.Name == config.Get().TexasUrlEnvVarName && env.Value == expectedValue {
 					return nil
