@@ -1,0 +1,70 @@
+name: Build OPA Bundle
+
+on:
+  pull_request:
+    paths:
+      - '.opa/**'
+      - '.github/workflows/build-opa-bundle.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.opa/**'
+      - '.github/workflows/build-opa-bundle.yml'
+
+env:
+  REGISTRY: ghcr.io
+  BUNDLE_NAME: ${{ github.repository }}/opa-bundle
+
+jobs:
+  build:
+    name: Build and push OPA bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Build OPA bundle
+        run: |
+          opa build -b .opa -o bundle.tar.gz
+          tar -tzf bundle.tar.gz
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push bundle to GHCR
+        if: ${{ !github.event.pull_request.draft }}
+        run: |
+          # Push with SHA tag
+          oras push ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}:sha-${{ github.sha }} \
+            bundle.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip
+
+          # Push with main tag only on main branch
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            oras push ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}:main \
+              bundle.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip
+            oras push ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}:latest \
+              bundle.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip
+          fi
+
+      - name: Summary
+        run: |
+          echo "## OPA Bundle Built and Pushed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SHA Tag:** sha-${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "**Latest Tag:** main, latest" >> $GITHUB_STEP_SUMMARY
+          fi
