@@ -13,6 +13,10 @@ import (
 )
 
 var _ = Describe("Helper Functions", func() {
+	const (
+		secConfigName = "my-security-config"
+	)
+
 	Describe("Ptr", func() {
 		It("should return a pointer to the value", func() {
 			v := 42
@@ -26,9 +30,7 @@ var _ = Describe("Helper Functions", func() {
 			strPtr := utilities.Ptr(strVal)
 			Expect(strPtr).NotTo(BeNil())
 			Expect(*strPtr).To(Equal(strVal))
-
-			boolVal := true
-			boolPtr := utilities.Ptr(boolVal)
+			boolPtr := utilities.Ptr(true)
 			Expect(boolPtr).NotTo(BeNil())
 			Expect(*boolPtr).To(BeTrue())
 		})
@@ -109,7 +111,6 @@ var _ = Describe("Helper Functions", func() {
 
 	Describe("GetMaskinportenSecretName", func() {
 		It("should return security config name with maskinporten suffix", func() {
-			secConfigName := "my-security-config"
 			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.MaskinportenNameSuffix)
 			result := utilities.GetMaskinportenSecretName(secConfigName)
 			Expect(result).To(Equal(expected))
@@ -118,7 +119,6 @@ var _ = Describe("Helper Functions", func() {
 
 	Describe("GetMaskinportenSecretFromSecretRefName", func() {
 		It("should return security config name with maskinporten suffix and hash", func() {
-			secConfigName := "my-security-config"
 			expectedHash := utilities.ShortHash(secConfigName)
 			expected := fmt.Sprintf("%s-%s-%s", secConfigName, utilities.MaskinportenNameSuffix, expectedHash)
 			result := utilities.GetMaskinportenSecretFromSecretRefName(secConfigName)
@@ -149,7 +149,6 @@ var _ = Describe("Helper Functions", func() {
 
 	Describe("GetMaskinportenServiceEntryName", func() {
 		It("should return security config name with maskinporten suffix", func() {
-			secConfigName := "my-security-config"
 			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.MaskinportenNameSuffix)
 			result := utilities.GetMaskinportenServiceEntryName(secConfigName)
 			Expect(result).To(Equal(expected))
