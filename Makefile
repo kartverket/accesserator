@@ -92,6 +92,15 @@ clean: kind ## Clean up local environment by deleting kind cluster
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	"$(CONTROLLER_GEN)" rbac:roleName=accesserator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
 
+.PHONY: docs
+docs: ## Generate API documentation from CRD bases using crdoc
+	docker run --platform linux/amd64 \
+	  -u $$(id -u):$$(id -g) --rm \
+	  -v $$PWD:/workdir \
+	  ghcr.io/fybrik/crdoc:latest \
+	  --resources /workdir/config/crd/bases \
+	  --output /workdir/api-docs.md
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...

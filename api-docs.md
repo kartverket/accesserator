@@ -91,16 +91,302 @@ spec defines the desired state of SecurityConfig
         </td>
         <td>true</td>
       </tr><tr>
+        <td><b><a href="#securityconfigspecmaskinporten">maskinporten</a></b></td>
+        <td>object</td>
+        <td>
+          Maskinporten specifies whether to configure the maskinporten API consumer capability for an application referred to by `applicationRef`.
+The configuration can either be provided inline via the `client` field,
+by referencing an existing MaskinportenClient resource via the `clientRef` field,
+or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#securityconfigspectokenx">tokenx</a></b></td>
         <td>object</td>
         <td>
-          Tokenx indicates whether a sidecar (called Texas) is started with the application referred to by `applicationRef`
-that provides an endpoint which is available to the application on the env var TEXAS_URL.
-The endpoint conforms to the OAuth 2.0 Token Exchange standard (RFC 8693).
-accessPolicies in the Application manifest of the application referred to by applicationRef
+          Tokenx specifies whether to configure the token exchange capability for an application referred to by `applicationRef`.
+accessPolicies of the application referred to by applicationRef
 will be used to restrict which applications can exchange tokens where the specified application is the intended audience.<br/>
         </td>
         <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten
+<sup><sup>[↩ Parent](#securityconfigspec)</sup></sup>
+
+
+
+Maskinporten specifies whether to configure the maskinporten API consumer capability for an application referred to by `applicationRef`.
+The configuration can either be provided inline via the `client` field,
+by referencing an existing MaskinportenClient resource via the `clientRef` field,
+or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>enabled</b></td>
+        <td>boolean</td>
+        <td>
+          Enabled indicates whether Maskinporten should be configured for the application.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecmaskinportenclient">client</a></b></td>
+        <td>object</td>
+        <td>
+          Client defines the Maskinporten client configuration inline.
+Use this when you want to configure the client directly.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecmaskinportenclientref">clientRef</a></b></td>
+        <td>object</td>
+        <td>
+          ClientRef references an existing MaskinportenClient by name.
+Use this when a MaskinportenClient exists, and you want to reference it.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecmaskinportensecretref">secretRef</a></b></td>
+        <td>object</td>
+        <td>
+          SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
+Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
+and MaskinportenClient CRD (e.g. manually registered at DigDir).<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten.client
+<sup><sup>[↩ Parent](#securityconfigspecmaskinporten)</sup></sup>
+
+
+
+Client defines the Maskinporten client configuration inline.
+Use this when you want to configure the client directly.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>clientName</b></td>
+        <td>string</td>
+        <td>
+          ClientName is the client name to be registered at DigDir.
+It is shown during login for user-centric flows, and is otherwise a human-readable way to differentiate between clients at DigDir's self-service portal.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecmaskinportenclientscopes">scopes</a></b></td>
+        <td>object</td>
+        <td>
+          Scopes is an object of consumed scopes.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten.client.scopes
+<sup><sup>[↩ Parent](#securityconfigspecmaskinportenclient)</sup></sup>
+
+
+
+Scopes is an object of consumed scopes.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecmaskinportenclientscopesconsumesindex">consumes</a></b></td>
+        <td>[]object</td>
+        <td>
+          `consumes` is a list of scopes that your client can request access to.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten.client.scopes.consumes[index]
+<sup><sup>[↩ Parent](#securityconfigspecmaskinportenclientscopes)</sup></sup>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          The scope consumed by the application to gain access to an external organization API.
+Ensure that the NAV organization has been granted access to the scope prior to requesting access.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten.clientRef
+<sup><sup>[↩ Parent](#securityconfigspecmaskinporten)</sup></sup>
+
+
+
+ClientRef references an existing MaskinportenClient by name.
+Use this when a MaskinportenClient exists, and you want to reference it.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name of the referenced MaskinportenClient.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten.secretRef
+<sup><sup>[↩ Parent](#securityconfigspecmaskinporten)</sup></sup>
+
+
+
+SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
+Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
+and MaskinportenClient CRD (e.g. manually registered at DigDir).
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecmaskinportensecretrefclientid">clientID</a></b></td>
+        <td>object</td>
+        <td>
+          ClientID references the secret key containing the Maskinporten client ID (MASKINPORTEN_CLIENT_ID).<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecmaskinportensecretrefclientjwk">clientJWK</a></b></td>
+        <td>object</td>
+        <td>
+          ClientJWK references the secret key containing the Maskinporten client JWK (MASKINPORTEN_CLIENT_JWK).<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten.secretRef.clientID
+<sup><sup>[↩ Parent](#securityconfigspecmaskinportensecretref)</sup></sup>
+
+
+
+ClientID references the secret key containing the Maskinporten client ID (MASKINPORTEN_CLIENT_ID).
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          Key is the key within the secret whose value should be used.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name is the name of the Kubernetes secret.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.maskinporten.secretRef.clientJWK
+<sup><sup>[↩ Parent](#securityconfigspecmaskinportensecretref)</sup></sup>
+
+
+
+ClientJWK references the secret key containing the Maskinporten client JWK (MASKINPORTEN_CLIENT_JWK).
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          Key is the key within the secret whose value should be used.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name is the name of the Kubernetes secret.<br/>
+        </td>
+        <td>true</td>
       </tr></tbody>
 </table>
 
@@ -110,10 +396,8 @@ will be used to restrict which applications can exchange tokens where the specif
 
 
 
-Tokenx indicates whether a sidecar (called Texas) is started with the application referred to by `applicationRef`
-that provides an endpoint which is available to the application on the env var TEXAS_URL.
-The endpoint conforms to the OAuth 2.0 Token Exchange standard (RFC 8693).
-accessPolicies in the Application manifest of the application referred to by applicationRef
+Tokenx specifies whether to configure the token exchange capability for an application referred to by `applicationRef`.
+accessPolicies of the application referred to by applicationRef
 will be used to restrict which applications can exchange tokens where the specified application is the intended audience.
 
 <table>
@@ -129,7 +413,7 @@ will be used to restrict which applications can exchange tokens where the specif
         <td><b>enabled</b></td>
         <td>boolean</td>
         <td>
-          Enabled indicates whether the TokenX sidecar should be included for the application.<br/>
+          Enabled indicates whether token exchange should be configured for the application.<br/>
         </td>
         <td>true</td>
       </tr></tbody>
@@ -162,6 +446,20 @@ status defines the observed state of SecurityConfig
       </tr><tr>
         <td><b><a href="#securityconfigstatusconditionsindex">conditions</a></b></td>
         <td>[]object</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>jwkerSecretName</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>maskinportenSecretName</b></td>
+        <td>string</td>
         <td>
           <br/>
         </td>
