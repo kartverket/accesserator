@@ -45,7 +45,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push bundle to GHCR
-        if: ${{ !github.event.pull_request.draft }}
         run: |
           # Push with SHA tag
           oras push ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}:sha-${{ github.sha }} \
