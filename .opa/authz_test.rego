@@ -1,4 +1,4 @@
-package authz_test
+package authz
 
 import rego.v1
 
