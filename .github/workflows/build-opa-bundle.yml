@@ -32,12 +32,19 @@ jobs:
         with:
           version: latest
 
+      - name: Test OPA policies
+        run: |
+          echo "Running OPA policy tests..."
+          opa test .opa -v
+          echo "All tests passed!"
+
       - name: Setup ORAS
         uses: oras-project/setup-oras@v1
 
       - name: Build OPA bundle
         run: |
           opa build -b .opa -o bundle.tar.gz
+          echo "Bundle contents:"
           tar -tzf bundle.tar.gz
 
       - name: Log into registry ${{ env.REGISTRY }}
