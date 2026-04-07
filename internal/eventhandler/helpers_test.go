@@ -43,6 +43,7 @@ func runCreateEvent(h handler.EventHandler, obj client.Object) []reconcile.Reque
 	return requests
 }
 
+// nolint:unparam
 func req(namespace, name string) reconcile.Request {
 	return reconcile.Request{NamespacedName: client.ObjectKey{Namespace: namespace, Name: name}}
 }

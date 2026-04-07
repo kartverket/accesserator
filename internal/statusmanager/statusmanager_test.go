@@ -40,6 +40,7 @@ func newMockResource(kind, name string, isNil bool) reconciliation.ControllerRes
 	}
 }
 
+// nolint:unparam
 func newTestJwker(namespace, appName, synchronizationState, secretName string) *naisiov1.Jwker {
 	return &naisiov1.Jwker{
 		ObjectMeta: metav1.ObjectMeta{
@@ -53,6 +54,7 @@ func newTestJwker(namespace, appName, synchronizationState, secretName string) *
 	}
 }
 
+// nolint:unparam
 func newTestMaskinportenClient(namespace, appName, synchronizationState, secretName string) *naisiov1.MaskinportenClient {
 	return &naisiov1.MaskinportenClient{
 		ObjectMeta: metav1.ObjectMeta{
