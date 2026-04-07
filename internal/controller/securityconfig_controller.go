@@ -54,6 +54,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Owns(&naisiov1.Jwker{}).
 		Owns(&naisiov1.MaskinportenClient{}).
+		Owns(&istionetworkingv1.ServiceEntry{}).
 		Owns(&networkv1.NetworkPolicy{}).
 		Owns(&corev1.Secret{}).
 		Watches(&v1alpha1.Application{}, eventhandler.HandleSkiperatorApplicationEvent(r.Client)).
