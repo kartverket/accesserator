@@ -58,6 +58,8 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkv1.NetworkPolicy{}).
 		Owns(&corev1.Secret{}).
 		Watches(&v1alpha1.Application{}, eventhandler.HandleSkiperatorApplicationEvent(r.Client)).
+		Watches(&naisiov1.MaskinportenClient{}, eventhandler.HandleMaskinportenClientEvent(r.Client)).
+		Watches(&corev1.Secret{}, eventhandler.HandleSecretEvent(r.Client)).
 		Named("securityconfig").
 		Complete(r)
 }

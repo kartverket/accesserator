@@ -25,12 +25,14 @@ func HandleSkiperatorApplicationEvent(c client.Client) handler.EventHandler {
 
 		reqs := make([]reconcile.Request, 0, len(securityConfigList.Items))
 		for _, securityConfig := range securityConfigList.Items {
-			reqs = append(reqs, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: securityConfig.GetNamespace(),
-					Name:      securityConfig.GetName(),
-				},
-			})
+			if string(securityConfig.Spec.ApplicationRef) == skiperatorApp.Name {
+				reqs = append(reqs, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: securityConfig.GetNamespace(),
+						Name:      securityConfig.GetName(),
+					},
+				})
+			}
 		}
 
 		return reqs
