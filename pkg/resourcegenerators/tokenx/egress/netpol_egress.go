@@ -7,14 +7,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetDesired(objectMeta metav1.ObjectMeta, scope state.Scope) *v1.NetworkPolicy {
-	if !scope.TokenXConfig.Enabled {
+func GetDesired(objectMeta metav1.ObjectMeta, tokenxConfig state.TokenXConfig) *v1.NetworkPolicy {
+	if !tokenxConfig.Enabled {
 		return nil
 	}
 
 	// fromNamespace is implicitly the namespace where the egress is created
 	// fromApp is the application referenced in SecurityConfig
-	fromApp := scope.SecurityConfig.Spec.ApplicationRef
+	fromApp := tokenxConfig.ApplicationRef
 
 	toNamespace := config.Get().TokenxNamespace
 	toApp := config.Get().TokenxName

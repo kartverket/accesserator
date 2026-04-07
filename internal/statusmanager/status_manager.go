@@ -21,6 +21,7 @@ const (
 	StateInvalid ReconciliationState = iota
 	StatePending
 	StateWaitingForJwker
+	StateWaitingForMaskinportenClient
 	StateFailed
 	StateReady
 )
@@ -99,10 +100,15 @@ func DetermineReconciliationState(
 		return utilities.Ptr(StatePending), nil
 	case len(scope.GetErrors()) > 0:
 		return utilities.Ptr(StateFailed), nil
-	case scope.TokenXConfig.Enabled:
+	}
+
+	waitingForJwker := false
+	waitingForMaskinportenClient := false
+
+	if scope.TokenXConfig.Enabled {
 		jwkerObjectKey := client.ObjectKey{
 			Namespace: scope.SecurityConfig.Namespace,
-			Name:      utilities.GetJwkerName(scope.SecurityConfig.Spec.ApplicationRef),
+			Name:      utilities.GetJwkerName(string(scope.SecurityConfig.Spec.ApplicationRef)),
 		}
 		jwkerResource, getJwkerErr := utilities.GetJwker(ctx, k8sClient, jwkerObjectKey)
 		if getJwkerErr != nil {
@@ -112,11 +118,51 @@ func DetermineReconciliationState(
 				getJwkerErr,
 			)
 		}
-		if jwkerResource.Status.SynchronizationState != utilities.JwkerSynchronizationStateReady {
-			return utilities.Ptr(StateWaitingForJwker), nil
+		if jwkerResource.Status.SynchronizationState != utilities.SynchronizationStateReady {
+			waitingForJwker = true
 		}
 		scope.SecurityConfig.Status.JwkerSecretName = jwkerResource.Status.SynchronizationSecretName
-		return utilities.Ptr(StateReady), nil
+	}
+
+	if scope.MaskinportenConfig.Enabled {
+		// If MaksinportenConfigType is secretRef, the integration secret is utilities.GetMaskinportenSecretFromSecretRefName(<SecurityConfig.Name>),
+		// otherwise we need to fetch if from the MaskinportenClient status
+		if scope.MaskinportenConfig.Type == state.SecretRef {
+			scope.SecurityConfig.Status.MaskinportenSectretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
+		} else {
+			var maskinportenClientName string
+			switch scope.MaskinportenConfig.Type {
+			case state.InlineClient:
+				maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
+			case state.ClientRef:
+				maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
+			default:
+				return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
+			}
+
+			maskinportenClientObjectKey := client.ObjectKey{
+				Namespace: scope.SecurityConfig.Namespace,
+				Name:      maskinportenClientName,
+			}
+			maskinportenClient, getMaksinportenClientErr := utilities.GetMaskinportenClient(ctx, k8sClient, maskinportenClientObjectKey)
+			if getMaksinportenClientErr != nil {
+				return nil, fmt.Errorf("failed to get MaskinportenClient resource %s/%s: %w",
+					maskinportenClientObjectKey.Namespace,
+					maskinportenClientObjectKey.Name,
+					getMaksinportenClientErr,
+				)
+			}
+			if maskinportenClient.Status.SynchronizationState != utilities.SynchronizationStateReady {
+				waitingForMaskinportenClient = true
+			}
+			scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
+		}
+	}
+	switch {
+	case waitingForJwker:
+		return utilities.Ptr(StateWaitingForJwker), nil
+	case waitingForMaskinportenClient:
+		return utilities.Ptr(StateWaitingForMaskinportenClient), nil
 	default:
 		return utilities.Ptr(StateReady), nil
 	}
@@ -126,7 +172,7 @@ func determinePhase(reconciliationState ReconciliationState) v1alpha.Phase {
 	switch reconciliationState {
 	case StateInvalid:
 		return v1alpha.PhaseInvalid
-	case StatePending, StateWaitingForJwker:
+	case StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient:
 		return v1alpha.PhasePending
 	case StateFailed:
 		return v1alpha.PhaseFailed
@@ -138,7 +184,7 @@ func determinePhase(reconciliationState ReconciliationState) v1alpha.Phase {
 
 func determineReadiness(reconciliationState ReconciliationState) bool {
 	switch reconciliationState {
-	case StateInvalid, StatePending, StateWaitingForJwker, StateFailed:
+	case StateInvalid, StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient, StateFailed:
 		return false
 	case StateReady:
 		return true
@@ -154,6 +200,8 @@ func statusMessage(reconciliationState ReconciliationState, validationErrorMessa
 		return "SecurityConfig pending due to missing Descendants."
 	case StateWaitingForJwker:
 		return "SecurityConfig pending, waiting for Jwker to be ready."
+	case StateWaitingForMaskinportenClient:
+		return "SecurityConfig pending, waiting for MaskinportenClient to be ready."
 	case StateFailed:
 		return "SecurityConfig failed."
 	case StateReady:

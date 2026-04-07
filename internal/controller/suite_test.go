@@ -11,6 +11,7 @@ import (
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 
@@ -58,8 +59,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = networkingv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	err = istionetworkingv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
+	err = os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")
+	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")

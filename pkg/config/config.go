@@ -8,9 +8,13 @@ import (
 )
 
 type Config struct {
-	ClusterName        string `split_words:"true"`
-	TokenxName         string `split_words:"true" default:"tokendings"`
-	TokenxNamespace    string `split_words:"true"`
+	RunsInProduction *bool `split_words:"true"`
+
+	ClusterName string `split_words:"true"`
+
+	TokenxName      string `split_words:"true" default:"tokendings"`
+	TokenxNamespace string `split_words:"true"`
+
 	TexasImageName     string `split_words:"true" default:"ghcr.io/nais/texas"`
 	TexasImageTag      string `split_words:"true"`
 	TexasPort          int32  `split_words:"true" default:"3000"`
@@ -25,7 +29,10 @@ func Load() error {
 		return err
 	}
 
-	missing := make([]string, 0, 3)
+	missing := make([]string, 0, 4)
+	if cfg.RunsInProduction == nil {
+		missing = append(missing, "ACCESSERATOR_RUNS_IN_PRODUCTION")
+	}
 	if cfg.ClusterName == "" {
 		missing = append(missing, "ACCESSERATOR_CLUSTER_NAME")
 	}

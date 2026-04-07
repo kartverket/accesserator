@@ -17,44 +17,164 @@ limitations under the License.
 package v1alpha
 
 import (
+	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // SecurityConfigSpec defines the desired state of SecurityConfig.
 type SecurityConfigSpec struct {
-	// Tokenx indicates whether a sidecar (called Texas) is started with the application referred to by `applicationRef`
-	// that provides an endpoint which is available to the application on the env var TEXAS_URL.
-	// The endpoint conforms to the OAuth 2.0 Token Exchange standard (RFC 8693).
-	// accessPolicies in the Application manifest of the application referred to by applicationRef
+	// Tokenx specifies whether to configure the token exchange capability for an application referred to by `applicationRef`.
+	// accessPolicies of the application referred to by applicationRef
 	// will be used to restrict which applications can exchange tokens where the specified application is the intended audience.
 	//
 	// +kubebuilder:validation:Optional
 	Tokenx *TokenXSpec `json:"tokenx,omitempty"`
 
+	// Maskinporten specifies whether to configure the maskinporten API consumer capability for an application referred to by `applicationRef`.
+	// The configuration can either be provided inline via the `client` field,
+	// by referencing an existing MaskinportenClient resource via the `clientRef` field,
+	// or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.
+	//
+	// +kubebuilder:validation:Optional
+	Maskinporten *MaskinportenSpec `json:"maskinporten,omitempty"`
+
 	// ApplicationRef is a reference to the name of the SKIP application for which this SecurityConfig applies.
 	//
 	// +kubebuilder:validation:Required
-	ApplicationRef string `json:"applicationRef,omitempty"`
+	ApplicationRef ResourceName `json:"applicationRef"`
 }
 
-// TokenXSpec defines the configuration for token exchange sidecar.
+// TokenXSpec defines the configuration for token exchange.
 //
 // +kubebuilder:object:generate=true
 type TokenXSpec struct {
-	// Enabled indicates whether the TokenX sidecar should be included for the application.
+	// Enabled indicates whether token exchange should be configured for the application.
 	//
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
 }
 
+// MaskinportenSpec defines the configuration for Maskinporten.
+//
+// At most one of `client`, `clientRef`, or `secretRef` may be specified.
+// Exactly one must be specified when `enabled` is true.
+//
+// +kubebuilder:object:generate=true
+// +kubebuilder:validation:XValidation:rule="[has(self.client), has(self.clientRef), has(self.secretRef)].filter(x, x).size() <= 1",message="At most one of client, clientRef, or secretRef may be specified"
+// +kubebuilder:validation:XValidation:rule="!self.enabled || [has(self.client), has(self.clientRef), has(self.secretRef)].filter(x, x).size() == 1",message="Exactly one of client, clientRef, or secretRef must be specified when enabled is true"
+type MaskinportenSpec struct {
+	// Enabled indicates whether Maskinporten should be configured for the application.
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// Client defines the Maskinporten client configuration inline.
+	// Use this when you want to configure the client directly.
+	//
+	// +kubebuilder:validation:Optional
+	Client *MaskinportenClientSpec `json:"client,omitempty"`
+
+	// ClientRef references an existing MaskinportenClient by name.
+	// Use this when a MaskinportenClient exists, and you want to reference it.
+	//
+	// +kubebuilder:validation:Optional
+	ClientRef *MaskinportenClientRef `json:"clientRef,omitempty"`
+
+	// SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
+	// Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
+	// and MaskinportenClient CRD (e.g. manually registered at DigDir).
+	//
+	// +kubebuilder:validation:Optional
+	SecretRef *SecretRef `json:"secretRef,omitempty"`
+}
+
+// MaskinportenClientSpec defines the inline configuration for a [MaskinportenClient](https://github.com/nais/digdirator?tab=readme-ov-file#digdirator).
+//
+// +kubebuilder:object:generate=true
+type MaskinportenClientSpec struct {
+	// ClientName is the client name to be registered at DigDir.
+	// It is shown during login for user-centric flows, and is otherwise a human-readable way to differentiate between clients at DigDir's self-service portal.
+	//
+	// +kubebuilder:validation:Required
+	ClientName string `json:"clientName"`
+
+	// Scopes is an object of consumed scopes.
+	//
+	// +kubebuilder:validation:Optional
+	Scopes *MaskinportenScope `json:"scopes,omitempty"`
+}
+
+// MaskinportenScope defines consumed scopes for the application.
+//
+// +kubebuilder:object:generate=true
+type MaskinportenScope struct {
+	// `consumes` is a list of scopes that your client can request access to.
+	//
+	// +kubebuilder:validation:Required
+	ConsumedScopes []naisiov1.ConsumedScope `json:"consumes"`
+}
+
+// MaskinportenClientRef defines a reference to an existing MaskinportenClient by name.
+//
+// +kubebuilder:object:generate=true
+type MaskinportenClientRef struct {
+	// Name of the referenced MaskinportenClient.
+	//
+	// +kubebuilder:validation:Required
+	Name ResourceName `json:"name"`
+}
+
+// ResourceName is a type for Kubernetes resource names.
+//
+// +kubebuilder:validation:MaxLength=253
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+type ResourceName string
+
+// SecretRef defines where to source each required Maskinporten environment variable from.
+// Each field points to a key in a Kubernetes secret, allowing the values to come from
+// one or more existing secrets.
+//
+// +kubebuilder:object:generate=true
+type SecretRef struct {
+	// ClientID references the secret key containing the Maskinporten client ID (MASKINPORTEN_CLIENT_ID).
+	//
+	// +kubebuilder:validation:Required
+	ClientID SecretKeySelector `json:"clientID"`
+
+	// ClientJWK references the secret key containing the Maskinporten client JWK (MASKINPORTEN_CLIENT_JWK).
+	//
+	// +kubebuilder:validation:Required
+	ClientJWK SecretKeySelector `json:"clientJWK"`
+}
+
+// SecretKeySelector identifies a key within a Kubernetes secret.
+//
+// +kubebuilder:object:generate=true
+type SecretKeySelector struct {
+	// Name is the name of the Kubernetes secret.
+	//
+	// +kubebuilder:validation:Required
+	Name ResourceName `json:"name"`
+
+	// Key is the key within the secret whose value should be used.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$`
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:MinLength=1
+	Key string `json:"key"`
+}
+
 // SecurityConfigStatus defines the observed state of SecurityConfig.
 type SecurityConfigStatus struct {
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
-	Phase              Phase              `json:"phase,omitempty"`
-	Message            string             `json:"message,omitempty"`
-	JwkerSecretName    string             `json:"jwkerSecretName,omitempty"`
-	Ready              bool               `json:"ready"`
+	ObservedGeneration      int64              `json:"observedGeneration,omitempty"`
+	Conditions              []metav1.Condition `json:"conditions,omitempty"`
+	Phase                   Phase              `json:"phase,omitempty"`
+	Message                 string             `json:"message,omitempty"`
+	JwkerSecretName         string             `json:"jwkerSecretName,omitempty"`
+	MaskinportenSectretName string             `json:"maskinportenSecretName,omitempty"`
+	Ready                   bool               `json:"ready"`
 }
 
 type Phase string

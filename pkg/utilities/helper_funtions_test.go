@@ -2,59 +2,174 @@ package utilities_test
 
 import (
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/kartverket/accesserator/pkg/utilities"
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func TestPtr(t *testing.T) {
-	v := 42
-	ptr := utilities.Ptr(v)
-	assert.NotNil(t, ptr)
-	assert.Equal(t, v, *ptr)
-}
+var _ = Describe("Helper Functions", func() {
+	const (
+		secConfigName = "my-security-config"
+	)
 
-func TestLowestNonZeroResult(t *testing.T) {
-	zero := ctrl.Result{}
-	one := ctrl.Result{RequeueAfter: 1 * time.Second}
-	two := ctrl.Result{RequeueAfter: 2 * time.Second}
+	Describe("Ptr", func() {
+		It("should return a pointer to the value", func() {
+			v := 42
+			ptr := utilities.Ptr(v)
+			Expect(ptr).NotTo(BeNil())
+			Expect(*ptr).To(Equal(v))
+		})
 
-	assert.Equal(t, zero, utilities.LowestNonZeroResult(zero, zero))
-	assert.Equal(t, one, utilities.LowestNonZeroResult(zero, one))
-	assert.Equal(t, one, utilities.LowestNonZeroResult(one, zero))
-	assert.Equal(t, one, utilities.LowestNonZeroResult(one, two))
-	assert.Equal(t, one, utilities.LowestNonZeroResult(two, one))
-}
+		It("should work with different types", func() {
+			strVal := "hello"
+			strPtr := utilities.Ptr(strVal)
+			Expect(strPtr).NotTo(BeNil())
+			Expect(*strPtr).To(Equal(strVal))
+			boolPtr := utilities.Ptr(true)
+			Expect(boolPtr).NotTo(BeNil())
+			Expect(*boolPtr).To(BeTrue())
+		})
+	})
 
-func TestGetJwkerName(t *testing.T) {
-	appRef := "my-app"
-	assert.Equal(t, appRef, utilities.GetJwkerName(appRef))
-}
+	Describe("LowestNonZeroResult", func() {
+		var (
+			zero ctrl.Result
+			one  ctrl.Result
+			two  ctrl.Result
+		)
 
-func TestGetJwkerSecretName(t *testing.T) {
-	jwkerName := "foo"
-	want := fmt.Sprintf("%s-%s", jwkerName, utilities.JwkerSecretNameSuffix)
-	assert.Equal(t, want, utilities.GetJwkerSecretName(jwkerName))
-}
+		BeforeEach(func() {
+			zero = ctrl.Result{}
+			one = ctrl.Result{RequeueAfter: 1 * time.Second}
+			two = ctrl.Result{RequeueAfter: 2 * time.Second}
+		})
 
-func TestGetTokenxEgressName(t *testing.T) {
-	secName := "sec"
-	tokenx := "tok"
-	want := fmt.Sprintf("%s-%s-%s", secName, tokenx, utilities.EgressNameSuffix)
-	assert.Equal(t, want, utilities.GetTokenxEgressName(secName, tokenx))
-}
+		It("should return zero result when both are zero", func() {
+			result := utilities.LowestNonZeroResult(zero, zero)
+			Expect(result).To(Equal(zero))
+		})
 
-func TestGetMockKubernetesClient(t *testing.T) {
-	scheme := runtime.NewScheme()
-	obj := &unstructured.Unstructured{}
-	obj.SetAPIVersion("v1")
-	obj.SetKind("ConfigMap")
-	obj.SetName("test-cm")
-	client := utilities.GetMockKubernetesClient(scheme, obj)
-	assert.NotNil(t, client)
-}
+		It("should return non-zero result when first is zero", func() {
+			result := utilities.LowestNonZeroResult(zero, one)
+			Expect(result).To(Equal(one))
+		})
+
+		It("should return non-zero result when second is zero", func() {
+			result := utilities.LowestNonZeroResult(one, zero)
+			Expect(result).To(Equal(one))
+		})
+
+		It("should return the lower non-zero result", func() {
+			result := utilities.LowestNonZeroResult(one, two)
+			Expect(result).To(Equal(one))
+
+			result = utilities.LowestNonZeroResult(two, one)
+			Expect(result).To(Equal(one))
+		})
+	})
+
+	Describe("GetJwkerName", func() {
+		It("should return the application ref as the jwker name", func() {
+			appRef := "my-app"
+			result := utilities.GetJwkerName(appRef)
+			Expect(result).To(Equal(appRef))
+		})
+	})
+
+	Describe("GetJwkerSecretName", func() {
+		It("should return jwker name with secret suffix", func() {
+			jwkerName := "foo"
+			expected := fmt.Sprintf("%s-%s", jwkerName, utilities.JwkerSecretNameSuffix)
+			result := utilities.GetJwkerSecretName(jwkerName)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Describe("GetTokenxEgressName", func() {
+		It("should return combined name with egress suffix", func() {
+			secName := "sec"
+			tokenx := "tok"
+			expected := fmt.Sprintf("%s-%s-%s", secName, tokenx, utilities.EgressNameSuffix)
+			result := utilities.GetTokenxEgressName(secName, tokenx)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Describe("GetMaskinportenClientName", func() {
+		It("should return application ref with maskinporten suffix", func() {
+			appRef := "my-app"
+			expected := fmt.Sprintf("%s-%s", appRef, utilities.MaskinportenNameSuffix)
+			result := utilities.GetMaskinportenClientName(appRef)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Describe("GetMaskinportenSecretName", func() {
+		It("should return security config name with maskinporten suffix", func() {
+			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.MaskinportenNameSuffix)
+			result := utilities.GetMaskinportenSecretName(secConfigName)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Describe("GetMaskinportenSecretFromSecretRefName", func() {
+		It("should return security config name with maskinporten suffix and hash", func() {
+			expectedHash := utilities.ShortHash(secConfigName)
+			expected := fmt.Sprintf("%s-%s-%s", secConfigName, utilities.MaskinportenNameSuffix, expectedHash)
+			result := utilities.GetMaskinportenSecretFromSecretRefName(secConfigName)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Describe("ShortHash", func() {
+		It("should return an 8-character hex string", func() {
+			result := utilities.ShortHash("test")
+			Expect(result).To(HaveLen(8))
+			Expect(result).To(MatchRegexp("^[0-9a-f]{8}$"))
+		})
+
+		It("should return the same hash for the same input", func() {
+			input := "my-security-config"
+			result1 := utilities.ShortHash(input)
+			result2 := utilities.ShortHash(input)
+			Expect(result1).To(Equal(result2))
+		})
+
+		It("should return different hashes for different inputs", func() {
+			result1 := utilities.ShortHash("input1")
+			result2 := utilities.ShortHash("input2")
+			Expect(result1).NotTo(Equal(result2))
+		})
+	})
+
+	Describe("GetMaskinportenServiceEntryName", func() {
+		It("should return security config name with maskinporten suffix", func() {
+			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.MaskinportenNameSuffix)
+			result := utilities.GetMaskinportenServiceEntryName(secConfigName)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Describe("GetMockKubernetesClient", func() {
+		It("should return a non-nil client", func() {
+			scheme := runtime.NewScheme()
+			obj := &unstructured.Unstructured{}
+			obj.SetAPIVersion("v1")
+			obj.SetKind("ConfigMap")
+			obj.SetName("test-cm")
+			client := utilities.GetMockKubernetesClient(scheme, obj)
+			Expect(client).NotTo(BeNil())
+		})
+
+		It("should work with empty objects", func() {
+			scheme := runtime.NewScheme()
+			client := utilities.GetMockKubernetesClient(scheme)
+			Expect(client).NotTo(BeNil())
+		})
+	})
+})

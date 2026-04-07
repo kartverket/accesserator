@@ -128,7 +128,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 							Namespace: pod.Namespace,
 						},
 						Spec: v1alpha.SecurityConfigSpec{
-							ApplicationRef: skiperatorAppName,
+							ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 						},
 					},
 					&v1alpha.SecurityConfig{
@@ -137,7 +137,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 							Namespace: pod.Namespace,
 						},
 						Spec: v1alpha.SecurityConfigSpec{
-							ApplicationRef: skiperatorAppName,
+							ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 						},
 					},
 				),
@@ -168,7 +168,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Namespace: pod.Namespace,
 				},
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: skiperatorAppName,
+					ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 				},
 			}
 
@@ -215,7 +215,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Namespace: pod.Namespace,
 				},
 				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: skiperatorAppName,
+					ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 				},
 			}
 

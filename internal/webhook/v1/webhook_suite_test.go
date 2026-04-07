@@ -65,6 +65,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
+	err = os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")
+	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")
@@ -218,7 +220,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: v1alpha.SecurityConfigSpec{
-				ApplicationRef: skiperatorAppName,
+				ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 			},
 		}
 		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())
@@ -270,7 +272,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: v1alpha.SecurityConfigSpec{
-				ApplicationRef: skiperatorAppName,
+				ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
 			},
 		}
 		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())

@@ -19,7 +19,7 @@ func GetSecurityConfigForApplication(ctx context.Context, k8sClient client.Clien
 
 	var matches []v1alpha.SecurityConfig
 	for _, sc := range list.Items {
-		if sc.Spec.ApplicationRef == appKey.Name {
+		if string(sc.Spec.ApplicationRef) == appKey.Name {
 			matches = append(matches, sc)
 		}
 	}

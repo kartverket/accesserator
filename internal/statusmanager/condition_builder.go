@@ -12,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const ReconciliationPending = "ReconciliationPending"
+
 // BuildConditions builds all conditions for the SecurityConfig status.
 func BuildConditions(
 	securityConfig *v1alpha.SecurityConfig,
@@ -55,13 +57,18 @@ func BuildSecurityConfigCondition(
 
 	case StatePending:
 		condition.Status = metav1.ConditionUnknown
-		condition.Reason = "ReconciliationPending"
+		condition.Reason = ReconciliationPending
 		condition.Message = "Descendants of SecurityConfig are not yet reconciled."
 
 	case StateWaitingForJwker:
 		condition.Status = metav1.ConditionUnknown
-		condition.Reason = "ReconciliationPending"
+		condition.Reason = ReconciliationPending
 		condition.Message = "Jwker resource has not finished reconciliation."
+
+	case StateWaitingForMaskinportenClient:
+		condition.Status = metav1.ConditionUnknown
+		condition.Reason = ReconciliationPending
+		condition.Message = "MaskinportenClient has not finished reconciliation."
 
 	case StateFailed:
 		condition.Status = metav1.ConditionFalse

@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    accesserator.kartverket.no/verify-securityconfig: "true"
+  labels:
+    app: app
+    app.kubernetes.io/managed-by: skiperator
+    application.skiperator.no/app: app
+    application.skiperator.no/app-name: app
+    skiperator.kartverket.no/controller: application
+spec:
+  containers:
+    - name: app
+  initContainers:
+    - name: istio-init
+    - name: istio-proxy
+status:
+  containerStatuses:
+    - name: app
+      ready: true
+  initContainerStatuses:
+    - name: istio-init
+      ready: true
+    - name: istio-proxy
+      ready: true
+  phase: Running

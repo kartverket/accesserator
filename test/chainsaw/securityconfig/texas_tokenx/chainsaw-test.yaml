@@ -1,14 +1,14 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: texas
+  name: texas-tokenx
 spec:
   skip: false
   concurrent: true
   skipDelete: false
   namespaceTemplate:
     metadata:
-      name: chainsaw-texas
+      name: chainsaw-texas-tokenx
       labels:
         accesserator-webhooks: enabled
         istio.io/rev: default
@@ -31,7 +31,7 @@ spec:
         - script:
             content: | 
               # Verify that TEXAS_URL is not set and assert that the number of containers in the app is 2.
-              kubectl exec -n chainsaw-texas deploy/app -c app -- printenv TEXAS_URL && exit 1 || exit 0
+              kubectl exec -n chainsaw-texas-tokenx deploy/app -c app -- printenv TEXAS_URL && exit 1 || exit 0
         - patch:
             resource:
               apiVersion: skiperator.kartverket.no/v1alpha1
@@ -51,7 +51,7 @@ spec:
         - script:
             content: |
               # Verify TEXAS_URL is set
-              TEXAS_URL=$(kubectl exec -n chainsaw-texas deploy/app -c app -- printenv TEXAS_URL)
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas-tokenx deploy/app -c app -- printenv TEXAS_URL)
               if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set"; exit 1; fi
               echo "✅ TEXAS_URL=$TEXAS_URL"
 
@@ -61,11 +61,11 @@ spec:
               echo "✅ Got mock token (length: ${#MOCK_TOKEN})"
 
               # Write request body to a temp file to avoid shell interpolation of special characters
-              printf '{"identity_provider":"tokenx","target":"kind-accesserator:chainsaw-texas:another-app","user_token":"%s"}' "$MOCK_TOKEN" > /tmp/token-exchange-body.json
+              printf '{"identity_provider":"tokenx","target":"kind-accesserator:chainsaw-texas-tokenx:another-app","user_token":"%s"}' "$MOCK_TOKEN" > /tmp/token-exchange-body.json
               echo "Request body: $(cat /tmp/token-exchange-body.json)"
 
               # Call texas token exchange and verify tokenx is disabled
-              RESPONSE=$(kubectl exec -n chainsaw-texas deploy/app -c app -- \
+              RESPONSE=$(kubectl exec -n chainsaw-texas-tokenx deploy/app -c app -- \
                 curl -sX POST $TEXAS_URL/api/v1/token/exchange \
                   -H "Content-Type: application/json" \
                   -d "{\"identity_provider\":\"tokenx\",\"target\":\"kind-accesserator:chainsaw-texas:another-app\",\"user_token\":\"$MOCK_TOKEN\"}")
@@ -85,9 +85,9 @@ spec:
                   enabled: true
         - script:
             content: |
-              kubectl rollout restart deploy/app -n chainsaw-texas
+              kubectl rollout restart deploy/app -n chainsaw-texas-tokenx
               # Wait for the app deployment to be ready again after the restart
-              kubectl wait --for=condition=available --timeout=20s deploy/app -n chainsaw-texas
+              kubectl wait --for=condition=available --timeout=20s deploy/app -n chainsaw-texas-tokenx
         - error:
             file: pod-with-texas-without-tokenx.yaml
         - error:
@@ -97,7 +97,7 @@ spec:
         - script:
             content: |
               # Verify TEXAS_URL is still set
-              TEXAS_URL=$(kubectl exec -n chainsaw-texas deploy/app -c app -- printenv TEXAS_URL)
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas-tokenx deploy/app -c app -- printenv TEXAS_URL)
               if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set after enabling tokenx"; exit 1; fi
               echo "✅ TEXAS_URL=$TEXAS_URL"
 
@@ -107,14 +107,14 @@ spec:
               echo "✅ Got mock token (length: ${#MOCK_TOKEN})"
 
               # Write request body to a temp file to avoid shell interpolation of special characters
-              printf '{"identity_provider":"tokenx","target":"kind-accesserator:chainsaw-texas:another-app","user_token":"%s"}' "$MOCK_TOKEN" > /tmp/token-exchange-body.json
+              printf '{"identity_provider":"tokenx","target":"kind-accesserator:chainsaw-texas-tokenx:another-app","user_token":"%s"}' "$MOCK_TOKEN" > /tmp/token-exchange-body.json
               echo "Request body: $(cat /tmp/token-exchange-body.json)"
 
               # Call texas token exchange and verify tokenx is enabled
-              RESPONSE=$(kubectl exec -n chainsaw-texas deploy/app -c app -- \
+              RESPONSE=$(kubectl exec -n chainsaw-texas-tokenx deploy/app -c app -- \
                   curl -sX POST $TEXAS_URL/api/v1/token/exchange \
                   -H "Content-Type: application/json" \
-                  -d "{\"identity_provider\":\"tokenx\",\"target\":\"kind-accesserator:chainsaw-texas:another-app\",\"user_token\":\"$MOCK_TOKEN\"}" \
+                  -d "{\"identity_provider\":\"tokenx\",\"target\":\"kind-accesserator:chainsaw-texas-tokenx:another-app\",\"user_token\":\"$MOCK_TOKEN\"}" \
                   -w "\n%{http_code}")
               echo "Response: $RESPONSE"
               HTTP_CODE=$(echo "$RESPONSE" | tail -n1)

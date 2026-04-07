@@ -1,0 +1,84 @@
+package eventhandler_test
+
+import (
+	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/eventhandler"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var _ = Describe("HandleSecretEvent", func() {
+	It("enqueues SecurityConfigs in the same namespace referencing the secret in clientID or clientJWK", func() {
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "shared-secret", Namespace: "team-a"}}
+
+		scClientIDMatch := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-client-id", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				Maskinporten: &v1alpha.MaskinportenSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "shared-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "other-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+		scClientJWKMatch := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-client-jwk", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				Maskinporten: &v1alpha.MaskinportenSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "other-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "shared-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+		scNoMatch := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-no-match", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				Maskinporten: &v1alpha.MaskinportenSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "another-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "another-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+		scWrongNamespace := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-wrong-ns", Namespace: "team-b"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				Maskinporten: &v1alpha.MaskinportenSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "shared-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "shared-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+
+		c := buildClient(scClientIDMatch, scClientJWKMatch, scNoMatch, scWrongNamespace)
+		h := eventhandler.HandleSecretEvent(c)
+
+		requests := runCreateEvent(h, secret)
+
+		Expect(requests).To(ConsistOf(
+			req("team-a", "sc-client-id"),
+			req("team-a", "sc-client-jwk"),
+		))
+	})
+
+	It("returns no requests for unrelated object type", func() {
+		c := buildClient()
+		h := eventhandler.HandleSecretEvent(c)
+
+		requests := runCreateEvent(h, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm", Namespace: "ns"}})
+
+		Expect(requests).To(BeEmpty())
+	})
+})

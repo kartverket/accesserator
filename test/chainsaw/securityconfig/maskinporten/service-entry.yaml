@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: security-config-maskinporten
+spec:
+  exportTo:
+    - .
+    - istio-gateway
+    - istio-system
+  hosts:
+    - test.maskinporten.no
+  ports:
+    - name: https
+      number: 443
+      protocol: HTTPS
+  resolution: DNS
