@@ -129,34 +129,34 @@ func DetermineReconciliationState(
 		// otherwise we need to fetch if from the MaskinportenClient status
 		if scope.MaskinportenConfig.Type == state.SecretRef {
 			scope.SecurityConfig.Status.MaskinportenSectretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
-		}
+		} else {
+			var maskinportenClientName string
+			switch scope.MaskinportenConfig.Type {
+			case state.InlineClient:
+				maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
+			case state.ClientRef:
+				maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
+			default:
+				return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
+			}
 
-		var maskinportenClientName string
-		switch scope.MaskinportenConfig.Type {
-		case state.InlineClient:
-			maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
-		case state.ClientRef:
-			maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
-		default:
-			return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
+			maskinportenClientObjectKey := client.ObjectKey{
+				Namespace: scope.SecurityConfig.Namespace,
+				Name:      maskinportenClientName,
+			}
+			maskinportenClient, getMaksinportenClientErr := utilities.GetMaskinportenClient(ctx, k8sClient, maskinportenClientObjectKey)
+			if getMaksinportenClientErr != nil {
+				return nil, fmt.Errorf("failed to get MaskinportenClient resource %s/%s: %w",
+					maskinportenClientObjectKey.Namespace,
+					maskinportenClientObjectKey.Name,
+					getMaksinportenClientErr,
+				)
+			}
+			if maskinportenClient.Status.SynchronizationState != utilities.SynchronizationStateReady {
+				waitingForMaskinportenClient = true
+			}
+			scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
 		}
-
-		maskinportenClientObjectKey := client.ObjectKey{
-			Namespace: scope.SecurityConfig.Namespace,
-			Name:      maskinportenClientName,
-		}
-		maskinportenClient, getMaksinportenClientErr := utilities.GetMaskinportenClient(ctx, k8sClient, maskinportenClientObjectKey)
-		if getMaksinportenClientErr != nil {
-			return nil, fmt.Errorf("failed to get MaskinportenClient resource %s/%s: %w",
-				maskinportenClientObjectKey.Namespace,
-				maskinportenClientObjectKey.Name,
-				getMaksinportenClientErr,
-			)
-		}
-		if maskinportenClient.Status.SynchronizationState != utilities.SynchronizationStateReady {
-			waitingForMaskinportenClient = true
-		}
-		scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
 	}
 	switch {
 	case waitingForJwker:
