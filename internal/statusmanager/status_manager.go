@@ -106,7 +106,12 @@ func DetermineReconciliationState(
 		return utilities.Ptr(StatePending), nil
 	case len(scope.GetErrors()) > 0:
 		return utilities.Ptr(StateFailed), nil
-	case scope.TokenXConfig.Enabled:
+	}
+
+	waitingForJwker := false
+	waitingForMaskinportenClient := false
+
+	if scope.TokenXConfig.Enabled {
 		jwkerObjectKey := client.ObjectKey{
 			Namespace: scope.SecurityConfig.Namespace,
 			Name:      utilities.GetJwkerName(string(scope.SecurityConfig.Spec.ApplicationRef)),
@@ -120,46 +125,50 @@ func DetermineReconciliationState(
 			)
 		}
 		if jwkerResource.Status.SynchronizationState != utilities.SynchronizationStateReady {
-			return utilities.Ptr(StateWaitingForJwker), nil
+			waitingForJwker = true
 		}
 		scope.SecurityConfig.Status.JwkerSecretName = jwkerResource.Status.SynchronizationSecretName
-		return utilities.Ptr(StateReady), nil
-	case scope.MaskinportenConfig.Enabled:
+	}
+
+	if scope.MaskinportenConfig.Enabled {
 		// If MaksinportenConfigType is secretRef, the integration secret is utilities.GetMaskinportenSecretFromSecretRefName(<SecurityConfig.Name>),
 		// otherwise we need to fetch if from the MaskinportenClient status
 		if scope.MaskinportenConfig.Type == state.SecretRef {
 			scope.SecurityConfig.Status.MaskinportenSectretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
-			return utilities.Ptr(StateReady), nil
-		}
+		} else {
+			var maskinportenClientName string
+			switch scope.MaskinportenConfig.Type {
+			case state.InlineClient:
+				maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
+			case state.ClientRef:
+				maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
+			default:
+				return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
+			}
 
-		var maskinportenClientName string
-		switch scope.MaskinportenConfig.Type {
-		case state.InlineClient:
-			maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
-		case state.ClientRef:
-			maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
-		default:
-			return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
+			maskinportenClientObjectKey := client.ObjectKey{
+				Namespace: scope.SecurityConfig.Namespace,
+				Name:      maskinportenClientName,
+			}
+			maskinportenClient, getMaksinportenClientErr := utilities.GetMaskinportenClient(ctx, k8sClient, maskinportenClientObjectKey)
+			if getMaksinportenClientErr != nil {
+				return nil, fmt.Errorf("failed to get MaskinportenClient resource %s/%s: %w",
+					maskinportenClientObjectKey.Namespace,
+					maskinportenClientObjectKey.Name,
+					getMaksinportenClientErr,
+				)
+			}
+			if maskinportenClient.Status.SynchronizationState != utilities.SynchronizationStateReady {
+				waitingForMaskinportenClient = true
+			}
+			scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
 		}
-
-		maskinportenClientObjectKey := client.ObjectKey{
-			Namespace: scope.SecurityConfig.Namespace,
-			Name:      maskinportenClientName,
-		}
-		maskinportenClient, getMaksinportenClientErr := utilities.GetMaskinportenClient(ctx, k8sClient, maskinportenClientObjectKey)
-		if getMaksinportenClientErr != nil {
-			return nil, fmt.Errorf("failed to get MaskinportenClient resource %s/%s: %w",
-				maskinportenClientObjectKey.Namespace,
-				maskinportenClientObjectKey.Name,
-				getMaksinportenClientErr,
-			)
-		}
-		if maskinportenClient.Status.SynchronizationState != utilities.SynchronizationStateReady {
-			return utilities.Ptr(StateWaitingForMaskinportenClient), nil
-		}
-
-		scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
-		return utilities.Ptr(StateReady), nil
+	}
+	switch {
+	case waitingForJwker:
+		return utilities.Ptr(StateWaitingForJwker), nil
+	case waitingForMaskinportenClient:
+		return utilities.Ptr(StateWaitingForMaskinportenClient), nil
 	default:
 		return utilities.Ptr(StateReady), nil
 	}

@@ -290,6 +290,74 @@ var _ = Describe("DetermineReconciliationState", func() {
 			"MaskinportenClientSecretName should be set from utilities.GetMaskinportenSecretFromSecretRefName func")
 	})
 
+	Context("when both TokenX and Maskinporten are enabled", func() {
+		It("returns StateWaitingForMaskinportenClient when Jwker is ready but MaskinportenClient is not ready", func() {
+			jwker := newTestJwker("default", "my-app", utilities.SynchronizationStateReady, "my-app-jwker-secret")
+			maskinportenClient := newTestMaskinportenClient("default", "my-app", "Synchronized", "")
+			k8sClient = newK8sClientWithObjects(jwker, maskinportenClient)
+
+			scope := &state.Scope{
+				SecurityConfig: v1alpha.SecurityConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "sc", Namespace: "default"},
+					Spec: v1alpha.SecurityConfigSpec{
+						ApplicationRef: "my-app",
+						Maskinporten: &v1alpha.MaskinportenSpec{
+							Enabled: true,
+							ClientRef: &v1alpha.MaskinportenClientRef{
+								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
+							},
+						},
+					},
+				},
+				TokenXConfig: state.TokenXConfig{Enabled: true},
+				MaskinportenConfig: state.MaskinportenConfig{
+					Enabled: true,
+					Type:    state.ClientRef,
+				},
+				InvalidConfig: false,
+				Descendants:   []state.Descendant[client.Object]{},
+			}
+
+			result, err := statusmanager.DetermineReconciliationState(ctx, k8sClient, scope, []reconciliation.ControllerResource{})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*result).To(Equal(statusmanager.StateWaitingForMaskinportenClient))
+		})
+
+		It("returns StateWaitingForJwker when MaskinportenClient is ready but Jwker is not ready", func() {
+			jwker := newTestJwker("default", "my-app", "Synchronized", "")
+			maskinportenClient := newTestMaskinportenClient("default", "my-app", utilities.SynchronizationStateReady, "mp-secret")
+			k8sClient = newK8sClientWithObjects(jwker, maskinportenClient)
+
+			scope := &state.Scope{
+				SecurityConfig: v1alpha.SecurityConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "sc", Namespace: "default"},
+					Spec: v1alpha.SecurityConfigSpec{
+						ApplicationRef: "my-app",
+						Maskinporten: &v1alpha.MaskinportenSpec{
+							Enabled: true,
+							ClientRef: &v1alpha.MaskinportenClientRef{
+								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
+							},
+						},
+					},
+				},
+				TokenXConfig: state.TokenXConfig{Enabled: true},
+				MaskinportenConfig: state.MaskinportenConfig{
+					Enabled: true,
+					Type:    state.ClientRef,
+				},
+				InvalidConfig: false,
+				Descendants:   []state.Descendant[client.Object]{},
+			}
+
+			result, err := statusmanager.DetermineReconciliationState(ctx, k8sClient, scope, []reconciliation.ControllerResource{})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*result).To(Equal(statusmanager.StateWaitingForJwker))
+		})
+	})
+
 	It("StateInvalid takes precedence over StatePending and StateFailed", func() {
 		errorMsg := "Some error"
 		scope := &state.Scope{

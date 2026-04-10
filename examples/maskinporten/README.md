@@ -82,13 +82,15 @@ spec:
 The result is a pod where the main app container can call the API of the `texas` sidecar to obtain an access token from maskinporten.
 
 ### Example: Obtain maskinporten access token with `texas`
-In this example, we use the CRD `MaskinportenClient` to configure the Maskinporten integration and reference it in the `SecurityConfig`. 
-This is done by the Kubernetes operator [digdirator](https://github.com/nais/digdirator). Since digdirator requires an actual organisation 
+In this example, we specify the Maskinporten configuration directly in the `SecurityConfig` manifest. This will create a `MaskinportenClient` resource with the specified configuration. 
+A `MaskinportenClient` resource requires the Kubernetes operator [digdirator](https://github.com/nais/digdirator) to be reconciled correctly. Since digdirator requires an actual [organization certificate](https://docs.digdir.no/docs/Maskinporten/maskinporten_virksomhetssertifikat) 
+to work, we use a mock controller to reconcile the `MaskinportenClient` resource in a local development environment.
+You can read more about how the mock controller works and how to run it in the [hack/mock_controller/README.md](../../hack/mock_controller/README.md) file.
 
 Check if a local cluster with all the necessary dependencies is configured,
-that accesserator is running on your machine or as a deployment in the local cluster, and that a local maskinporten 
-mock controller is running on your machine or as a deployment in the local cluster. The mock controller watches `MaskinportenClient` resources and creates the necessary secrets for requesting maskinporten tokens. 
-You can read more about how the mock controller works and how to run it in the [hack/mock_controller/README.md](../../hack/mock_controller/README.md) file.
+that accesserator is running on your machine or as a deployment in the local cluster, and that the 
+mock controller is running as a deployment in the local cluster.
+
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 make -C "$REPO_ROOT" ensurelocal ensurerunningordeployed ensuremockcontrollerdeployed
