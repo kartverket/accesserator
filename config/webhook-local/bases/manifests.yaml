@@ -57,3 +57,26 @@ webhooks:
         resources:
           - pods
     sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      url: https://host.docker.internal:9443/validate-accesserator-kartverket-no-v1alpha-securityconfig
+    name: vsecurityconfig-v1alpha.kb.io
+    namespaceSelector:
+      matchExpressions:
+        - key: accesserator-webhooks
+          operator: In
+          values:
+            - enabled
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - accesserator.kartverket.no
+        apiVersions:
+          - v1alpha
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - securityconfigs
+    sideEffects: None

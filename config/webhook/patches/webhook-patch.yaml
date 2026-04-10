@@ -35,3 +35,14 @@ webhooks:
           operator: In
           values:
             - enabled
+  - name: vsecurityconfig-v1alpha.kb.io
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: accesserator-system
+    namespaceSelector:
+      matchExpressions:
+        - key: accesserator-webhooks
+          operator: In
+          values:
+            - enabled
