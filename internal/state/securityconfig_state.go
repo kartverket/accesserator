@@ -21,6 +21,7 @@ type Scope struct {
 	SecurityConfig         v1alpha.SecurityConfig
 	TokenXConfig           TokenXConfig
 	MaskinportenConfig     MaskinportenConfig
+	OpaConfig              OpaConfig
 	Descendants            []Descendant[client.Object]
 	InvalidConfig          bool
 	ValidationErrorMessage *string
@@ -38,6 +39,11 @@ type MaskinportenConfig struct {
 	ClientSpec *naisiov1.MaskinportenClientSpec
 	ClientRef  *v1alpha.MaskinportenClientRef
 	SecretData *map[string][]byte
+}
+
+type OpaConfig struct {
+	Enabled          bool
+	BundleBinaryData map[string][]byte
 }
 
 type Descendant[T client.Object] struct {

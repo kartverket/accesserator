@@ -17,6 +17,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/opa"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -56,6 +57,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&naisiov1.MaskinportenClient{}).
 		Owns(&networkv1.NetworkPolicy{}).
 		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
 		Watches(&v1alpha1.Application{}, eventhandler.HandleSkiperatorApplicationEvent(r.Client)).
 		Named("securityconfig").
 		Complete(r)
@@ -68,7 +70,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch
 // +kubebuilder:rbac:groups=nais.io,resources=jwkers;maskinportenclients,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=serviceentries,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -124,6 +126,7 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Name:      utilities.GetTokenxEgressName(securityConfig.Name, config.Get().TokenxName),
 		Namespace: securityConfig.Namespace,
 	}
+
 	maskinportenClientObjectMeta := metav1.ObjectMeta{
 		Name:      utilities.GetMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
 		Namespace: securityConfig.Namespace,
@@ -134,6 +137,11 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	maskinportenServiceEntryObjectMeta := metav1.ObjectMeta{
 		Name:      utilities.GetMaskinportenServiceEntryName(securityConfig.Name),
+		Namespace: securityConfig.Namespace,
+	}
+
+	opaConfigMapObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetOpaConfigMapName(securityConfig.Name),
 		Namespace: securityConfig.Namespace,
 	}
 
@@ -229,6 +237,30 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 						current.Spec.Hosts = desired.Spec.Hosts
 						current.Spec.Ports = desired.Spec.Ports
 						current.Spec.Resolution = desired.Spec.Resolution
+					},
+				},
+			},
+		},
+		ControllerResourceAdapter[*corev1.ConfigMap]{
+			reconciliation.ReconcilerAdapter[*corev1.ConfigMap]{
+				Func: reconciliation.ResourceReconciler[*corev1.ConfigMap]{
+					ResourceKind:    "ConfigMap",
+					ResourceName:    opaConfigMapObjectMeta.Name,
+					DesiredResource: utilities.Ptr(opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *corev1.ConfigMap) bool {
+						if len(current.BinaryData) != len(desired.BinaryData) {
+							return true
+						}
+						for key, desiredVal := range desired.BinaryData {
+							if !bytes.Equal(current.BinaryData[key], desiredVal) {
+								return true
+							}
+						}
+						return false
+					},
+					UpdateFields: func(current, desired *corev1.ConfigMap) {
+						current.BinaryData = desired.BinaryData
 					},
 				},
 			},
