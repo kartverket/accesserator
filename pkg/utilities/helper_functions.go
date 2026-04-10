@@ -6,6 +6,7 @@ import (
 	"hash/fnv"
 	"time"
 
+	"github.com/kartverket/accesserator/api/v1alpha"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -77,6 +78,14 @@ func GetMaskinportenSecretFromSecretRefName(securityConfigName string) string {
 	)
 }
 
+func GetOpaPort(securityConfig v1alpha.SecurityConfig) int32 {
+	opaPort := OpaDefaultPort
+	if securityConfig.Spec.Opa.Port != nil {
+		opaPort = *securityConfig.Spec.Opa.Port
+	}
+	return opaPort
+}
+
 // ShortHash returns the first 8 hex characters of an FNV-32a hash of s.
 // Useful for producing short, stable, Kubernetes-safe name suffixes.
 func ShortHash(s string) string {
@@ -87,6 +96,10 @@ func ShortHash(s string) string {
 
 func GetMaskinportenServiceEntryName(securityConfigName string) string {
 	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
+}
+
+func GetOpaConfigMapName(securityConfigName string) string {
+	return fmt.Sprintf("%s-%s", securityConfigName, OpaConfigMapNameSuffix)
 }
 
 func GetMockKubernetesClient(scheme *runtime.Scheme, objects ...client.Object) client.Client {
