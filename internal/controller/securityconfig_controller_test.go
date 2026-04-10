@@ -527,8 +527,6 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}).Should(BeTrue())
 		})
 
-		// TODO: Add test to verify that x-validation for SecurityConfig.Spec.Maskinporten works!
-
 		It("should NOT create a Jwker resource nor a NetworkPolicy resource when TokenX is disabled", func() {
 			By("Disabling TokenX on the SecurityConfig")
 			securityConfig := &accesseratorv1alpha.SecurityConfig{}
