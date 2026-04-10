@@ -5,5 +5,5 @@ import rego.v1
 default allow := false
 
 allow if {
-    input.password == "password123"
+    input.jwt.groups in linst of [abc, bdavs, tilgangsstyring]
 }
