@@ -33,41 +33,25 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	imageURL := fmt.Sprintf("%s:%s", config.Get().TexasImageName, config.Get().TexasImageTag)
 	envVars := GetTexasEnvVars(securityConfig)
 
-	return corev1.Container{
-		Name:  TexasInitContainerName,
-		Image: imageURL,
-		Ports: []corev1.ContainerPort{
-			{
-				ContainerPort: config.Get().TexasPort,
-				Name:          "http",
-				Protocol:      corev1.ProtocolTCP,
-			},
+	texasContainer := utilities.CommonInitContainer
+	texasContainer.Name = TexasInitContainerName
+	texasContainer.Image = imageURL
+	texasContainer.Ports = []corev1.ContainerPort{
+		{
+			ContainerPort: config.Get().TexasPort,
+			Name:          "http",
+			Protocol:      corev1.ProtocolTCP,
 		},
-		// NOTE: RestartPolicy Always is only available for init containers in Kubernetes v1.33+
-		// https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior
-		RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
-		SecurityContext: &corev1.SecurityContext{
-			AllowPrivilegeEscalation: utilities.Ptr(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-				Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-			},
-			Privileged:             utilities.Ptr(false),
-			ReadOnlyRootFilesystem: utilities.Ptr(true),
-			RunAsGroup:             utilities.Ptr(int64(150)),
-			RunAsNonRoot:           utilities.Ptr(true),
-			RunAsUser:              utilities.Ptr(int64(150)),
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		Env: []corev1.EnvVar{
-			{Name: TokenXEnabledEnvVarName, Value: envVars.TokenXEnabled},
-			{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
-			{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
-			{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
-		},
-		EnvFrom: envVars.IntegrationSecretsRefs,
 	}
+	texasContainer.Env = []corev1.EnvVar{
+		{Name: TokenXEnabledEnvVarName, Value: envVars.TokenXEnabled},
+		{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
+		{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
+		{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
+	}
+	texasContainer.EnvFrom = envVars.IntegrationSecretsRefs
+
+	return texasContainer
 }
 
 // GetTexasEnvVars resolves the env var values for the Texas container from the SecurityConfig.
