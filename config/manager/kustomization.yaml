@@ -6,6 +6,8 @@ resources:
 - pdb.yaml
 - serviceaccount.yaml
 - clusterrolebinding.yaml
+- service.yaml
+- webhook-certificate.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
