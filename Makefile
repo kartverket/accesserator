@@ -263,7 +263,7 @@ mock-controller-namespace: kubectl ## Create mock-controller-system namespace in
 .PHONY: install-jwker-crds
 install-jwker-crds: ## Installing Jwker CRDs
 	@echo -e "🤞  Installing jwker crds..."
-	"$(KUBECTL)" apply -f https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_jwkers.yaml --context $(KUBECONTEXT)
+	"$(KUBECTL)" apply -f https://raw.githubusercontent.com/nais/liberator/34a9e8ad9d4bf1b6f8e292e05ccb71db1147fbcb/config/crd/bases/nais.io_jwkers.yaml --context $(KUBECONTEXT)
 
 .PHONY: jwker
 jwker: install-jwker-crds ## Installing Jwker on k8s cluster
