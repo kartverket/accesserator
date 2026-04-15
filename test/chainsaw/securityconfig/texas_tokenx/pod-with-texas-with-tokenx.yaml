@@ -19,6 +19,10 @@ spec:
     - name: istio-init
     - name: istio-proxy
     - env:
+        - name: BIND_ADDRESS
+          value: "127.0.0.1:3000"
+        - name: PROBE_BIND_ADDRESS
+          value: "0.0.0.0:3001"
         - name: TOKEN_X_ENABLED
           value: "true"
         - name: MASKINPORTEN_ENABLED

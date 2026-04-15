@@ -18,6 +18,7 @@ type Config struct {
 	TexasImageName     string `split_words:"true" default:"ghcr.io/nais/texas"`
 	TexasImageTag      string `split_words:"true"`
 	TexasPort          int32  `split_words:"true" default:"3000"`
+	TexasProbePort     int32  `split_words:"true" default:"3001"`
 	TexasUrlEnvVarName string `split_words:"true" default:"TEXAS_URL"`
 }
 

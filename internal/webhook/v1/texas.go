@@ -8,15 +8,21 @@ import (
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
 	TexasInitContainerName = "texas"
 
+	BindAddressEnvVarName         = "BIND_ADDRESS"
+	ProbeBindAddressEnvVarName    = "PROBE_BIND_ADDRESS"
 	TokenXEnabledEnvVarName       = "TOKEN_X_ENABLED"
 	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
 	AzureEnabledEnvVarName        = "AZURE_ENABLED"
 	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
+
+	IstioProbeRewritePathPattern = "/app-health/%s/readyz"
+	IstioProbeRewritePort        = 15020
 )
 
 // TexasEnvVars holds the resolved environment variable values for the Texas sidecar.
@@ -58,9 +64,26 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 			RunAsNonRoot:           utilities.Ptr(true),
 			RunAsUser:              utilities.Ptr(int64(150)),
 		},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/healthz",
+					Port: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: config.Get().TexasProbePort,
+					},
+					Scheme: corev1.URISchemeHTTP,
+				},
+			},
+			InitialDelaySeconds: 2,
+		},
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		Env: []corev1.EnvVar{
+			// Texas should be available on localhost
+			{Name: BindAddressEnvVarName, Value: "127.0.0.1:" + fmt.Sprint(config.Get().TexasPort)},
+			// Texas probes must be available on 0.0.0.0 because Istio resolves the pod IP for probe rewrites
+			{Name: ProbeBindAddressEnvVarName, Value: "0.0.0.0:" + fmt.Sprint(config.Get().TexasProbePort)},
 			{Name: TokenXEnabledEnvVarName, Value: envVars.TokenXEnabled},
 			{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
 			{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
@@ -120,7 +143,41 @@ func IsTexasContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.Ports, actual.Ports) &&
 		reflect.DeepEqual(expected.SecurityContext, actual.SecurityContext) &&
 		reflect.DeepEqual(expected.TerminationMessagePath, actual.TerminationMessagePath) &&
-		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy)
+		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy) &&
+		assertReadiness(expected.ReadinessProbe, actual.ReadinessProbe)
+}
+
+func assertReadiness(expected *corev1.Probe, actual *corev1.Probe) bool {
+	// We expect to always have a HTTPGet readiness probe
+	if expected == nil ||
+		actual == nil ||
+		expected.HTTPGet == nil ||
+		actual.HTTPGet == nil {
+		return false
+	}
+
+	// Fields not explicitly set are given default values by Kubernetes
+	if (expected.InitialDelaySeconds != 0 && expected.InitialDelaySeconds != actual.InitialDelaySeconds) ||
+		(expected.TimeoutSeconds != 0 && expected.TimeoutSeconds != actual.TimeoutSeconds) ||
+		(expected.PeriodSeconds != 0 && expected.PeriodSeconds != actual.PeriodSeconds) ||
+		(expected.SuccessThreshold != 0 && expected.SuccessThreshold != actual.SuccessThreshold) ||
+		(expected.FailureThreshold != 0 && expected.FailureThreshold != actual.FailureThreshold) ||
+		(expected.TerminationGracePeriodSeconds != nil &&
+			expected.TerminationGracePeriodSeconds != actual.TerminationGracePeriodSeconds) {
+		return false
+	}
+
+	// Istio rewrites readiness probes for all containers, in order to bypass mTLS requirements.
+	// ReadinessProbe configuration is thus dependent on whether Istio is running or not.
+	if actual.HTTPGet.Path == fmt.Sprintf(IstioProbeRewritePathPattern, TexasInitContainerName) &&
+		actual.HTTPGet.Port.IntVal == IstioProbeRewritePort {
+		return true
+	}
+	if expected.HTTPGet.Path == actual.HTTPGet.Path && reflect.DeepEqual(expected.HTTPGet.Port, actual.HTTPGet.Port) {
+		return true
+	}
+
+	return false
 }
 
 // MutateTexasOnPod adds the Texas init container and TEXAS_URL env var to the pod spec.
