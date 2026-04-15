@@ -168,17 +168,21 @@ func MutatePodWithTexasURLEnvVar(pod *corev1.Pod, applicationRef string) error {
 }
 
 // ValidateTexasOnPod checks that the Texas URL env var and init container are correctly set on the pod.
-func ValidateTexasOnPod(pod corev1.Pod, securityConfig v1alpha.SecurityConfig, sidecarContainer corev1.Container) error {
+func ValidateTexasOnPod(
+	pod corev1.Pod,
+	securityConfig v1alpha.SecurityConfig,
+	expectedSidecarContainer corev1.Container,
+) error {
 	if err := ValidateTexasURLEnvVar(pod, securityConfig); err != nil {
 		return err
 	}
-	return ValidateTexasInitContainer(pod, sidecarContainer)
+	return ValidateTexasInitContainer(pod, expectedSidecarContainer)
 }
 
-func ValidateTexasInitContainer(pod corev1.Pod, sidecarContainer corev1.Container) error {
-	for _, initContainer := range pod.Spec.InitContainers {
-		if initContainer.Name == TexasInitContainerName {
-			if IsTexasContainerEqual(sidecarContainer, initContainer) {
+func ValidateTexasInitContainer(pod corev1.Pod, expectedSidecarContainer corev1.Container) error {
+	for _, actualInitContainer := range pod.Spec.InitContainers {
+		if actualInitContainer.Name == TexasInitContainerName {
+			if IsTexasContainerEqual(expectedSidecarContainer, actualInitContainer) {
 				return nil
 			}
 			break
