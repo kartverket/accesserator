@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kartverket/accesserator/pkg/utilities"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -84,7 +83,7 @@ func (r *mockReconciler) Reconcile(ctx context.Context, req reconcile.Request) (
 			return reconcile.Result{}, createErr
 		}
 		logger.Info(fmt.Sprintf("Successfully created Secret %s/%s.", secretKey.Namespace, secretKey.Name))
-		maskinportenClient.Status.SynchronizationState = utilities.SynchronizationStateReady
+		maskinportenClient.Status.SynchronizationState = "RolloutComplete"
 		maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 		logger.Info(
 			fmt.Sprintf(
@@ -150,7 +149,7 @@ func (r *mockReconciler) Reconcile(ctx context.Context, req reconcile.Request) (
 	} else {
 		logger.Info(fmt.Sprintf("Secret %s/%s is up to date. No update needed.", secretKey.Namespace, secretKey.Name))
 	}
-	maskinportenClient.Status.SynchronizationState = utilities.SynchronizationStateReady
+	maskinportenClient.Status.SynchronizationState = "RolloutComplete"
 	maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 	logger.Info(
 		fmt.Sprintf(

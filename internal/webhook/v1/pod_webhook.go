@@ -238,9 +238,9 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 func BuildAccesseratorServices(serviceTypes []ServiceType, securityConfig v1alpha.SecurityConfig) ([]AccesseratorService, error) {
 	services := make([]AccesseratorService, 0, len(serviceTypes))
 	for _, serviceType := range serviceTypes {
-		container, err := GetServiceContainer(serviceType, securityConfig)
+		expectedContainer, err := GetServiceContainer(serviceType, securityConfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get container for service type %s: %w", serviceType, err)
+			return nil, fmt.Errorf("failed to get expectedContainer for service type %s: %w", serviceType, err)
 		}
 
 		mutateFunc, err := GetServiceMutationFunc(serviceType)
@@ -248,14 +248,14 @@ func BuildAccesseratorServices(serviceTypes []ServiceType, securityConfig v1alph
 			return nil, fmt.Errorf("failed to get mutation func for service type %s: %w", serviceType, err)
 		}
 
-		validateFunc, err := GetServiceValidationFunc(serviceType, *container)
+		validateFunc, err := GetServiceValidationFunc(serviceType, *expectedContainer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get validation func for service type %s: %w", serviceType, err)
 		}
 
 		services = append(services, AccesseratorService{
 			ServiceType:  serviceType,
-			Container:    *container,
+			Container:    *expectedContainer,
 			MutateFunc:   mutateFunc,
 			ValidateFunc: validateFunc,
 		})
@@ -290,11 +290,11 @@ func GetServiceContainer(st ServiceType, securityConfig v1alpha.SecurityConfig) 
 }
 
 // GetServiceValidationFunc returns the pod-validation function for the given service type.
-func GetServiceValidationFunc(st ServiceType, sidecarContainer corev1.Container) (func(corev1.Pod, v1alpha.SecurityConfig) error, error) {
+func GetServiceValidationFunc(st ServiceType, expectedSidecarContainer corev1.Container) (func(corev1.Pod, v1alpha.SecurityConfig) error, error) {
 	switch st {
 	case Texas:
 		return func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
-			return ValidateTexasOnPod(pod, securityConfig, sidecarContainer)
+			return ValidateTexasOnPod(pod, securityConfig, expectedSidecarContainer)
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown service type '%s'", st)

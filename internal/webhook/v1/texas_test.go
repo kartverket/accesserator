@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var _ = Describe("pod_webhook.go unit tests", func() {
@@ -75,6 +76,10 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				},
 			}
 			c := v1.GetTexasContainer(securityConfig)
+			Expect(c.ReadinessProbe).ToNot(BeNil())
+			Expect(c.ReadinessProbe.HTTPGet).ToNot(BeNil())
+			Expect(c.ReadinessProbe.HTTPGet.Path).To(Equal("/healthz"))
+			Expect(c.ReadinessProbe.HTTPGet.Port).To(Equal(intstr.FromInt32(config.Get().TexasProbePort)))
 			Expect(c.Env).NotTo(BeEmpty())
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.MaskinportenEnabledEnvVarName, Value: "true"}))
 			Expect(c.EnvFrom).NotTo(BeEmpty())
@@ -117,6 +122,10 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				},
 			}
 			c := v1.GetTexasContainer(securityConfig)
+			Expect(c.ReadinessProbe).ToNot(BeNil())
+			Expect(c.ReadinessProbe.HTTPGet).ToNot(BeNil())
+			Expect(c.ReadinessProbe.HTTPGet.Path).To(Equal("/healthz"))
+			Expect(c.ReadinessProbe.HTTPGet.Port).To(Equal(intstr.FromInt32(config.Get().TexasProbePort)))
 			Expect(c.Env).NotTo(BeEmpty())
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.TokenXEnabledEnvVarName, Value: "true"}))
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.MaskinportenEnabledEnvVarName, Value: "true"}))
