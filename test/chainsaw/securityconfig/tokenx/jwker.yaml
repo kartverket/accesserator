@@ -13,4 +13,4 @@ spec:
   secretName: app-jwker-secret
 status:
   synchronizationSecretName: app-jwker-secret
-  synchronizationState: Synchronized
+  synchronizationState: RolloutComplete
