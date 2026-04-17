@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const synchronizationStateNotReady = "not ready"
+
 func newTestSecurityConfigForStatusManager() *v1alpha.SecurityConfig {
 	return &v1alpha.SecurityConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -127,7 +129,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 	Context("when TokenX is enabled", func() {
 		It("returns StateWaitingForJwker when Jwker is not yet ready", func() {
-			jwker := newTestJwker("default", "my-app", "Synchronized", "")
+			jwker := newTestJwker("default", "my-app", synchronizationStateNotReady, "")
 			k8sClient = newK8sClientWithObjects(jwker)
 
 			scope := &state.Scope{
@@ -148,7 +150,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 		It("returns StateReady and sets JwkerSecretName when Jwker is ready", func() {
 			const secretName = "my-app-jwker-secret"
-			jwker := newTestJwker("default", "my-app", utilities.SynchronizationStateReady, secretName)
+			jwker := newTestJwker("default", "my-app", utilities.JwkerSynchronizationStateReady, secretName)
 			k8sClient = newK8sClientWithObjects(jwker)
 
 			scope := &state.Scope{
@@ -190,7 +192,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 	Context("when Maskinporten is enabled through inlineClient or clientRef", func() {
 		It("returns StateWaitingForMaskinportenClient when MaskinportenClient is not yet ready", func() {
-			maskinportenClient := newTestMaskinportenClient("default", "my-app", "Synchronized", "")
+			maskinportenClient := newTestMaskinportenClient("default", "my-app", synchronizationStateNotReady, "")
 			k8sClient = newK8sClientWithObjects(maskinportenClient)
 
 			scope := &state.Scope{
@@ -214,7 +216,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 		It("returns StateReady and sets MaskinportenClientSecretName when MaskinportenClient is ready", func() {
 			const secretName = "my-app-maskinporten-secret"
-			maskinportenClient := newTestMaskinportenClient("default", "my-app", utilities.SynchronizationStateReady, secretName)
+			maskinportenClient := newTestMaskinportenClient("default", "my-app", utilities.MaskinportenClientSynchronizationStateReady, secretName)
 			k8sClient = newK8sClientWithObjects(maskinportenClient)
 
 			scope := &state.Scope{
@@ -292,8 +294,8 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 	Context("when both TokenX and Maskinporten are enabled", func() {
 		It("returns StateWaitingForMaskinportenClient when Jwker is ready but MaskinportenClient is not ready", func() {
-			jwker := newTestJwker("default", "my-app", utilities.SynchronizationStateReady, "my-app-jwker-secret")
-			maskinportenClient := newTestMaskinportenClient("default", "my-app", "Synchronized", "")
+			jwker := newTestJwker("default", "my-app", utilities.JwkerSynchronizationStateReady, "my-app-jwker-secret")
+			maskinportenClient := newTestMaskinportenClient("default", "my-app", synchronizationStateNotReady, "")
 			k8sClient = newK8sClientWithObjects(jwker, maskinportenClient)
 
 			scope := &state.Scope{
@@ -325,8 +327,8 @@ var _ = Describe("DetermineReconciliationState", func() {
 		})
 
 		It("returns StateWaitingForJwker when MaskinportenClient is ready but Jwker is not ready", func() {
-			jwker := newTestJwker("default", "my-app", "Synchronized", "")
-			maskinportenClient := newTestMaskinportenClient("default", "my-app", utilities.SynchronizationStateReady, "mp-secret")
+			jwker := newTestJwker("default", "my-app", synchronizationStateNotReady, "")
+			maskinportenClient := newTestMaskinportenClient("default", "my-app", utilities.MaskinportenClientSynchronizationStateReady, "mp-secret")
 			k8sClient = newK8sClientWithObjects(jwker, maskinportenClient)
 
 			scope := &state.Scope{

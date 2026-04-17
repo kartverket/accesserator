@@ -118,7 +118,7 @@ func DetermineReconciliationState(
 				getJwkerErr,
 			)
 		}
-		if jwkerResource.Status.SynchronizationState != utilities.SynchronizationStateReady {
+		if jwkerResource.Status.SynchronizationState != utilities.JwkerSynchronizationStateReady {
 			waitingForJwker = true
 		}
 		scope.SecurityConfig.Status.JwkerSecretName = jwkerResource.Status.SynchronizationSecretName
@@ -152,7 +152,7 @@ func DetermineReconciliationState(
 					getMaksinportenClientErr,
 				)
 			}
-			if maskinportenClient.Status.SynchronizationState != utilities.SynchronizationStateReady {
+			if maskinportenClient.Status.SynchronizationState != utilities.MaskinportenClientSynchronizationStateReady {
 				waitingForMaskinportenClient = true
 			}
 			scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
