@@ -83,7 +83,7 @@ func (r *mockReconciler) Reconcile(ctx context.Context, req reconcile.Request) (
 			return reconcile.Result{}, createErr
 		}
 		logger.Info(fmt.Sprintf("Successfully created Secret %s/%s.", secretKey.Namespace, secretKey.Name))
-		maskinportenClient.Status.SynchronizationState = "RolloutComplete"
+		maskinportenClient.Status.SynchronizationState = "Synchronized"
 		maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 		logger.Info(
 			fmt.Sprintf(
@@ -149,7 +149,7 @@ func (r *mockReconciler) Reconcile(ctx context.Context, req reconcile.Request) (
 	} else {
 		logger.Info(fmt.Sprintf("Secret %s/%s is up to date. No update needed.", secretKey.Namespace, secretKey.Name))
 	}
-	maskinportenClient.Status.SynchronizationState = "RolloutComplete"
+	maskinportenClient.Status.SynchronizationState = "Synchronized"
 	maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 	logger.Info(
 		fmt.Sprintf(

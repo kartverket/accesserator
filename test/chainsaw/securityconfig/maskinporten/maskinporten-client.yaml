@@ -11,4 +11,4 @@ spec:
   secretName: security-config-maskinporten
 status:
   synchronizationSecretName: security-config-maskinporten
-  synchronizationState: RolloutComplete
+  synchronizationState: Synchronized

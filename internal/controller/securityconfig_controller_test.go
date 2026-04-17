@@ -183,7 +183,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}).Should(Equal(accesseratorv1alpha.PhasePending))
 
 			By("Marking the Jwker resource as finished reconciling")
-			jwker.Status.SynchronizationState = utilities.SynchronizationStateReady
+			jwker.Status.SynchronizationState = utilities.JwkerSynchronizationStateReady
 			Expect(k8sClient.Status().Update(ctx, jwker)).To(Succeed())
 
 			By("Reconciling again to let SecurityConfig transition to PhaseReady")
@@ -279,7 +279,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}).Should(Equal(accesseratorv1alpha.PhasePending))
 
 			By("Marking the MaskinportenClient resource as ready")
-			maskinportenClient.Status.SynchronizationState = utilities.SynchronizationStateReady
+			maskinportenClient.Status.SynchronizationState = utilities.MaskinportenClientSynchronizationStateReady
 			maskinportenClient.Status.SynchronizationSecretName = utilities.GetMaskinportenSecretName(securityConfigName)
 			Expect(k8sClient.Status().Update(ctx, maskinportenClient)).To(Succeed())
 
@@ -376,7 +376,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 
 			By("Marking the referenced MaskinportenClient as ready")
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: externalClientName, Namespace: namespaceName}, externalClient)).To(Succeed())
-			externalClient.Status.SynchronizationState = utilities.SynchronizationStateReady
+			externalClient.Status.SynchronizationState = utilities.MaskinportenClientSynchronizationStateReady
 			externalClient.Status.SynchronizationSecretName = "external-maskinporten-secret"
 			Expect(k8sClient.Status().Update(ctx, externalClient)).To(Succeed())
 

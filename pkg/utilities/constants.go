@@ -3,8 +3,9 @@ package utilities
 const (
 	EgressNameSuffix = "egress"
 
-	JwkerSecretNameSuffix     = "jwker-secret"
-	SynchronizationStateReady = "RolloutComplete"
+	JwkerSecretNameSuffix                       = "jwker-secret"
+	MaskinportenClientSynchronizationStateReady = "Synchronized"
+	JwkerSynchronizationStateReady              = "RolloutComplete"
 
 	MaskinportenNameSuffix = "maskinporten"
 
