@@ -82,7 +82,7 @@ sourceenv: ## Source environment variables from .env file
 	@set -a; [ -f .env ] && . .env; set +a
 
 .PHONY: local
-local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker ztoperator deploy-mock-controller generate install ## Set up entire local development environment with external dependencies
+local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker deploy-mock-controller generate install ## Set up entire local development environment with external dependencies
 
 .PHONY: clean
 clean: kind ## Clean up local environment by deleting kind cluster
@@ -279,13 +279,6 @@ skiperator: ## Install Skiperator on k8s cluster
 	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-skiperator.sh
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
-
-.PHONY: ztoperator
-ztoperator: ## Install Ztoperator on k8s cluster
-	@echo -e "🤞  Installing Ztoperator..."
-	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-ztoperator.sh
-	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n ztoperator-system -l app=ztoperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Ztoperator." && exit 1)
-	@echo -e "✅  Ztoperator installed in namespace 'ztoperator-system'!"
 
 .PHONY: install-istio
 install-istio: ## Install istio
