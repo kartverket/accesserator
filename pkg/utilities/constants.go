@@ -4,7 +4,7 @@ const (
 	EgressNameSuffix = "egress"
 
 	JwkerSecretNameSuffix     = "jwker-secret"
-	SynchronizationStateReady = "RolloutComplete"
+	SynchronizationStateReady = "Synchronized"
 
 	MaskinportenNameSuffix = "maskinporten"
 
