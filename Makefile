@@ -269,9 +269,9 @@ install-jwker-crds: ## Installing Jwker CRDs
 jwker: install-jwker-crds ## Installing Jwker on k8s cluster
 	@echo -e "🤞  Installing Jwker..."
 	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/install-jwker.sh
-	"$(KUBECTL)" wait pod --for=create --timeout=60s -n tokenx -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
-	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n tokenx -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
-	@echo -e "✅  Jwker installed in namespace 'tokenx'!"
+	"$(KUBECTL)" wait pod --for=create --timeout=60s -n jwker-system -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n jwker-system -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
+	@echo -e "✅  Jwker installed in namespace 'jwker-system'!"
 
 .PHONY: skiperator
 skiperator: ## Install Skiperator on k8s cluster

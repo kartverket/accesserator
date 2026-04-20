@@ -76,7 +76,7 @@ spec:
     - from:
         - source:
             notPrincipals:
-              - cluster.local/ns/tokenx/sa/jwker
+              - cluster.local/ns/jwker-system/sa/jwker
       to:
         - operation:
             paths:
