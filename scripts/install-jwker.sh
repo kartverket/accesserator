@@ -40,7 +40,7 @@ spec:
     - name: JWKER_CLIENT_ID
       value: dfb2cec9-3b6d-456b-a14f-649236247e3d
     - name: TOKENDINGS_URL
-      value: http://tokendings.tokenx:7456
+      value: http://tokendings.tokenx-api:7456
     - name: CLUSTER_NAME
       value: kind-accesserator
     - name: JWKER_PRIVATE_JWK
@@ -51,13 +51,13 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: jwker-egress
-  namespace: tokenx
+  namespace: jwker-system
 spec:
   egress:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: tokenx
+              kubernetes.io/metadata.name: tokenx-api
           podSelector:
             matchLabels:
               app: tokendings
