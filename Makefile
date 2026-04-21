@@ -453,6 +453,11 @@ ensuremockcontrollerdeployed: kubectl ismockcontrollernotrunning ## Ensure mock-
 	fi; \
 	echo "✅ mock-controller is deployed and ready (replicas=$$DESIRED)."
 
+.PHONY: webhook-test-manifests
+webhook-test-manifests: kustomize ## Build webhook manifests for envtest into webhook-tests/
+	@mkdir -p webhook-tests
+	@"$(KUSTOMIZE)" build config/webhook > webhook-tests/webhook-manifests.yaml
+
 ##@ Dependencies
 
 .PHONY: istiohelm

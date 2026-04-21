@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -41,6 +42,8 @@ var (
 	k8sClient client.Client
 	cfg       *rest.Config
 	testEnv   *envtest.Environment
+
+	webhookManifestsDir string
 )
 
 const skiperatorAppName = "skiperator-app"
@@ -76,6 +79,9 @@ var _ = BeforeSuite(func() {
 	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())
 
+	webhookManifestsDir, err = buildWebhookManifestsWithKustomize()
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
@@ -87,7 +93,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook", "bases")},
+			Paths: []string{webhookManifestsDir},
 		},
 	}
 
@@ -171,6 +177,26 @@ func getFirstFoundEnvTestBinaryDir() string {
 		}
 	}
 	return ""
+}
+
+// buildWebhookManifestsWithKustomize uses the Makefile target to build the webhook manifests with Kustomize.
+// This is done to include namespace selectors and object conditions in the webhook configuration we test against.
+func buildWebhookManifestsWithKustomize() (string, error) {
+	repoRoot := filepath.Join("..", "..", "..")
+	outDir := filepath.Join(repoRoot, "webhook-tests")
+
+	cmd := exec.Command("make", "-C", repoRoot, "webhook-test-manifests")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to build webhook test manifests via make: %w, output: %s", err, string(out))
+	}
+
+	manifestPath := filepath.Join(outDir, "webhook-manifests.yaml")
+	if _, err := os.Stat(manifestPath); err != nil {
+		return "", fmt.Errorf("expected manifest file %s was not created: %w", manifestPath, err)
+	}
+
+	return outDir, nil
 }
 
 // These are integration-style tests that exercise webhook wiring through the apiserver.
