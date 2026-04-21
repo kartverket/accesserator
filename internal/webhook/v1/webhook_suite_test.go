@@ -278,60 +278,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 		Expect(persistedPod.Spec.InitContainers).To(BeNil())
 	})
 
-	It("does not inject a Texas sidecar as an init container when pod is NOT annotated but lies in webhook enabled namespace", func() {
-		ns := getWebhookNamespace("pod-annotation-incorrect-namespace-enabled", true)
-		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
-		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
-		setupTexasEnabledSkiperatorApplication(ctx, ns)
-
-		pod := getPod(
-			metav1.ObjectMeta{
-				Name:      "pod-webhook-create",
-				Namespace: ns.Name,
-				Labels: map[string]string{
-					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
-				},
-			},
-			skiperatorAppName,
-		)
-		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
-
-		persistedPod := &corev1.Pod{}
-		getErr := k8sClient.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, persistedPod)
-		Expect(getErr).NotTo(HaveOccurred())
-		Expect(persistedPod.Spec.InitContainers).To(BeNil())
-	})
-
-	It("does inject a Texas sidecar as an init container when pod is annotated correctly AND lies in webhook enabled namespace", func() {
-		ns := getWebhookNamespace("pod-annotation-correct-namespace-enabled", true)
-		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
-		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
-		setupTexasEnabledSkiperatorApplication(ctx, ns)
-
-		pod := getPod(
-			metav1.ObjectMeta{
-				Name:      "pod-webhook-create",
-				Namespace: ns.Name,
-				Annotations: map[string]string{
-					v1.AccesseratorServicesAnnotation: "Texas",
-				},
-				Labels: map[string]string{
-					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
-				},
-			},
-			skiperatorAppName,
-		)
-		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
-
-		mutatedPod := &corev1.Pod{}
-		getErr := k8sClient.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, mutatedPod)
-		Expect(getErr).NotTo(HaveOccurred())
-
-		Expect(mutatedPod.Spec.InitContainers).NotTo(BeNil())
-		Expect(mutatedPod.Spec.InitContainers).To(ContainElement(HaveField("Name", Equal(v1.TexasInitContainerName))))
-	})
-
-	It("injects a Texas sidecar as an init container when pod is annotated correctly and securityconfig exists", func() {
+	It("injects a Texas sidecar as an init container when pod is annotated correctly, namespace is managed by SKIP and securityconfig exists", func() {
 		ns := getWebhookNamespace("pod-webhook-create-ns", true)
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
