@@ -10,7 +10,7 @@ spec:
     metadata:
       name: chainsaw-token-x
       labels:
-        accesserator-webhooks: enabled
+        skip.kartverket.no/skip-managed: "true"
   steps:
     - try:
         - create:
