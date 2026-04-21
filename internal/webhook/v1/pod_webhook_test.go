@@ -2,6 +2,7 @@ package v1_test
 
 import (
 	"context"
+	"errors"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	v1 "github.com/kartverket/accesserator/internal/webhook/v1"
@@ -15,6 +16,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type getErrorClient struct {
+	client.Client
+	err error
+}
+
+func (c getErrorClient) Get(_ context.Context, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
+	return c.err
+}
 
 var _ = Describe("pod_webhook.go unit tests", func() {
 	var (
@@ -284,6 +294,137 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 		It("returns [] when annotation is 'something, something else'", func() {
 			Expect(v1.ParseAccesseratorServices("something, something else")).To(BeEmpty())
+		})
+	})
+
+	Describe("IsWebhookEligible", func() {
+		newPod := func() corev1.Pod {
+			return corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "p",
+					Namespace: "ns",
+					Labels: map[string]string{
+						v1.SkiperatorApplicationRefLabel: "app",
+					},
+					Annotations: map[string]string{
+						v1.AccesseratorServicesAnnotation: "texas",
+					},
+				},
+			}
+		}
+
+		newNamespace := func(labels map[string]string) *corev1.Namespace {
+			return &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "ns",
+					Labels: labels,
+				},
+			}
+		}
+
+		It("returns false when pod has no labels", func() {
+			pod := newPod()
+			pod.Labels = nil
+
+			eligible, msg := v1.IsWebhookEligible(ctx, utilities.GetMockKubernetesClient(scheme), pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("pod ns/p has no labels"))
+		})
+
+		It("returns false when pod is not created from a Skiperator Application", func() {
+			pod := newPod()
+			delete(pod.Labels, v1.SkiperatorApplicationRefLabel)
+
+			eligible, msg := v1.IsWebhookEligible(ctx, utilities.GetMockKubernetesClient(scheme), pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("pod ns/p is not created from a Skiperator Application"))
+		})
+
+		It("returns false when pod has no annotations", func() {
+			pod := newPod()
+			pod.Annotations = nil
+
+			eligible, msg := v1.IsWebhookEligible(ctx, utilities.GetMockKubernetesClient(scheme), pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("pod ns/p has no annotations"))
+		})
+
+		It("returns false when pod has no Accesserator webhook annotations", func() {
+			pod := newPod()
+			pod.Annotations = map[string]string{"some.other/annotation": "value"}
+
+			eligible, msg := v1.IsWebhookEligible(ctx, utilities.GetMockKubernetesClient(scheme), pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("pod ns/p has no Accesserator webhook annotations"))
+		})
+
+		It("returns false when namespace is not found", func() {
+			pod := newPod()
+
+			eligible, msg := v1.IsWebhookEligible(ctx, utilities.GetMockKubernetesClient(scheme), pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("namespace ns not found"))
+		})
+
+		It("returns false when namespace lookup fails", func() {
+			pod := newPod()
+			mockClient := getErrorClient{
+				Client: utilities.GetMockKubernetesClient(scheme),
+				err:    errors.New("boom"),
+			}
+
+			eligible, msg := v1.IsWebhookEligible(ctx, mockClient, pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("failed to get namespace ns: boom"))
+		})
+
+		It("returns false when namespace has no labels", func() {
+			pod := newPod()
+			mockClient := utilities.GetMockKubernetesClient(scheme, newNamespace(nil))
+
+			eligible, msg := v1.IsWebhookEligible(ctx, mockClient, pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("namespace ns has no labels"))
+		})
+
+		It("returns false when namespace does not have the created by SKIP label", func() {
+			pod := newPod()
+			mockClient := utilities.GetMockKubernetesClient(scheme, newNamespace(map[string]string{"other": "label"}))
+
+			eligible, msg := v1.IsWebhookEligible(ctx, mockClient, pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("namespace ns does not have the created by SKIP label"))
+		})
+
+		It("returns false when created by SKIP label has wrong value", func() {
+			pod := newPod()
+			mockClient := utilities.GetMockKubernetesClient(scheme, newNamespace(map[string]string{v1.CreatedBySkipNamespaceLabel: "false"}))
+
+			eligible, msg := v1.IsWebhookEligible(ctx, mockClient, pod)
+
+			Expect(eligible).To(BeFalse())
+			Expect(msg).To(Equal("namespace ns does have the created by SKIP label, but it's value is not true"))
+		})
+
+		It("returns true when pod and namespace satisfy all webhook eligibility requirements", func() {
+			pod := newPod()
+			mockClient := utilities.GetMockKubernetesClient(
+				scheme,
+				newNamespace(map[string]string{v1.CreatedBySkipNamespaceLabel: v1.CreatedBySkipNamespaceLabelValue}),
+			)
+
+			eligible, msg := v1.IsWebhookEligible(ctx, mockClient, pod)
+
+			Expect(eligible).To(BeTrue())
+			Expect(msg).To(BeEmpty())
 		})
 	})
 })
