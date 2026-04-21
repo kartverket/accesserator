@@ -229,8 +229,16 @@ install: kustomize generate ## Install CRDs, Webhook configurations and ClusterR
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No CRDs to install; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No ClusterRoles to install; skipping."; fi
-	@out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
-	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi
+	@if $(MAKE) ensureaccesseratornotdeployed >/dev/null 2>&1; then \
+		echo "Accesserator is not deployed; installing local webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi; \
+	else \
+		echo "Accesserator is deployed; installing cluster webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi; \
+	fi
+
 
 .PHONY: uninstall
 uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations and ClusterRoles from the local kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
@@ -238,8 +246,17 @@ uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations 
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No CRDs to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No ClusterRoles to delete; skipping."; fi
-	@out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
-	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi
+	@if $(MAKE) ensureaccesseratornotdeployed >/dev/null 2>&1; then \
+		echo "Accesserator is not deployed; uninstalling local webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi; \
+	else \
+		echo "Accesserator is deployed; uninstalling cluster webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi; \
+	fi
+
+
 
 ##@ Cluster
 
