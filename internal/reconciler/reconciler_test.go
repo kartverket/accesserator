@@ -1,4 +1,4 @@
-package controller_test
+package reconciler_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/accesserator/internal/controller"
+	"github.com/kartverket/accesserator/internal/reconciler"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
@@ -60,7 +60,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 
 	Describe("GetResourceKind", func() {
 		It("should return the correct resource kind for Jwker", func() {
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind: "Jwker",
@@ -73,7 +73,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 		})
 
 		It("should return the correct resource kind for NetworkPolicy", func() {
-			adapter := controller.ControllerResourceAdapter[*networkingv1.NetworkPolicy]{
+			adapter := reconciler.ControllerResourceAdapter[*networkingv1.NetworkPolicy]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*networkingv1.NetworkPolicy]{
 					Func: reconciliation.ResourceReconciler[*networkingv1.NetworkPolicy]{
 						ResourceKind: "NetworkPolicy",
@@ -88,7 +88,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 
 	Describe("GetResourceName", func() {
 		It("should return the correct resource name", func() {
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind: "Jwker",
@@ -103,7 +103,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 
 	Describe("IsResourceNil", func() {
 		It("should return true when DesiredResource is nil", func() {
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
@@ -118,7 +118,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 
 		It("should return true when DesiredResource points to nil", func() {
 			var nilJwker *naisiov1.Jwker
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
@@ -138,7 +138,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 					Namespace: testNamespace,
 				},
 			}
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
@@ -165,7 +165,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 				},
 			}
 
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
@@ -222,7 +222,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 				},
 			}
 
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
@@ -287,7 +287,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 				},
 			}
 
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
@@ -333,7 +333,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 
 			// Reconcile with nil desired resource
 			var nilJwker *naisiov1.Jwker
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
@@ -365,7 +365,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 
 		It("should handle reconcile when desired is nil and resource does not exist", func() {
 			var nilJwker *naisiov1.Jwker
-			adapter := controller.ControllerResourceAdapter[*naisiov1.Jwker]{
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
 				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
 					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
 						ResourceKind:    "Jwker",
