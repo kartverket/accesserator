@@ -24,7 +24,7 @@ if [[ "${ctx}" != "${KUBECONTEXT}" ]]; then
   exit 1
 fi
 
-required_namespaces=(tokenx skiperator-system cert-manager istio-system auth istio-gateways mock-controller-system)
+required_namespaces=(tokenx-api jwker-system skiperator-system cert-manager istio-system auth istio-gateways mock-controller-system)
 
 for ns in "${required_namespaces[@]}"; do
   if ! "${KUBECTL_BIN}" get namespace "${ns}" --context "${KUBECONTEXT}" >/dev/null 2>&1; then
