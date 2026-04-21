@@ -239,7 +239,6 @@ install: kustomize generate ## Install CRDs, Webhook configurations and ClusterR
 		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi; \
 	fi
 
-
 .PHONY: uninstall
 uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations and ClusterRoles from the local kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
@@ -255,8 +254,6 @@ uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations 
 		out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
 		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi; \
 	fi
-
-
 
 ##@ Cluster
 
