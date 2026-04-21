@@ -28,11 +28,11 @@ webhooks:
           values:
             - "true"
     matchConditions:
-      - name: has-accesserator-annotation
+      - name: has-accesserator-annotation-prefix
         expression: >
           object != null &&
           object.metadata != null &&
-          object.metadata.annotations != null &&
+          ('annotations' in object.metadata) &&
           object.metadata.annotations.exists(k, k.startsWith("accesserator.kartverket.no/"))
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -65,9 +65,9 @@ webhooks:
           values:
             - "true"
     matchConditions:
-      - name: has-accesserator-annotation
+      - name: has-accesserator-annotation-prefix
         expression: >
           object != null &&
           object.metadata != null &&
-          object.metadata.annotations != null &&
+          ('annotations' in object.metadata) &&
           object.metadata.annotations.exists(k, k.startsWith("accesserator.kartverket.no/"))
