@@ -92,6 +92,7 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 				Name:      pod.GetName(),
 			},
 		)
+		return nil
 	}
 
 	podSecurityConfig, err := GetPodSecurityConfiguration(ctx, d.Client, pod)
@@ -166,6 +167,7 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 				Name:      pod.GetName(),
 			},
 		)
+		return nil, nil
 	}
 
 	podSecurityConfig, err := GetPodSecurityConfiguration(ctx, k8sClient, pod)
