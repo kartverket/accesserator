@@ -52,6 +52,48 @@ type TokenXSpec struct {
 	//
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
+
+	// AccessPolicy specifies configuration of which clients can exchange tokens with the application as target when
+	// token exchange is enabled. If not specified, no clients are allowed.
+	//
+	// +kubebuilder:validation:Optional
+	AccessPolicy *AccessPolicySpec `json:"accessPolicy,omitempty"`
+}
+
+// AccessPolicySpec specifies configuration of which clients can exchange tokens with the application as target when
+// token exchange is enabled. If not specified, no clients are allowed.
+//
+// +kubebuilder:object:generate=true
+type AccessPolicySpec struct {
+	// InheritInboundRules specifies whether the inbound access policy rules of the corresponding Skiperator Application
+	// should be used as clients for token exchange. Defaults to false. When set to true, the complete list of clients
+	// will be the union of the explicitly specified clients in Clients and the clients resolved from inbound rules.
+	//
+	// +kubebuilder:validation:Optional
+	InheritInboundRules bool `json:"inheritInboundRules"`
+
+	// Clients which may perform token exchange with your application as target.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=100
+	// +kubebuilder:validation:Optional
+	Clients []AccessPolicyClient `json:"clients,omitempty"`
+}
+
+// AccessPolicyClient define client applications which may perform token exchange with your application as target.
+//
+// +kubebuilder:object:generate=true
+type AccessPolicyClient struct {
+	// Application is the name of the client application that can exchange tokens with the target application.
+	//
+	// +kubebuilder:validation:Required
+	Application ResourceName `json:"application"`
+
+	// Namespace is the namespace which the client application resides. If not specified, the namespace of the
+	// SecurityConfig's referenced application will be used.
+	//
+	// +kubebuilder:validation:Optional
+	Namespace *ResourceName `json:"namespace,omitempty"`
 }
 
 // MaskinportenSpec defines the configuration for Maskinporten.
@@ -95,6 +137,8 @@ type MaskinportenClientSpec struct {
 	// ClientName is the client name to be registered at DigDir.
 	// It is shown during login for user-centric flows, and is otherwise a human-readable way to differentiate between clients at DigDir's self-service portal.
 	//
+	// +kubebuilder:validation:MaxLength=100
+	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	ClientName string `json:"clientName"`
 
@@ -110,6 +154,8 @@ type MaskinportenClientSpec struct {
 type MaskinportenScope struct {
 	// `consumes` is a list of scopes that your client can request access to.
 	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=100
 	// +kubebuilder:validation:Required
 	ConsumedScopes []naisiov1.ConsumedScope `json:"consumes"`
 }

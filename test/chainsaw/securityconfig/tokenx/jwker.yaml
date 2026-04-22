@@ -9,6 +9,18 @@ spec:
         - application: mock-oauth2
           namespace: auth
           cluster: kind-accesserator
+        - application: label-referenced-app
+          namespace: label-referenced-namespace-1
+          cluster: kind-accesserator
+        - application: label-referenced-app
+          namespace: label-referenced-namespace-2
+          cluster: kind-accesserator
+        - application: clients-list-app-1
+          namespace: clients-list-namespace-1
+          cluster: kind-accesserator
+        - application: clients-list-app-2
+          namespace: clients-list-namespace-2
+          cluster: kind-accesserator
     outbound: {}
   secretName: app-jwker-secret
 status:

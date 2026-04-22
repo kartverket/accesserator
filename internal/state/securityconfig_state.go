@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/skiperator/api/v1alpha1/podtypes"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -29,7 +28,7 @@ type Scope struct {
 type TokenXConfig struct {
 	Enabled        bool
 	ApplicationRef string
-	AccessPolicy   *podtypes.AccessPolicy
+	InboundRules   naisiov1.AccessPolicyInboundRules
 }
 
 type MaskinportenConfig struct {

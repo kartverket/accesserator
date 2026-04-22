@@ -169,10 +169,11 @@ var _ = Describe("SecurityConfig Resolver", func() {
 		Context("when both tokenx and maskinporten are enabled", func() {
 			It("should return scope with both configs enabled", func() {
 				// Create application with access policy
+				otherAppName := "other-app"
 				accessPolicy := &podtypes.AccessPolicy{
 					Inbound: &podtypes.InboundPolicy{
 						Rules: []podtypes.InternalRule{
-							{Application: "other-app"},
+							{Application: otherAppName},
 						},
 					},
 				}
@@ -198,6 +199,14 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						ApplicationRef: testAppName,
 						Tokenx: &accesseratorv1alpha.TokenXSpec{
 							Enabled: true,
+							AccessPolicy: &accesseratorv1alpha.AccessPolicySpec{
+								InheritInboundRules: true,
+								Clients: []accesseratorv1alpha.AccessPolicyClient{
+									{
+										Application: accesseratorv1alpha.ResourceName(otherAppName),
+									},
+								},
+							},
 						},
 						Maskinporten: &accesseratorv1alpha.MaskinportenSpec{
 							Enabled: true,
@@ -216,8 +225,10 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				// Verify TokenX config
 				Expect(result.TokenXConfig.Enabled).To(BeTrue())
 				Expect(result.TokenXConfig.ApplicationRef).To(Equal(testAppName))
-				Expect(result.TokenXConfig.AccessPolicy).NotTo(BeNil())
-				Expect(result.TokenXConfig.AccessPolicy.Inbound.Rules).To(HaveLen(1))
+				Expect(result.TokenXConfig.InboundRules).NotTo(BeNil())
+				Expect(result.TokenXConfig.InboundRules.GetRules()).To(HaveLen(1))
+				Expect(result.TokenXConfig.InboundRules.GetRules()[0].Application).To(Equal(otherAppName))
+				Expect(result.TokenXConfig.InboundRules.GetRules()[0].Namespace).To(Equal(testNamespace))
 
 				// Verify Maskinporten config
 				Expect(result.MaskinportenConfig.Enabled).To(BeTrue())

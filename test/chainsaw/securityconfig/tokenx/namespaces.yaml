@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: label-referenced-namespace-1
+  labels:
+    foo: bar
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: label-referenced-namespace-2
+  labels:
+    foo: bar

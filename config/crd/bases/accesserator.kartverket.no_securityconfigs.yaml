@@ -66,6 +66,8 @@ spec:
                         description: |-
                           ClientName is the client name to be registered at DigDir.
                           It is shown during login for user-centric flows, and is otherwise a human-readable way to differentiate between clients at DigDir's self-service portal.
+                        maxLength: 100
+                        minLength: 1
                         type: string
                       scopes:
                         description: Scopes is an object of consumed scopes.
@@ -83,6 +85,8 @@ spec:
                               required:
                               - name
                               type: object
+                            maxItems: 100
+                            minItems: 1
                             type: array
                         required:
                         - consumes
@@ -177,6 +181,47 @@ spec:
                   accessPolicies of the application referred to by applicationRef
                   will be used to restrict which applications can exchange tokens where the specified application is the intended audience.
                 properties:
+                  accessPolicy:
+                    description: |-
+                      AccessPolicy specifies configuration of which clients can exchange tokens with the application as target when
+                      token exchange is enabled. If not specified, no clients are allowed.
+                    properties:
+                      clients:
+                        description: Clients which may perform token exchange with
+                          your application as target.
+                        items:
+                          description: AccessPolicyClient define client applications
+                            which may perform token exchange with your application
+                            as target.
+                          properties:
+                            application:
+                              description: Application is the name of the client application
+                                that can exchange tokens with the target application.
+                              maxLength: 253
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                              type: string
+                            namespace:
+                              description: |-
+                                Namespace is the namespace which the client application resides. If not specified, the namespace of the
+                                SecurityConfig's referenced application will be used.
+                              maxLength: 253
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                              type: string
+                          required:
+                          - application
+                          type: object
+                        maxItems: 100
+                        minItems: 1
+                        type: array
+                      inheritInboundRules:
+                        description: |-
+                          InheritInboundRules specifies whether the inbound access policy rules of the corresponding Skiperator Application
+                          should be used as clients for token exchange. Defaults to false. When set to true, the complete list of clients
+                          will be the union of the explicitly specified clients in Clients and the clients resolved from inbound rules.
+                        type: boolean
+                    type: object
                   enabled:
                     description: Enabled indicates whether token exchange should be
                       configured for the application.
