@@ -12,8 +12,8 @@ MUTATING_CFG="accesserator-mutating-webhook-configuration"
 VALIDATING_CFG="accesserator-validating-webhook-configuration"
 
 EXPECTED_SVC="webhook-service"
-EXPECTED_SELECTOR_KEY="accesserator-webhooks"
-EXPECTED_SELECTOR_VALUE="enabled"
+EXPECTED_SELECTOR_KEY="skip.kartverket.no/skip-managed"
+EXPECTED_SELECTOR_VALUE="true"
 
 check_deployment() {
   echo "🔎 Checking Deployment ${NAMESPACE}/${DEPLOYMENT}..."

@@ -12,10 +12,23 @@ webhooks:
         namespace: accesserator-system
     namespaceSelector:
       matchExpressions:
-        - key: accesserator-webhooks
+        - key: skip.kartverket.no/skip-managed
           operator: In
           values:
-            - enabled
+            - "true"
+    matchConditions:
+      - name: has-accesserator-annotation-prefix
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('annotations' in object.metadata) &&
+          object.metadata.annotations.exists(k, k.startsWith("accesserator.kartverket.no/"))
+      - name: has-skiperator-app-label
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('labels' in object.metadata) &&
+          ('application.skiperator.no/app-name' in object.metadata.labels)
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -31,7 +44,20 @@ webhooks:
         namespace: accesserator-system
     namespaceSelector:
       matchExpressions:
-        - key: accesserator-webhooks
+        - key: skip.kartverket.no/skip-managed
           operator: In
           values:
-            - enabled
+            - "true"
+    matchConditions:
+      - name: has-accesserator-annotation-prefix
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('annotations' in object.metadata) &&
+          object.metadata.annotations.exists(k, k.startsWith("accesserator.kartverket.no/"))
+      - name: has-skiperator-app-label
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('labels' in object.metadata) &&
+          ('application.skiperator.no/app-name' in object.metadata.labels)

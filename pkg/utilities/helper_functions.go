@@ -89,13 +89,6 @@ func GetMaskinportenServiceEntryName(securityConfigName string) string {
 	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
 }
 
-func GetMockKubernetesClient(scheme *runtime.Scheme, objects ...client.Object) client.Client {
-	return fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithObjects(objects...).
-		Build()
-}
-
 func GetSecret(ctx context.Context, k8sClient client.Client, key client.ObjectKey) (*v1.Secret, error) {
 	var secret v1.Secret
 	if err := k8sClient.Get(ctx, key, &secret); err != nil {
@@ -150,4 +143,12 @@ func GetMaskinportenClient(
 		)
 	}
 	return &maskinportenClient, nil
+}
+
+// GetMockKubernetesClient returns a fake Kubernetes client with the provided scheme and objects. Only used in testing.
+func GetMockKubernetesClient(scheme *runtime.Scheme, objects ...client.Object) client.Client {
+	return fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objects...).
+		Build()
 }

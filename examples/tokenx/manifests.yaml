@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   name: tokenx-example
   labels:
-    accesserator-webhooks: enabled
+    skip.kartverket.no/skip-managed: "true"
     istio.io/rev: default
 ---
 apiVersion: skiperator.kartverket.no/v1alpha1

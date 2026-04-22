@@ -8,6 +8,7 @@ import (
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,11 +17,15 @@ import (
 )
 
 const (
+	CreatedBySkipNamespaceLabel      = "skip.kartverket.no/skip-managed"
+	CreatedBySkipNamespaceLabelValue = "true"
+
 	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
 
-	AccesseratorServicesAnnotation    = "accesserator.kartverket.no/services"
-	AccesseratorVerifyAnnotationKey   = "accesserator.kartverket.no/verify-securityconfig"
-	AccesseratorVerifyAnnotationValue = "true"
+	AccesseratorWebhookAnnotationPrefix = "accesserator.kartverket.no/"
+	AccesseratorServicesAnnotation      = AccesseratorWebhookAnnotationPrefix + "services"
+	AccesseratorVerifyAnnotationKey     = AccesseratorWebhookAnnotationPrefix + "verify-securityconfig"
+	AccesseratorVerifyAnnotationValue   = "true"
 
 	Texas ServiceType = iota
 )
@@ -72,6 +77,23 @@ var _ admission.Defaulter[*corev1.Pod] = &PodCustomDefaulter{}
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Pod.
 func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error {
 	podlog.Info("Defaulting for Pod")
+
+	isPodWebhookEligible, errMsg := IsWebhookEligible(ctx, d.Client, *pod)
+	if !isPodWebhookEligible {
+		podlog.Error(
+			fmt.Errorf(
+				"webhook eligibility check failed: %s",
+				errMsg,
+			),
+			"received mutating webhook request for pod that is not eligible for Accesserator webhook processing",
+			"pod",
+			types.NamespacedName{
+				Namespace: pod.GetNamespace(),
+				Name:      pod.GetGenerateName(),
+			},
+		)
+		return nil
+	}
 
 	podSecurityConfig, err := GetPodSecurityConfiguration(ctx, d.Client, pod)
 	if err != nil {
@@ -130,6 +152,23 @@ func (v *PodCustomValidator) ValidateDelete(_ context.Context, pod *corev1.Pod) 
 
 func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
+
+	isPodWebhookEligible, errMsg := IsWebhookEligible(ctx, k8sClient, *pod)
+	if !isPodWebhookEligible {
+		podlog.Error(
+			fmt.Errorf(
+				"webhook eligibility check failed: %s",
+				errMsg,
+			),
+			"received validating webhook request for pod that is not eligible for Accesserator webhook processing",
+			"pod",
+			types.NamespacedName{
+				Namespace: pod.GetNamespace(),
+				Name:      pod.GetName(),
+			},
+		)
+		return nil, nil
+	}
 
 	podSecurityConfig, err := GetPodSecurityConfiguration(ctx, k8sClient, pod)
 	if err != nil {
@@ -311,4 +350,44 @@ func GetServiceMutationFunc(st ServiceType) (func(*corev1.Pod, v1alpha.SecurityC
 	default:
 		return nil, fmt.Errorf("unknown service type '%s'", st)
 	}
+}
+
+func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.Pod) (bool, string) {
+	if pod.Labels == nil {
+		return false, fmt.Sprintf("pod %s/%s has no labels", pod.Namespace, pod.Name)
+	}
+	_, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	if !isSkiperatorPod {
+		return false, fmt.Sprintf("pod %s/%s is not created from a Skiperator Application", pod.Namespace, pod.Name)
+	}
+	if pod.Annotations == nil {
+		return false, fmt.Sprintf("pod %s/%s has no annotations", pod.Namespace, pod.Name)
+	}
+	hasAccesseratorWebhookAnnotationPrefix := false
+	for annotation := range pod.Annotations {
+		if strings.HasPrefix(annotation, AccesseratorWebhookAnnotationPrefix) {
+			hasAccesseratorWebhookAnnotationPrefix = true
+		}
+	}
+	if !hasAccesseratorWebhookAnnotationPrefix {
+		return false, fmt.Sprintf("pod %s/%s has no Accesserator webhook annotations", pod.Namespace, pod.Name)
+	}
+	ns := &corev1.Namespace{}
+	if err := k8sClient.Get(ctx, client.ObjectKey{Name: pod.Namespace}, ns); err != nil {
+		if errors.IsNotFound(err) {
+			return false, fmt.Sprintf("namespace %s not found", pod.Namespace)
+		}
+		return false, fmt.Sprintf("failed to get namespace %s: %s", pod.Namespace, err.Error())
+	}
+	if ns.Labels == nil {
+		return false, fmt.Sprintf("namespace %s has no labels", pod.Namespace)
+	}
+	value, hasLabel := ns.Labels[CreatedBySkipNamespaceLabel]
+	if !hasLabel {
+		return false, fmt.Sprintf("namespace %s does not have the created by SKIP label", pod.Namespace)
+	}
+	if value != CreatedBySkipNamespaceLabelValue {
+		return false, fmt.Sprintf("namespace %s does have the created by SKIP label, but it's value is not %s", pod.Namespace, CreatedBySkipNamespaceLabelValue)
+	}
+	return true, ""
 }

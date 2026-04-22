@@ -10,7 +10,7 @@ spec:
     metadata:
       name: chainsaw-texas-maskinporten
       labels:
-        accesserator-webhooks: enabled
+        skip.kartverket.no/skip-managed: "true"
         istio.io/rev: default
   steps:
     - try:

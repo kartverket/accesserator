@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -41,6 +42,8 @@ var (
 	k8sClient client.Client
 	cfg       *rest.Config
 	testEnv   *envtest.Environment
+
+	webhookManifestsDir string
 )
 
 const skiperatorAppName = "skiperator-app"
@@ -76,6 +79,9 @@ var _ = BeforeSuite(func() {
 	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())
 
+	webhookManifestsDir, err = buildWebhookManifestsWithKustomize()
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
@@ -87,7 +93,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook", "bases")},
+			Paths: []string{webhookManifestsDir},
 		},
 	}
 
@@ -173,18 +179,40 @@ func getFirstFoundEnvTestBinaryDir() string {
 	return ""
 }
 
+// buildWebhookManifestsWithKustomize uses the Makefile target to build the webhook manifests with Kustomize.
+// This is done to include namespace selectors and object conditions in the webhook configuration we test against.
+func buildWebhookManifestsWithKustomize() (string, error) {
+	repoRoot := filepath.Join("..", "..", "..")
+	outDir := filepath.Join(repoRoot, "webhook-tests")
+
+	cmd := exec.Command("make", "-C", repoRoot, "webhook-test-manifests")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to build webhook test manifests via make: %w, output: %s", err, string(out))
+	}
+
+	manifestPath := filepath.Join(outDir, "webhook-manifests.yaml")
+	if _, err := os.Stat(manifestPath); err != nil {
+		return "", fmt.Errorf("expected manifest file %s was not created: %w", manifestPath, err)
+	}
+
+	return outDir, nil
+}
+
 // These are integration-style tests that exercise webhook wiring through the apiserver.
 // We split them into mutating vs validating invocation to make intent and failures clearer.
 
-func getWebhookEnabledNamespace(name string) *corev1.Namespace {
-	return &corev1.Namespace{
+func getWebhookNamespace(name string, webhookEnabled bool) *corev1.Namespace {
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"accesserator-webhooks": "enabled",
-			},
+			Name:   name,
+			Labels: map[string]string{},
 		},
 	}
+	if webhookEnabled {
+		ns.Labels[v1.CreatedBySkipNamespaceLabel] = v1.CreatedBySkipNamespaceLabelValue
+	}
+	return ns
 }
 
 func getPod(objectMeta metav1.ObjectMeta, containerName string) *corev1.Pod {
@@ -199,33 +227,62 @@ func getPod(objectMeta metav1.ObjectMeta, containerName string) *corev1.Pod {
 	}
 }
 
+func setupTexasEnabledSkiperatorApplication(ctx context.Context, ns *corev1.Namespace) {
+	securityConfigName := "security-config"
+	skiperatorApp := v1alpha1.Application{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      skiperatorAppName,
+			Namespace: ns.GetName(),
+		},
+	}
+	Expect(k8sClient.Create(ctx, &skiperatorApp)).To(Succeed())
+	securityConfig := v1alpha.SecurityConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      securityConfigName,
+			Namespace: ns.GetName(),
+		},
+		Spec: v1alpha.SecurityConfigSpec{
+			ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
+		},
+	}
+	Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())
+	securityConfig.Status.Ready = true
+	Expect(k8sClient.Status().Update(ctx, &securityConfig)).To(Succeed())
+}
+
 var _ = Describe("Pod mutating and validating webhook", func() {
-	It("injects a Texas sidecar as an init container when pod is annotated correctly and securityconfig exists", func() {
-		ns := getWebhookEnabledNamespace("pod-webhook-create-ns")
-		skiperatorAppName := skiperatorAppName
-		securityConfigName := "security-config"
+	It("does not inject a Texas sidecar as an init container when pod is annotated correctly but lies in webhook disabled namespace", func() {
+		ns := getWebhookNamespace("pod-annotation-correct-namespace-disabled", false)
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+		setupTexasEnabledSkiperatorApplication(ctx, ns)
 
-		skiperatorApp := v1alpha1.Application{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      skiperatorAppName,
-				Namespace: ns.GetName(),
+		pod := getPod(
+			metav1.ObjectMeta{
+				Name:      "pod-webhook-create",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					v1.AccesseratorServicesAnnotation: "Texas",
+				},
+				Labels: map[string]string{
+					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+				},
 			},
-		}
-		Expect(k8sClient.Create(ctx, &skiperatorApp)).To(Succeed())
-		securityConfig := v1alpha.SecurityConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      securityConfigName,
-				Namespace: ns.GetName(),
-			},
-			Spec: v1alpha.SecurityConfigSpec{
-				ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
-			},
-		}
-		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())
-		securityConfig.Status.Ready = true
-		Expect(k8sClient.Status().Update(ctx, &securityConfig)).To(Succeed())
+			skiperatorAppName,
+		)
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+
+		persistedPod := &corev1.Pod{}
+		getErr := k8sClient.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, persistedPod)
+		Expect(getErr).NotTo(HaveOccurred())
+		Expect(persistedPod.Spec.InitContainers).To(BeNil())
+	})
+
+	It("injects a Texas sidecar as an init container when pod is annotated correctly, namespace is managed by SKIP and securityconfig exists", func() {
+		ns := getWebhookNamespace("pod-webhook-create-ns", true)
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+		setupTexasEnabledSkiperatorApplication(ctx, ns)
 
 		pod := getPod(
 			metav1.ObjectMeta{
@@ -253,31 +310,10 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 	})
 
 	It("does not inject a Texas sidecar as an init container when pod is updated to inject Texas", func() {
-		ns := getWebhookEnabledNamespace("pod-webhook-update-ns")
+		ns := getWebhookNamespace("pod-webhook-update-ns", true)
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
-		skiperatorAppName := skiperatorAppName
-		securityConfigName := "security-config"
-
-		skiperatorApp := v1alpha1.Application{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      skiperatorAppName,
-				Namespace: ns.GetName(),
-			},
-		}
-		Expect(k8sClient.Create(ctx, &skiperatorApp)).To(Succeed())
-		securityConfig := v1alpha.SecurityConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      securityConfigName,
-				Namespace: ns.GetName(),
-			},
-			Spec: v1alpha.SecurityConfigSpec{
-				ApplicationRef: v1alpha.ResourceName(skiperatorAppName),
-			},
-		}
-		Expect(k8sClient.Create(ctx, &securityConfig)).To(Succeed())
-		securityConfig.Status.Ready = true
-		Expect(k8sClient.Status().Update(ctx, &securityConfig)).To(Succeed())
+		setupTexasEnabledSkiperatorApplication(ctx, ns)
 
 		// Create Pod with Skiperator reference
 		pod := getPod(
@@ -313,7 +349,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 	})
 
 	It("does not inject a Texas sidecar as an init container when pod is deleted", func() {
-		ns := getWebhookEnabledNamespace("pod-webhook-delete-ns")
+		ns := getWebhookNamespace("pod-webhook-delete-ns", true)
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
 		pod := getPod(
