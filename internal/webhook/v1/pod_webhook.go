@@ -89,7 +89,7 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 			"pod",
 			types.NamespacedName{
 				Namespace: pod.GetNamespace(),
-				Name:      pod.GetName(),
+				Name:      pod.GetGenerateName(),
 			},
 		)
 		return nil
