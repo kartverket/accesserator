@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    accesserator.kartverket.no/verify-securityconfig: "true"
+    accesserator.kartverket.no/services: "texas"
+  labels:
+    app: app-with-annotation
+    app.kubernetes.io/managed-by: skiperator
+    application.skiperator.no/app: app-with-annotation
+    application.skiperator.no/app-name: app-with-annotation
+    skiperator.kartverket.no/controller: application
+spec:
+  containers:
+    - name: app-with-annotation
+  initContainers:
+    - name: istio-init
+    - name: istio-proxy
+    - name: texas
+status:
+  containerStatuses:
+    - name: app-with-annotation
+      ready: true
+  initContainerStatuses:
+    - name: istio-init
+      ready: true
+    - name: istio-proxy
+      ready: true
+    - name: texas
+      ready: true
