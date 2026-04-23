@@ -1,0 +1,27 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: readystate
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-readystate
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        - create:
+            file: securityconfig.yaml
+        - assert:
+            file: securityconfig-with-failed-status.yaml
+        - error:
+            file: securityconfig-with-success-status.yaml
+        - create:
+            file: skiperator-application.yaml
+        - error:
+            file: securityconfig-with-failed-status.yaml
+        - assert:
+            file: securityconfig-with-success-status.yaml
