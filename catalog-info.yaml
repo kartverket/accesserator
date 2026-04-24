@@ -12,3 +12,4 @@ spec:
   system: system:default/skip
   dependsOn:
     - component:default/skip-apps
+    - component:default/texas
