@@ -23,6 +23,10 @@ import (
 
 // ControllerResources creates all resource adapters for the given SecurityConfig
 func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource {
+	if scope.InvalidConfig {
+		return nil
+	}
+
 	return []reconciliation.ControllerResource{
 		jwkerControllerResource(scope),
 		tokenxEgressControllerResource(scope),

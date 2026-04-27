@@ -10,6 +10,7 @@ import (
 	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/internal/statusmanager"
+	"github.com/kartverket/accesserator/internal/validator"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -109,6 +110,8 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return reconcile.Result{}, err
 	}
+
+	scope = validator.ValidateSecurityConfig(ctx, r.Client, scope)
 
 	controllerResources := reconciler.ControllerResources(scope)
 
