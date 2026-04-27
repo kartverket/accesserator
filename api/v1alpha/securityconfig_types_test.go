@@ -84,6 +84,67 @@ var _ = Describe("SecurityConfig CRD", func() {
 				err = k8sClient.Create(ctx, sc)
 				Expect(err).ToNot(HaveOccurred())
 			})
+
+			Describe("When spec.tokenx.accessPolicy is specified", func() {
+				It("should require non-empty client list", func() {
+					sc := makeSecurityConfig(map[string]interface{}{
+						"applicationRef": skiperatorAppName,
+						"tokenx": map[string]interface{}{
+							"enabled": true,
+							"accessPolicy": map[string]interface{}{
+								"clients": []map[string]interface{}{},
+							},
+						},
+					})
+					err := k8sClient.Create(ctx, sc)
+					Expect(err).To(HaveOccurred())
+					Expect(errors.IsInvalid(err)).To(BeTrue())
+					Expect(err.Error()).To(ContainSubstring("spec.tokenx.accessPolicy.clients in body should have at least 1 items"))
+				})
+			})
+
+			It("should reject too big client list", func() {
+				n := 101
+				clientList := make([]accesseratorv1alpha.AccessPolicyClient, n)
+				for i := 0; i < n; i++ {
+					clientList[i] = accesseratorv1alpha.AccessPolicyClient{
+						Application: accesseratorv1alpha.ResourceName(fmt.Sprintf("client-%d", i+1)),
+					}
+				}
+				sc := makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"tokenx": map[string]interface{}{
+						"enabled": true,
+						"accessPolicy": map[string]interface{}{
+							"clients": clientList,
+						},
+					},
+				})
+				err := k8sClient.Create(ctx, sc)
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("spec.tokenx.accessPolicy.clients: Too many"))
+			})
+
+			It("should reject client without application", func() {
+				sc := makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"tokenx": map[string]interface{}{
+						"enabled": true,
+						"accessPolicy": map[string]interface{}{
+							"clients": []map[string]interface{}{
+								{
+									"namespace": "some-namespace",
+								},
+							},
+						},
+					},
+				})
+				err := k8sClient.Create(ctx, sc)
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("spec.tokenx.accessPolicy.clients[0].application: Required value"))
+			})
 		})
 
 		Describe("When spec.maskinporten is specified", func() {

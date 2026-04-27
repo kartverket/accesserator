@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -170,6 +171,60 @@ var _ = Describe("Helper Functions", func() {
 			scheme := runtime.NewScheme()
 			client := utilities.GetMockKubernetesClient(scheme)
 			Expect(client).NotTo(BeNil())
+		})
+	})
+
+	type ComplexObject struct {
+		Foo v1alpha.ResourceName
+		Bar int32
+		Baz string
+	}
+
+	Describe("UniqueSliceElements", func() {
+		It("should return unique string elements", func() {
+			input := []string{"foo", "bar", "foo", "baz"}
+			expect := []string{"foo", "bar", "baz"}
+			result := utilities.UniqueSliceElements(input)
+			Expect(result).To(HaveLen(3))
+			Expect(result).To(Equal(expect))
+		})
+
+		It("should return unique complex elements", func() {
+			equal1 := ComplexObject{
+				Foo: "foo",
+				Bar: 100,
+				Baz: "baz",
+			}
+			equal2 := ComplexObject{
+				Foo: "foo",
+				Bar: 100,
+				Baz: "baz",
+			}
+			notequal1 := ComplexObject{
+				Foo: "foo",
+				Bar: 200,
+				Baz: "baz",
+			}
+			notequal2 := ComplexObject{
+				Foo: "notfoo",
+				Bar: 100,
+				Baz: "baz",
+			}
+			notequal3 := ComplexObject{
+				Foo: "foo",
+				Bar: 100,
+				Baz: "notbaz",
+			}
+			result1 := utilities.UniqueSliceElements([]ComplexObject{equal1, equal2})
+			Expect(result1).To(HaveLen(1))
+			result2 := utilities.UniqueSliceElements([]ComplexObject{equal1, equal2, notequal1})
+			Expect(result2).To(HaveLen(2))
+			result3 := utilities.UniqueSliceElements([]ComplexObject{equal1, equal2, notequal2})
+			Expect(result3).To(HaveLen(2))
+			result4 := utilities.UniqueSliceElements([]ComplexObject{equal1, equal2, notequal3})
+			Expect(result4).To(HaveLen(2))
+			result5 := utilities.UniqueSliceElements([]ComplexObject{equal1, equal2, notequal1, notequal2, notequal3})
+			Expect(result5).To(HaveLen(4))
 		})
 	})
 })

@@ -10,3 +10,6 @@ spec:
       rules:
         - application: mock-oauth2
           namespace: auth
+        - application: label-referenced-app
+          namespacesByLabel:
+            foo: bar

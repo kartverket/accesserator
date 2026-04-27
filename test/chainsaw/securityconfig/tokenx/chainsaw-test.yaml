@@ -14,6 +14,8 @@ spec:
   steps:
     - try:
         - create:
+            file: namespaces.yaml
+        - create:
             file: skiperator-application.yaml
         - create:
             file: securityconfig-tokenx-disabled.yaml
@@ -32,6 +34,13 @@ spec:
               spec:
                 tokenx:
                   enabled: true
+                  accessPolicy:
+                    inheritInboundRules: true
+                    clients:
+                      - application: clients-list-app-1
+                        namespace: clients-list-namespace-1
+                      - application: clients-list-app-2
+                        namespace: clients-list-namespace-2
         - assert:
             file: securityconfig-with-updated-status.yaml
         - assert:
