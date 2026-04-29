@@ -32,6 +32,8 @@ metadata:
 spec:
   tokenx:
     enabled: true
+    accessPolicy:
+      inheritInboundRules: true
   applicationRef: app
 ---
 apiVersion: skiperator.kartverket.no/v1alpha1
@@ -59,4 +61,6 @@ metadata:
 spec:
   tokenx:
     enabled: true
+    accessPolicy:
+      inheritInboundRules: true
   applicationRef: another-app
