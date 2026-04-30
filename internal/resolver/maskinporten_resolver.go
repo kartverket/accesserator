@@ -98,24 +98,16 @@ func GetMaskinportenSecretData(ctx context.Context, k8sClient client.Client, sec
 		MaskinportenClientIdEnvVar:  clientIdData,
 		MaskinportenClientJwkEnvVar: clientJwkData,
 	}
-	for key, value := range GetMaskinportenPublicUrlsAsSecretData() {
-		secretData[key] = value
-	}
-	return &secretData, nil
-}
-
-func GetMaskinportenPublicUrlsAsSecretData() map[string][]byte {
-	secretData := make(map[string][]byte, 3)
 	if *config.Get().RunsInProduction {
 		secretData[MaskinportenIssuerEnvVar] = []byte(utilities.MaskinportenProdIssuer)
 		secretData[MaskinportenTokenEndpointEnvVar] = []byte(utilities.MaskinportenProdTokenEndpoint)
 		secretData[MaskinportenJwksUriEnvVar] = []byte(utilities.MaskinportenProdJwksUri)
-		return secretData
+		return &secretData, nil
 	}
 	secretData[MaskinportenIssuerEnvVar] = []byte(utilities.MaskinportenTestIssuer)
 	secretData[MaskinportenTokenEndpointEnvVar] = []byte(utilities.MaskinportenTestTokenEndpoint)
 	secretData[MaskinportenJwksUriEnvVar] = []byte(utilities.MaskinportenTestJwksUri)
-	return secretData
+	return &secretData, nil
 }
 
 func DetermineMaskinportenConfigType(securityConfig v1alpha.SecurityConfig) (*state.MaskinportenConfigType, error) {
