@@ -236,7 +236,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 
 				result, err := resolver.DetermineMaskinportenConfigType(sc)
 
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(*result).To(Equal(state.None))
 			})
 		})

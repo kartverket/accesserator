@@ -169,7 +169,7 @@ var _ = Describe("SecurityConfig CRD", func() {
 						},
 					})
 					err := k8sClient.Create(ctx, sc)
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 
 					// All three config sources
 					sc = makeSecurityConfig(map[string]interface{}{
