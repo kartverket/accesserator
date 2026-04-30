@@ -209,7 +209,11 @@ undeploy: kustomize ## Undeploy accesserator and all the resources deployed by a
 
 .PHONY: undeploy-mock-controller
 undeploy-mock-controller: kubectl ## Undeploy mock-controller and all the resources deployed by mock-controller to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	"$(KUBECTL)" delete deployment mock-controller -n mock-controller-system --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found)
+	@if [ -n "$$($(KUBECTL) get deployments -n mock-controller-system --context $(KUBECONTEXT) -o name 2>/dev/null)" ]; then \
+		"$(KUBECTL)" delete deployment mock-controller -n mock-controller-system --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found); \
+	else \
+		echo "No deployments found in mock-controller-system; skipping."; \
+	fi
 
 .PHONY: webhooks
 webhooks: kustomize ## Extract webhook certificate details
