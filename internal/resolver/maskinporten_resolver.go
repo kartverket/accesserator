@@ -69,6 +69,16 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 			Type:       *maskinportenConfigType,
 			SecretData: maskinportenSecretData,
 		}, nil
+	case state.None:
+		return &state.MaskinportenConfig{
+			Enabled: true,
+			Type:    *maskinportenConfigType,
+			ClientSpec: &naisiov1.MaskinportenClientSpec{
+				ClientName: utilities.GetDefaultMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
+				Scopes:     naisiov1.MaskinportenScope{},
+				SecretName: utilities.GetMaskinportenSecretName(securityConfig.Name),
+			},
+		}, nil
 	default:
 		return nil, fmt.Errorf("unrecognized Maskinporten config type: %d", *maskinportenConfigType)
 	}
@@ -118,6 +128,5 @@ func DetermineMaskinportenConfigType(securityConfig v1alpha.SecurityConfig) (*st
 		}
 		return utilities.Ptr(state.SecretRef), nil
 	}
-
-	return nil, fmt.Errorf("cannot determine which Maskinporten configuration type to use: no config source specified")
+	return utilities.Ptr(state.None), nil
 }

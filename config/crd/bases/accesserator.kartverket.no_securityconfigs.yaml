@@ -168,13 +168,9 @@ spec:
                 - enabled
                 type: object
                 x-kubernetes-validations:
-                - message: At most one of client, clientRef, or secretRef may be specified
+                - message: At most one of client, clientRef, or secretRef may be specified.
                   rule: '[has(self.client), has(self.clientRef), has(self.secretRef)].filter(x,
                     x).size() <= 1'
-                - message: Exactly one of client, clientRef, or secretRef must be
-                    specified when enabled is true
-                  rule: '!self.enabled || [has(self.client), has(self.clientRef),
-                    has(self.secretRef)].filter(x, x).size() == 1'
               tokenx:
                 description: |-
                   Tokenx specifies whether to configure the token exchange capability for an application referred to by `applicationRef`.

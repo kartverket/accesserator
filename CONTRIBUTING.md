@@ -52,26 +52,11 @@ To run the Ginko tests locally, run the following command in the terminal:
 make test
 ```
 
-When running the end-to-end tests locally, you can either run them with accesserator running on your host machine or with an accesserator running in the local cluster. 
-To run the end-to-end tests with accesserator running on your host machine, you can either run all tests with
+Run all end-to-end tests in parallel with
 ```bash
-make chainsaw-test-host
+make chainsaw-test-all
 ```
 or run a single test with
 ```bash
-make chainsaw-test-host-single dir=<TEST FOLDER>
-```
-
-To run the end-to-end tests with accesserator running in the local cluster, you first have to deploy accesserator with the command
-```bash
-make deploy
-```
-
-You can then run the end-to-end tests with
-```bash
-make chainsaw-test-remote
-```
-or run a single test with
-```bash
-make chainsaw-test-remote-single dir=<TEST FOLDER>
+make chainsaw-test-single dir=<TEST FOLDER>
 ```

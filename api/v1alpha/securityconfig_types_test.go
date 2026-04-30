@@ -160,7 +160,7 @@ var _ = Describe("SecurityConfig CRD", func() {
 			})
 
 			Describe("When spec.maskinporten.enabled is true", func() {
-				It("should require exactly one of .client, .clientRef and .secretRef to be set", func() {
+				It("should require at most one of .client, .clientRef and .secretRef to be set", func() {
 					// No config source
 					sc := makeSecurityConfig(map[string]interface{}{
 						"applicationRef": skiperatorAppName,
@@ -169,9 +169,7 @@ var _ = Describe("SecurityConfig CRD", func() {
 						},
 					})
 					err := k8sClient.Create(ctx, sc)
-					Expect(err).To(HaveOccurred())
-					Expect(errors.IsInvalid(err)).To(BeTrue())
-					Expect(err.Error()).To(ContainSubstring("Exactly one of client, clientRef, or secretRef must be specified when enabled is true"))
+					Expect(err).ToNot(HaveOccurred())
 
 					// All three config sources
 					sc = makeSecurityConfig(map[string]interface{}{

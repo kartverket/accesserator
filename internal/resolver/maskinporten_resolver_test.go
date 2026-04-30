@@ -220,7 +220,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 		})
 
 		Context("when no config source is specified", func() {
-			It("should return error", func() {
+			It("should return None as config type", func() {
 				sc := accesseratorv1alpha.SecurityConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testSecurityConfig,
@@ -236,9 +236,8 @@ var _ = Describe("Maskinporten Resolver", func() {
 
 				result, err := resolver.DetermineMaskinportenConfigType(sc)
 
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("no config source specified"))
-				Expect(result).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
+				Expect(*result).To(Equal(state.None))
 			})
 		})
 	})

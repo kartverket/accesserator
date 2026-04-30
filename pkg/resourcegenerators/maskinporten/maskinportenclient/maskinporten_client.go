@@ -7,7 +7,8 @@ import (
 )
 
 func GetDesired(objectMeta v1.ObjectMeta, maskinportenConfig state.MaskinportenConfig) *naisiov1.MaskinportenClient {
-	if !maskinportenConfig.Enabled || maskinportenConfig.Type != state.InlineClient {
+	if !maskinportenConfig.Enabled ||
+		(maskinportenConfig.Type != state.InlineClient && maskinportenConfig.Type != state.None) {
 		return nil
 	}
 

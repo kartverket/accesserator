@@ -31,4 +31,4 @@ jobs:
 
       - name: Run Chainsaw tests
         run: |
-          make chainsaw-test-remote
+          make chainsaw-test-all
