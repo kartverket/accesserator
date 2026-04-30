@@ -132,7 +132,7 @@ func DetermineReconciliationState(
 		} else {
 			var maskinportenClientName string
 			switch scope.MaskinportenConfig.Type {
-			case state.InlineClient:
+			case state.InlineClient, state.None:
 				maskinportenClientName = utilities.GetMaskinportenClientName(string(scope.SecurityConfig.Spec.ApplicationRef))
 			case state.ClientRef:
 				maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)

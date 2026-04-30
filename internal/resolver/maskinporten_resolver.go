@@ -69,6 +69,16 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 			Type:       *maskinportenConfigType,
 			SecretData: maskinportenSecretData,
 		}, nil
+	case state.None:
+		return &state.MaskinportenConfig{
+			Enabled: true,
+			Type:    *maskinportenConfigType,
+			ClientSpec: &naisiov1.MaskinportenClientSpec{
+				ClientName: utilities.GetDefaultMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
+				Scopes:     naisiov1.MaskinportenScope{},
+				SecretName: utilities.GetMaskinportenSecretName(securityConfig.Name),
+			},
+		}, nil
 	default:
 		return nil, fmt.Errorf("unrecognized Maskinporten config type: %d", *maskinportenConfigType)
 	}
@@ -88,16 +98,24 @@ func GetMaskinportenSecretData(ctx context.Context, k8sClient client.Client, sec
 		MaskinportenClientIdEnvVar:  clientIdData,
 		MaskinportenClientJwkEnvVar: clientJwkData,
 	}
+	for key, value := range GetMaskinportenPublicUrlsAsSecretData() {
+		secretData[key] = value
+	}
+	return &secretData, nil
+}
+
+func GetMaskinportenPublicUrlsAsSecretData() map[string][]byte {
+	secretData := make(map[string][]byte, 3)
 	if *config.Get().RunsInProduction {
 		secretData[MaskinportenIssuerEnvVar] = []byte(utilities.MaskinportenProdIssuer)
 		secretData[MaskinportenTokenEndpointEnvVar] = []byte(utilities.MaskinportenProdTokenEndpoint)
 		secretData[MaskinportenJwksUriEnvVar] = []byte(utilities.MaskinportenProdJwksUri)
-		return &secretData, nil
+		return secretData
 	}
 	secretData[MaskinportenIssuerEnvVar] = []byte(utilities.MaskinportenTestIssuer)
 	secretData[MaskinportenTokenEndpointEnvVar] = []byte(utilities.MaskinportenTestTokenEndpoint)
 	secretData[MaskinportenJwksUriEnvVar] = []byte(utilities.MaskinportenTestJwksUri)
-	return &secretData, nil
+	return secretData
 }
 
 func DetermineMaskinportenConfigType(securityConfig v1alpha.SecurityConfig) (*state.MaskinportenConfigType, error) {
@@ -118,6 +136,5 @@ func DetermineMaskinportenConfigType(securityConfig v1alpha.SecurityConfig) (*st
 		}
 		return utilities.Ptr(state.SecretRef), nil
 	}
-
-	return nil, fmt.Errorf("cannot determine which Maskinporten configuration type to use: no config source specified")
+	return utilities.Ptr(state.None), nil
 }

@@ -12,6 +12,7 @@ const (
 	InlineClient MaskinportenConfigType = iota
 	ClientRef
 	SecretRef
+	None
 )
 
 type MaskinportenConfigType int

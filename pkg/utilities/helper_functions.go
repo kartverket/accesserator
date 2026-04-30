@@ -64,6 +64,10 @@ func GetMaskinportenClientName(applicationRef string) string {
 	return fmt.Sprintf("%s-%s", applicationRef, MaskinportenNameSuffix)
 }
 
+func GetDefaultMaskinportenClientName(applicationRef string) string {
+	return applicationRef
+}
+
 func GetMaskinportenSecretName(securityConfigName string) string {
 	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
 }
