@@ -106,7 +106,7 @@ spec:
             content: |
               # Verify TEXAS_URL is still set
               TEXAS_URL=$(kubectl exec -n chainsaw-texas-maskinporten deploy/app -c app -- printenv TEXAS_URL)
-              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set after enabling tokenx"; exit 1; fi
+              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set after enabling maskinporten"; exit 1; fi
               echo "✅ TEXAS_URL=$TEXAS_URL"
 
               # Call texas token and verify maskinporten is enabled
@@ -129,19 +129,3 @@ spec:
               esac
               echo "❌ Unexpected error_description: $ERROR_DESC. Body: $BODY"
               exit 1
-      cleanup:
-        - script:
-            content: |
-              ENV_FILE=../../../../hack/mock_controller/.env
-              if [ ! -f "$ENV_FILE" ]; then
-                echo "⚠️  hack/mock_controller/.env not found. No need to cleanup mock-controller-env secret."
-                exit 0
-              fi
-              echo "⏳ Restoring mock-controller-env secret from $ENV_FILE"
-              kubectl create secret generic mock-controller-env \
-                --from-env-file="$ENV_FILE" \
-                -n mock-controller-system \
-                --dry-run=client -o yaml | kubectl apply -f -
-              kubectl rollout restart deployment/mock-controller -n mock-controller-system
-              kubectl rollout status deployment/mock-controller -n mock-controller-system --timeout=30s
-              echo "✅ mock-controller-env secret restored and mock-controller restarted"

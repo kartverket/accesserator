@@ -113,25 +113,17 @@ vet: ## Run go vet against code.
 test: generate fmt vet setup-envtest ## Run go tests.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" go test $$(go list ./...) -coverprofile cover.out
 
-.PHONY: chainsaw-test-remote
-chainsaw-test-remote: chainsaw ensureaccesseratordeployed ## Run chainsaw tests against local kind cluster with accesserator running in the cluster
-	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/chainsaw/securityconfig && \
-        echo "✅ Tests succeeded" || (echo "❌ Tests failed" && exit 1)
+.PHONY: chainsaw-test-all
+chainsaw-test-all: chainsaw install ensurelocal ensurerunningordeployed ## Run all chainsaw tests in parallel
+	@/bin/bash ./scripts/chainsaw-test-all.sh
 
-.PHONY: chainsaw-test-remote-single
-chainsaw-test-remote-single: chainsaw ensureaccesseratordeployed ## Run a specific chainsaw test against local kind cluster with accesserator running in the cluster. Example usage: make chainsaw-test-remote-single dir=<CHAINSAW_TEST_DIR>
-	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
-        echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
+.PHONY: chainsaw-test-single
+chainsaw-test-single: chainsaw-ensure-dir-set chainsaw install ensurelocal ensurerunningordeployed ## Run a specific chainsaw test. Example usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>
+	@/bin/bash ./scripts/chainsaw-test-single.sh -d $(dir)
 
-.PHONY: chainsaw-test-host
-chainsaw-test-host: chainsaw install ensurelocal ensureaccesseratornotdeployed isrunning ## Run chainsaw tests against local kind cluster with accesserator running on host
-	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/chainsaw/securityconfig && \
-        echo "✅ Tests succeeded" || (echo "❌ Tests failed" && exit 1)
-
-.PHONY: chainsaw-test-host-single
-chainsaw-test-host-single: chainsaw install ensurelocal ensureaccesseratornotdeployed isrunning ## Run a specific chainsaw test against local kind cluster with accesserator running on host. Example usage: make chainsaw-test-host-single dir=<CHAINSAW_TEST_DIR>
-	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
-    	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
+.PHONY: chainsaw-ensure-dir-set
+chainsaw-ensure-dir-set: ## Ensure that the 'dir' variable is set when running 'make chainsaw-test-single'
+	$(if $(strip $(dir)),,$(error dir is not set. Usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>))
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
