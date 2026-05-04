@@ -1,0 +1,65 @@
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: tokendings
+spec:
+  accessPolicy:
+    inbound:
+      rules:
+        - application: jwker
+    outbound:
+      external:
+        - host: test.idporten.no
+        - host: test.ansattporten.no
+        - host: login.microsoftonline.com
+  env:
+    - name: JAVA_TOOL_OPTIONS
+      value: -Dlogback.configurationFile=/config/logback.xml
+    - name: AUTH_ACCEPTED_AUDIENCE
+      value: http://tokendings.tokenx-api:8080/registration/client
+    - name: ISSUER_URL
+      value: http://tokendings.tokenx-api:8080
+    - name: APPLICATION_PORT
+      value: "8080"
+    - name: TOKEN_EXPIRY_SECONDS
+      value: "300"
+    - name: JDK_JAVA_OPTIONS
+      value: -XX:MaxRAMPercentage=70
+  filesFrom:
+    - configMap: tokendings-config
+      mountPath: /config
+  image: ghcr.io/nais/tokendings:non.existing.tag
+  liveness:
+    failureThreshold: 5
+    initialDelay: 5
+    path: /internal/isalive
+    port: 8080
+    timeout: 1
+  port: 8080
+  prometheus:
+    path: /internal/metrics
+    port: 8080
+    scrapeInterval: 60s
+  readiness:
+    failureThreshold: 5
+    initialDelay: 5
+    path: /internal/isready
+    port: 8080
+    timeout: 1
+  replicas:
+    max: 3
+    min: 2
+    targetCpuUtilization: 80
+    targetMemoryUtilization: 90
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  startup:
+    failureThreshold: 5
+    initialDelay: 5
+    path: /internal/isalive
+    port: 8080
+    timeout: 1
