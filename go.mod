@@ -1,13 +1,13 @@
 module github.com/kartverket/accesserator
 
-go 1.26.2
+go 1.25.7
 
 require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.3.0
 	github.com/kartverket/skiperator v1.1.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/nais/liberator v0.0.0-20260429132748-dc0b75da6b70
+	github.com/nais/liberator v0.0.0-20260216142648-ee49a9372bc4
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	go.uber.org/zap v1.27.1
