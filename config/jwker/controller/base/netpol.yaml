@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: jwker-netpol
+  name: jwker
 spec:
   egress:
     - ports:
@@ -16,12 +16,6 @@ spec:
           podSelector:
             matchLabels:
               app: tokendings
-    - ports:
-        - port: 443
-          protocol: TCP
-      to:
-        - ipBlock:
-            cidr: 10.128.254.16/28
   ingress:
     - from:
         - namespaceSelector:
