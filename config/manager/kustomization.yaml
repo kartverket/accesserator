@@ -18,6 +18,6 @@ images:
   newTag: latest
 
 configMapGenerator:
-  - name: jwker-config
+  - name: accesserator-env
     envs:
       - ../../.env

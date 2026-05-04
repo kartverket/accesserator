@@ -164,16 +164,10 @@ deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomi
 		echo "❌ .env file not found. Create one before deploying."; \
 		exit 1; \
 	fi
-	@if "$(KUBECTL)" get secret accesserator-env -n accesserator-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
-		echo "⏳ Updating existing accesserator-env secret..."; \
-		"$(KUBECTL)" create secret generic accesserator-env --from-env-file=.env -n accesserator-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
-		"$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; \
-	else \
-		echo "⏳ Creating accesserator-env secret..."; \
-		"$(KUBECTL)" create secret generic accesserator-env --from-env-file=.env -n accesserator-system --context $(KUBECONTEXT); \
-	fi
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
+	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n accesserator-system -l app=accesserator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying accesserator." && exit 1)
+	@echo -e "✅  accesserator installed in namespace 'accesserator-system'!"
 
 .PHONY: deploy-mock-controller
 deploy-mock-controller: mock-controller-namespace docker-build-mock-controller ## Deploy mock-controller and all the required resources for accesserator to run properly to the kind cluster
