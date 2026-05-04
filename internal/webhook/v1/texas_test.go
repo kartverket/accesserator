@@ -35,7 +35,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				},
 			}
 			c := v1.GetTexasContainer(securityConfig)
-			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s", config.Get().TexasImageName, config.Get().TexasImageTag)))
+			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s@%s", config.Get().TexasImageName, config.Get().TexasImageTag, config.Get().TexasImageSha)))
 			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
 			Expect(c.SecurityContext).ToNot(BeNil())
 			Expect(c.Env).NotTo(BeEmpty())

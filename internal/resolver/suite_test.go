@@ -58,6 +58,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "test-tag")
 	Expect(err).NotTo(HaveOccurred())
+	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "test-sha")
+	Expect(err).NotTo(HaveOccurred())
 	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())
 
