@@ -37,8 +37,6 @@ spec:
   image: ghcr.io/navikt/mock-oauth2-server:${MOCK_OAUTH2_SERVER_VERSION}
   port: 8080
   replicas: 1
-  ingresses:
-    - fake.auth
   envFrom:
     - configMap: mock-oauth2-config
 ---
