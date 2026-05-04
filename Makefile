@@ -261,24 +261,34 @@ cluster: kind ## Create Kind cluster with kube context kind-accesserator
 ##@ Namespace
 
 .PHONY: accesserator-namespace
-accesserator-namespace: kubectl ## Create accesserator-system namespace in the cluster
-	@/bin/bash ./scripts/create-accesserator-namespace.sh
+accesserator-namespace: ## Create accesserator-system namespace in the cluster
+	@$(MAKE) create-namespace namespace=accesserator-system
+
+.PHONY: jwker-namespace
+jwker-namespace: kubectl ## Create jwker-system namespace in the cluster
+	@$(MAKE) create-namespace namespace=jwker-system
+
+.PHONY: tokendings-namespace
+tokendings-namespace: kubectl ## Create tokenx-api namespace in the cluster
+	@$(MAKE) create-namespace namespace=tokenx-api
 
 .PHONY: mock-controller-namespace
 mock-controller-namespace: kubectl ## Create mock-controller-system namespace in the cluster
-	@/bin/bash ./scripts/create-mock-controller-namespace.sh
+	@$(MAKE) create-namespace namespace=mock-controller-system
 
 ##@ Operators
 
 .PHONY: install-jwker-crds
 install-jwker-crds: ## Installing Jwker CRDs
-	@echo -e "🤞  Installing jwker crds..."
-	"$(KUBECTL)" apply -f https://raw.githubusercontent.com/nais/liberator/34a9e8ad9d4bf1b6f8e292e05ccb71db1147fbcb/config/crd/bases/nais.io_jwkers.yaml --context $(KUBECONTEXT)
+	@echo -e "🤞  Installing jwker cluster resources..."
+	@out="$$( "$(KUSTOMIZE)" build config/jwker/cluster-resources 2>/dev/null || true )"; \
+    if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No jwker cluster resources to install; aborting." && exit 1; fi
 
 .PHONY: jwker
-jwker: install-jwker-crds ## Installing Jwker on k8s cluster
-	@echo -e "🤞  Installing Jwker..."
-	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/install-jwker.sh
+jwker: kustomize install-jwker-crds jwker-namespace ## Installing Jwker on k8s cluster
+	@echo -e "🤞  Installing jwker controller..."
+	@out="$$( "$(KUSTOMIZE)" build config/jwker/controller 2>/dev/null || true )"; \
+    if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f - -n jwker-system; else echo "No jwker controller to install; aborting." && exit 1; fi
 	"$(KUBECTL)" wait pod --for=create --timeout=60s -n jwker-system -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
 	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n jwker-system -l app=jwker --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Jwker." && exit 1; }
 	@echo -e "✅  Jwker installed in namespace 'jwker-system'!"
@@ -320,15 +330,20 @@ cert-manager: kustomize kubectl ## Install cert-manager to the cluster
 ##@ Helper services
 
 .PHONY: tokendings
-tokendings: ## Deploying tokendings oauth authorization server
+tokendings: kubectl kustomize tokendings-namespace tokendings-database ## Deploying tokendings oauth authorization server
 	@echo -e "🤞  Setting up Tokendings..."
-	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/install-tokendings.sh
+	@out="$$( "$(KUSTOMIZE)" build config/tokendings 2>/dev/null || true )"; \
+	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f - -n tokenx-api; else echo "No tokendings resources to install; aborting." && exit 1; fi
 	"$(KUBECTL)" wait pod --for=create --timeout=60s -n tokenx-api -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
 	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n tokenx-api -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
 	@echo -e "✅  Tokendings installed in namespace 'tokenx-api'!"
 
+.PHONY: tokendings-database
+tokendings-database: kubectl
+	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/setup-tokendings-database.sh
+
 .PHONY: mock-oauth2
-mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
+mock-oauth2: kubectl ## Deployinh Mock-OAuth service in auth namespace
 	@echo -e "🤞  Deploying 'mock-oauth2'..."
 	@KUBECONTEXT=$(KUBECONTEXT) MOCK_OAUTH2_CONFIG=scripts/mock-oauth2-server-config.json /bin/bash ./scripts/install-mock-oauth2.sh
 	@echo -e "✅  'mock-oauth2' is ready and running"
@@ -673,4 +688,20 @@ ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running 
 		echo -e "    This can be done with 'make mock-oauth2' and 'make mock-oauth2-ingress' respectively."; \
 		exit 1; \
 	fi
+
+create-namespace: kubectl
+	$(if $(strip $(namespace)),,$(error namespace is not set))
+	@echo "🤞 Creating namespace: $(namespace)"
+	@output=$$($(KUBECTL) create namespace "$(namespace)" --context "$(KUBECONTEXT)" 2>&1); \
+	status=$$?; \
+	if [ $$status -eq 0 ]; then \
+		echo "✅ Namespace '$(namespace)' created successfully"; \
+	elif echo "$$output" | grep -qiE "already exists|AlreadyExists"; then \
+		echo "✅ Namespace '$(namespace)' already exists, continuing..."; \
+	else \
+		echo "❌ Error creating '$(namespace)' namespace:"; \
+		echo "$$output"; \
+		exit 1; \
+	fi
+	$(KUBECTL) label namespaces $(namespace) istio.io/rev=default
 
