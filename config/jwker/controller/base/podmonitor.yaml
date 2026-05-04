@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    instance: primary
+  name: jwker-monitor
+spec:
+  namespaceSelector:
+    matchNames:
+      - jwker-system
+  podMetricsEndpoints:
+    - port: metrics
+  selector:
+    matchLabels:
+      app: jwker
