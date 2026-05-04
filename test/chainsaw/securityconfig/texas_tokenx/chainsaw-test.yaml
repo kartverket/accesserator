@@ -30,7 +30,7 @@ spec:
             file: pod-without-texas.yaml
         - script:
             content: | 
-              # Verify that TEXAS_URL is not set and assert that the number of containers in the app is 2.
+              # Verify that TEXAS_URL is not set
               kubectl exec -n chainsaw-texas-tokenx deploy/app -c app -- printenv TEXAS_URL && exit 1 || exit 0
         - patch:
             resource:
