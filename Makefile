@@ -78,8 +78,8 @@ ismockcontrollernotrunning: ## Check if mock-controller is NOT running on your h
 	@echo "✅ mock-controller is not running on your host. Ready to deploy."
 
 .PHONY: sourceenv
-sourceenv: ## Source environment variables from .env file
-	@set -a; [ -f .env ] && . .env; set +a
+sourceenv: ## Source environment variables from config/manager/base/.env file
+	@set -a; [ -f config/manager/base/.env ] && . config/manager/base/.env; set +a
 
 .PHONY: local
 local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker deploy-mock-controller generate install ## Set up entire local development environment with external dependencies
@@ -160,10 +160,6 @@ endif
 deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomize docker-build ## Deploy accesserator and all the required resources for accesserator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
-	@if [ ! -f .env ]; then \
-		echo "❌ .env file not found. Create one before deploying."; \
-		exit 1; \
-	fi
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n accesserator-system -l app=accesserator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying accesserator." && exit 1)
