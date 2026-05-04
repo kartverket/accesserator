@@ -24,7 +24,7 @@ spec:
             - -metrics-secure=false
             - -webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
           envFrom:
-            - secretRef:
+            - configMapRef:
                 name: accesserator-env
           image: accesserator:latest
           imagePullPolicy: Never
@@ -32,6 +32,7 @@ spec:
             httpGet:
               path: /healthz
               port: probes
+            initialDelaySeconds: 5
           name: accesserator
           ports:
             - containerPort: 8181
@@ -44,12 +45,13 @@ spec:
             httpGet:
               path: /readyz
               port: probes
+            initialDelaySeconds: 5
           resources:
             limits:
               memory: 256Mi
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 64Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

@@ -1,20 +1,9 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: accesserator-netpol
+  name: accesserator
   namespace: accesserator-system
 spec:
-  egress:
-    - ports:
-        - port: 6443
-          protocol: TCP
-      to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              component: kube-apiserver
   ingress:
     - from:
         - namespaceSelector:
@@ -31,4 +20,3 @@ spec:
       app: accesserator
   policyTypes:
     - Ingress
-    - Egress
