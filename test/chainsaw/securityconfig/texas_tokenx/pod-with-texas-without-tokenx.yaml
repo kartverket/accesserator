@@ -31,7 +31,6 @@ spec:
           value: "false"
         - name: IDPORTEN_ENABLED
           value: "false"
-      image: ghcr.io/nais/texas:2025-12-12-090328-adc830c
       imagePullPolicy: IfNotPresent
       name: texas
       ports:
