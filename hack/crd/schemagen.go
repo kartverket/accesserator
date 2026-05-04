@@ -10,10 +10,10 @@ package crd
 //go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/crd/skiperator.kartverket.no_applications.yaml
 
 // Jwker CRD
-//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/refs/heads/main/config/crd/bases/nais.io_jwkers.yaml
+//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/f638cfb830180dc1d175cab8e7a07a1606688667/config/crd/bases/nais.io_jwkers.yaml
 
 // MaskinportenClient CRD
-//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/refs/heads/main/config/crd/bases/nais.io_maskinportenclients.yaml
+//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/f638cfb830180dc1d175cab8e7a07a1606688667/config/crd/bases/nais.io_maskinportenclients.yaml
 
 // Istio ServiceEntry CRD
 //go:generate urlcrd -outdir=./bases -kind=ServiceEntry -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.28.0/kubernetes/customresourcedefinitions.gen.yaml
