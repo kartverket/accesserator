@@ -334,8 +334,7 @@ tokendings: kubectl kustomize tokendings-namespace tokendings-database ## Deploy
 	@echo -e "🤞  Setting up Tokendings..."
 	@out="$$( "$(KUSTOMIZE)" build config/tokendings 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f - -n tokenx-api; else echo "No tokendings resources to install; aborting." && exit 1; fi
-	"$(KUBECTL)" wait pod --for=create --timeout=60s -n tokenx-api -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
-	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=60s -n tokenx-api -l app=tokendings --context $(KUBECONTEXT) &> /dev/null || { echo -e "❌  Error deploying Tokendings." && exit 1; }
+	@$(MAKE) wait-for-skiperator-pod app=tokendings namespace=tokenx-api
 	@echo -e "✅  Tokendings installed in namespace 'tokenx-api'!"
 
 .PHONY: tokendings-database
@@ -346,6 +345,7 @@ tokendings-database: kubectl
 mock-oauth2: kubectl ## Deployinh Mock-OAuth service in auth namespace
 	@echo -e "🤞  Deploying 'mock-oauth2'..."
 	@KUBECONTEXT=$(KUBECONTEXT) MOCK_OAUTH2_CONFIG=scripts/mock-oauth2-server-config.json /bin/bash ./scripts/install-mock-oauth2.sh
+	@$(MAKE) wait-for-skiperator-pod app=mock-oauth2 namespace=auth
 	@echo -e "✅  'mock-oauth2' is ready and running"
 
 ##@ Helpers
@@ -704,4 +704,9 @@ create-namespace: kubectl
 		exit 1; \
 	fi
 	$(KUBECTL) label namespaces $(namespace) istio.io/rev=default
+
+wait-for-skiperator-pod: kubectl
+	$(if $(strip $(app)),,$(error app is not set))
+	$(if $(strip $(namespace)),,$(error namespace is not set))
+	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/wait-for-skiperator-pod-ready.sh $(app) $(namespace)
 
