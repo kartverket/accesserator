@@ -4,6 +4,7 @@ metadata:
   labels:
     app: jwker
   name: jwker
+  namespace: jwker-system
 spec:
   minAvailable: 50%
   selector:

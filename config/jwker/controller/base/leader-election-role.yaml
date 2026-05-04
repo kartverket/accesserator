@@ -4,6 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: jwker
   name: leader-election-role
+  namespace: jwker-system
 rules:
   - apiGroups:
       - ""

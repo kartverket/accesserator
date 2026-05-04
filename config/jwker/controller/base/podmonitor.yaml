@@ -4,6 +4,7 @@ metadata:
   labels:
     instance: primary
   name: jwker-monitor
+  namespace: jwker-system
 spec:
   namespaceSelector:
     matchNames:

@@ -4,6 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: jwker
   name: jwker-leader-election
+  namespace: jwker-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

@@ -12,6 +12,7 @@ patches:
   - target:
       kind: Deployment
       name: jwker
+      namespace: jwker-system
     path: patches/deployment.yaml
 images:
   - name: ghcr.io/nais/jwker
