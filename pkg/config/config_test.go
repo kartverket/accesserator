@@ -13,6 +13,7 @@ const (
 	defaultTokenxNamespace    = "ns"
 	defaultTexasImageName     = "ghcr.io/nais/texas"
 	defaultTexasImageTag      = "latest"
+	defaultTexasImageSha      = "abc123"
 	defaultTexasPort          = int32(3000)
 	defaultTexasUrlEnvVarName = "TEXAS_URL"
 	defaultRunsInProduction   = "false"
@@ -26,6 +27,7 @@ func setAllEnvVars(t *testing.T) {
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_NAME", defaultTexasImageName)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
+	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
 	t.Setenv("ACCESSERATOR_TEXAS_PORT", fmt.Sprintf("%d", defaultTexasPort))
 	t.Setenv("ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME", defaultTexasUrlEnvVarName)
 }
@@ -50,6 +52,9 @@ func TestLoad_AllRequiredSet(t *testing.T) {
 	if c.TexasImageTag != defaultTexasImageTag {
 		t.Errorf("TexasImageTag = %q, want %q", c.TexasImageTag, defaultTexasImageTag)
 	}
+	if c.TexasImageSha != defaultTexasImageSha {
+		t.Errorf("TexasImageSha = %q, want %q", c.TexasImageSha, defaultTexasImageSha)
+	}
 }
 
 func TestLoad_Defaults(t *testing.T) {
@@ -57,6 +62,7 @@ func TestLoad_Defaults(t *testing.T) {
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
+	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
 
 	if err := config.Load(); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -84,6 +90,7 @@ func TestLoad_MissingRunsInProduction(t *testing.T) {
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
+	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
 
 	err := config.Load()
 	if err == nil {
@@ -98,6 +105,7 @@ func TestLoad_MissingClusterName(t *testing.T) {
 	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
+	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
 
 	err := config.Load()
 	if err == nil {
@@ -112,6 +120,7 @@ func TestLoad_MissingTokenxNamespace(t *testing.T) {
 	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
 	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
+	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
 
 	err := config.Load()
 	if err == nil {
@@ -146,6 +155,7 @@ func TestLoad_AllRequiredMissing(t *testing.T) {
 		"ACCESSERATOR_CLUSTER_NAME",
 		"ACCESSERATOR_TOKENX_NAMESPACE",
 		"ACCESSERATOR_TEXAS_IMAGE_TAG",
+		"ACCESSERATOR_TEXAS_IMAGE_SHA",
 		"ACCESSERATOR_RUNS_IN_PRODUCTION",
 	} {
 		if !contains(got, key) {
@@ -171,6 +181,7 @@ func TestLoad_CustomValues(t *testing.T) {
 	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "custom-ns")
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_NAME", "custom-image")
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "v2.0.0")
+	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "123abc")
 	t.Setenv("ACCESSERATOR_TEXAS_PORT", "8080")
 	t.Setenv("ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME", "CUSTOM_URL")
 
@@ -196,6 +207,9 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 	if c.TexasImageTag != "v2.0.0" {
 		t.Errorf("TexasImageTag = %q, want %q", c.TexasImageTag, "v2.0.0")
+	}
+	if c.TexasImageSha != "123abc" {
+		t.Errorf("TexasImageTag = %q, want %q", c.TexasImageTag, "123abc")
 	}
 	if c.TexasPort != 8080 {
 		t.Errorf("TexasPort = %d, want %d", c.TexasPort, 8080)

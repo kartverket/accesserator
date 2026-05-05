@@ -2,54 +2,54 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: accesserator
-  name: accesserator
-  namespace: accesserator-system
+    app: jwker
+  name: jwker
+  namespace: jwker-system
 spec:
   replicas: 2
   revisionHistoryLimit: 0
   selector:
     matchLabels:
-      app: accesserator
+      app: jwker
   template:
     metadata:
       labels:
-        app: accesserator
+        app: jwker
     spec:
       automountServiceAccountToken: true
       containers:
-        - args:
-            - -leader-elect
-            - -metrics-bind-address=0.0.0.0:8181
-            - -metrics-secure=false
-            - -webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
-          envFrom:
-            - secretRef:
-                name: accesserator-env
-          image: accesserator:latest
-          imagePullPolicy: Never
+        - env:
+            - name: TOKENDINGS_URL
+              value: http://tokendings.tokenx-api:8080
+            - name: LEADER_ELECTION
+              value: "true"
+            - name: GOMEMLIMIT
+              value: 230MiB
+          image: ghcr.io/nais/jwker:non.existing.tag
           livenessProbe:
             httpGet:
               path: /healthz
-              port: probes
-          name: accesserator
+              port: 8180
+              scheme: HTTP
+            initialDelaySeconds: 30
+          name: jwker
           ports:
+            - containerPort: 8180
+              name: probes
             - containerPort: 8181
               name: metrics
-            - containerPort: 8081
-              name: probes
-            - containerPort: 9443
-              name: webhook-server
           readinessProbe:
             httpGet:
               path: /readyz
-              port: probes
+              port: 8180
+              scheme: HTTP
+            initialDelaySeconds: 30
           resources:
             limits:
               memory: 256Mi
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 64Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -65,18 +65,15 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           volumeMounts:
-            - mountPath: /tmp/k8s-webhook-server/serving-certs
-              name: webhook-certs
-              readOnly: true
+            - mountPath: /tmp
+              name: writable-tmp
       imagePullSecrets:
         - name: github-auth
       priorityClassName: skip-critical
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-      serviceAccountName: accesserator
+      serviceAccountName: jwker
       volumes:
-        - name: webhook-certs
-          secret:
-            defaultMode: 420
-            secretName: webhook-server-cert
+        - emptyDir: {}
+          name: writable-tmp

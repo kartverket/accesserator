@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - base/clusterrole.yaml
+  - base/clusterrolebinding.yaml
+  - https://raw.githubusercontent.com/nais/liberator/f638cfb830180dc1d175cab8e7a07a1606688667/config/crd/bases/nais.io_jwkers.yaml

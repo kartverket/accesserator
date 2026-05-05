@@ -34,7 +34,6 @@ spec:
       envFrom:
         - secretRef:
             name: security-config-maskinporten
-      image: ghcr.io/nais/texas:2025-12-12-090328-adc830c
       imagePullPolicy: IfNotPresent
       name: texas
       ports:

@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - base/application.yaml
+  - base/authorizationpolicy.yaml
+  - base/configmap.yaml
+  - base/netpol.yaml
+
+patches:
+  - target:
+      group: skiperator.kartverket.no
+      version: v1alpha1
+      kind: Application
+      name: tokendings
+    path: patches/application.yaml
+
+configurations:
+  - configurations/skiperator-application-image-config.yaml
+
+images:
+  - name: ghcr.io/nais/tokendings
+    newTag: 2026-05-04-094640-67a343f
+    digest: sha256:bc1ac3d9421b583174db4c395a3ea8824644075ba2304dca80cea79dc1b1b1e3

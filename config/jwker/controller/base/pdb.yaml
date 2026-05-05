@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: jwker
+  name: jwker
+  namespace: jwker-system
+spec:
+  minAvailable: 50%
+  selector:
+    matchLabels:
+      app: jwker

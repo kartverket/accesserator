@@ -17,6 +17,7 @@ type Config struct {
 
 	TexasImageName     string `split_words:"true" default:"ghcr.io/nais/texas"`
 	TexasImageTag      string `split_words:"true"`
+	TexasImageSha      string `split_words:"true"`
 	TexasPort          int32  `split_words:"true" default:"3000"`
 	TexasProbePort     int32  `split_words:"true" default:"3001"`
 	TexasUrlEnvVarName string `split_words:"true" default:"TEXAS_URL"`
@@ -42,6 +43,9 @@ func Load() error {
 	}
 	if cfg.TexasImageTag == "" {
 		missing = append(missing, "ACCESSERATOR_TEXAS_IMAGE_TAG")
+	}
+	if cfg.TexasImageSha == "" {
+		missing = append(missing, "ACCESSERATOR_TEXAS_IMAGE_SHA")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))

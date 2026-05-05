@@ -36,7 +36,7 @@ type TexasEnvVars struct {
 
 // GetTexasContainer builds the Texas sidecar container for the given SecurityConfig.
 func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
-	imageURL := fmt.Sprintf("%s:%s", config.Get().TexasImageName, config.Get().TexasImageTag)
+	imageURL := fmt.Sprintf("%s:%s@%s", config.Get().TexasImageName, config.Get().TexasImageTag, config.Get().TexasImageSha)
 	envVars := GetTexasEnvVars(securityConfig)
 
 	return corev1.Container{

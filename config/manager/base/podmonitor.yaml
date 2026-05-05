@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    instance: primary
+  name: accesserator-monitor
+  namespace: accesserator-system
+spec:
+  namespaceSelector:
+    matchNames:
+      - accesserator-system
+  podMetricsEndpoints:
+    - port: metrics
+  selector:
+    matchLabels:
+      app: accesserator
