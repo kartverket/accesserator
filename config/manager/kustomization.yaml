@@ -6,6 +6,7 @@ resources:
 - base/leader-election-rolebinding.yaml
 - base/netpol.yaml
 - base/pdb.yaml
+- base/podmonitor.yaml
 - base/serviceaccount.yaml
 - base/clusterrolebinding.yaml
 - base/service.yaml
