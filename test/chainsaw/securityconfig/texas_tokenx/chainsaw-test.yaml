@@ -118,11 +118,6 @@ spec:
                   -w "\n%{http_code}")
               echo "Response: $RESPONSE"
               
-              # Debug
-              kubectl logs -l app=jwker -n jwker-system -c jwker
-              kubectl logs -l app=tokendings -n tokenx-api -c tokendings
-              kubectl logs -l app=app -n chainsaw-texas-tokenx -c texas
-              
               HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
               BODY=$(echo "$RESPONSE" | awk 'NR>1{print prev} {prev=$0}')
               if [ "$HTTP_CODE" != "200" ]; then echo "❌ Expected HTTP 200, got: $HTTP_CODE. Body: $BODY"; exit 1; fi
