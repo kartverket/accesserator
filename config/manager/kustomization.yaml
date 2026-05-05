@@ -18,6 +18,7 @@ images:
   newTag: latest
 
 configMapGenerator:
-  - name: accesserator-env
-    envs:
-      - base/.env
+- envs:
+  - base/.env
+  name: accesserator-env
+  namespace: accesserator-system
