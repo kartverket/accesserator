@@ -114,11 +114,11 @@ test: generate fmt vet setup-envtest ## Run go tests.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" go test $$(go list ./...) -coverprofile cover.out
 
 .PHONY: chainsaw-test-all
-chainsaw-test-all: chainsaw install ensurelocal ensurerunningordeployed ## Run all chainsaw tests in parallel
+chainsaw-test-all: chainsaw install ensurelocal ensurerunningordeployed ensuremockoauth2isreachable ## Run all chainsaw tests in parallel
 	@/bin/bash ./scripts/chainsaw-test-all.sh
 
 .PHONY: chainsaw-test-single
-chainsaw-test-single: chainsaw-ensure-dir-set chainsaw install ensurelocal ensurerunningordeployed ## Run a specific chainsaw test. Example usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>
+chainsaw-test-single: chainsaw-ensure-dir-set chainsaw install ensurelocal ensurerunningordeployed ensuremockoauth2isreachable ## Run a specific chainsaw test. Example usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>
 	@/bin/bash ./scripts/chainsaw-test-single.sh -d $(dir)
 
 .PHONY: chainsaw-ensure-dir-set
