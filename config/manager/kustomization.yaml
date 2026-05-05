@@ -8,7 +8,6 @@ resources:
 - base/pdb.yaml
 - base/podmonitor.yaml
 - base/serviceaccount.yaml
-- base/clusterrolebinding.yaml
 - base/service.yaml
 - base/webhook-certificate.yaml
 - base/webhook-issuer.yaml
