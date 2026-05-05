@@ -4,7 +4,6 @@ metadata:
   labels:
     app.kubernetes.io/name: accesserator
   name: accesserator
-  namespace: accesserator-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
