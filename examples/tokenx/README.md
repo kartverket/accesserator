@@ -16,6 +16,8 @@ metadata:
 spec:
   tokenx:
     enabled: true
+    accessPolicy:
+      inheritInboundRules: true
   applicationRef: app
 ```
 
