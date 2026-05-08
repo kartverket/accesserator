@@ -35,6 +35,8 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v2.4.1'
 
       - name: Test OPA policies
         run: |
@@ -69,7 +71,8 @@ jobs:
 
       - name: Sign bundle with cosign
         run: |
-          cosign sign --yes ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}@${{ steps.push.outputs.digest }}
+          cosign sign --yes \
+            ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}@${{ steps.push.outputs.digest }}          
 
       - name: Summary
         run: |
