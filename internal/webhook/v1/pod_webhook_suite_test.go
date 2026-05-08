@@ -51,7 +51,7 @@ const skiperatorAppName = "skiperator-app"
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Webhook Suite")
+	RunSpecs(t, "Pod Webhook Suite")
 }
 
 var _ = BeforeSuite(func() {
