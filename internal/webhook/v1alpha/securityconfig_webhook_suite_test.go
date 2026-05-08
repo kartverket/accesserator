@@ -18,7 +18,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -199,16 +198,6 @@ func buildWebhookManifestsWithKustomize() (string, error) {
 
 // These are integration-style tests that exercise webhook wiring through the apiserver.
 // We split them into mutating vs validating invocation to make intent and failures clearer.
-
-func getWebhookNamespace(name string) *corev1.Namespace {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: map[string]string{},
-		},
-	}
-	return ns
-}
 
 var _ = Describe("SecurityConfig validating webhook", func() {
 	// SecurityConfig webhook does nothing as of now, so nothing to test.
