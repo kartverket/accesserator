@@ -61,3 +61,9 @@ webhooks:
           object.metadata != null &&
           ('labels' in object.metadata) &&
           ('application.skiperator.no/app-name' in object.metadata.labels)
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: accesserator-system
