@@ -6,7 +6,7 @@ import data.authz
 
 # Test that correct password allows access
 test_allow_with_correct_password if {
-    authz.allow with input as {"password": "before update"}
+    authz.allow with input as {"password": "after update"}
 }
 
 # Test that wrong password denies access
