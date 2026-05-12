@@ -1,2 +1,4 @@
 resources:
   - cluster-issuer.yaml
+  - webhook-certificate.yaml
+  - webhook-issuer.yaml
