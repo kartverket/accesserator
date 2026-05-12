@@ -2,34 +2,65 @@ package config_test
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/kartverket/accesserator/pkg/config"
 )
 
 const (
-	defaultClusterName        = "my-cluster"
-	defaultTokenxName         = "tokendings"
-	defaultTokenxNamespace    = "ns"
-	defaultTexasImageName     = "ghcr.io/nais/texas"
-	defaultTexasImageTag      = "latest"
-	defaultTexasImageSha      = "abc123"
-	defaultTexasPort          = int32(3000)
-	defaultTexasUrlEnvVarName = "TEXAS_URL"
-	defaultRunsInProduction   = "false"
+	defaultClusterName                         = "my-cluster"
+	defaultTokenxName                          = "tokendings"
+	defaultTokenxNamespace                     = "ns"
+	defaultTexasImageName                      = "ghcr.io/nais/texas"
+	defaultTexasImageTag                       = "latest"
+	defaultTexasImageSha                       = "abc123"
+	defaultTexasPort                           = int32(3000)
+	defaultTexasUrlEnvVarName                  = "TEXAS_URL"
+	defaultOpaImageName                        = "openpolicyagent/opa"
+	defaultOpaImageTag                         = "latest"
+	defaultOpaImageSha                         = "def456"
+	defaultOpaUrlEnvVarName                    = "OPA_URL"
+	defaultOpaAllowedBundleRegistryUrlPrefixes = "http://bundle-source,oci://bundle-source"
+	defaultRunsInProduction                    = "false"
 )
+
+var defaultEnvVars = map[string]string{
+	"ACCESSERATOR_RUNS_IN_PRODUCTION":                       defaultRunsInProduction,
+	"ACCESSERATOR_CLUSTER_NAME":                             defaultClusterName,
+	"ACCESSERATOR_TOKENX_NAME":                              defaultTokenxName,
+	"ACCESSERATOR_TOKENX_NAMESPACE":                         defaultTokenxNamespace,
+	"ACCESSERATOR_TEXAS_IMAGE_NAME":                         defaultTexasImageName,
+	"ACCESSERATOR_TEXAS_IMAGE_TAG":                          defaultTexasImageTag,
+	"ACCESSERATOR_TEXAS_IMAGE_SHA":                          defaultTexasImageSha,
+	"ACCESSERATOR_TEXAS_PORT":                               fmt.Sprintf("%d", defaultTexasPort),
+	"ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME":                   defaultTexasUrlEnvVarName,
+	"ACCESSERATOR_OPA_IMAGE_NAME":                           defaultOpaImageName,
+	"ACCESSERATOR_OPA_IMAGE_TAG":                            defaultOpaImageTag,
+	"ACCESSERATOR_OPA_IMAGE_SHA":                            defaultOpaImageSha,
+	"ACCESSERATOR_OPA_URL_ENV_VAR_NAME":                     defaultOpaUrlEnvVarName,
+	"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES": defaultOpaAllowedBundleRegistryUrlPrefixes,
+}
 
 func setAllEnvVars(t *testing.T) {
 	t.Helper()
-	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
-	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
-	t.Setenv("ACCESSERATOR_TOKENX_NAME", defaultTokenxName)
-	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_NAME", defaultTexasImageName)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
-	t.Setenv("ACCESSERATOR_TEXAS_PORT", fmt.Sprintf("%d", defaultTexasPort))
-	t.Setenv("ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME", defaultTexasUrlEnvVarName)
+	setAllEnvVarsExcept(t)
+}
+
+func setAllEnvVarsExcept(t *testing.T, omittedKeys ...string) {
+	t.Helper()
+
+	omitted := make(map[string]struct{}, len(omittedKeys))
+	for _, key := range omittedKeys {
+		omitted[key] = struct{}{}
+	}
+
+	for key, value := range defaultEnvVars {
+		if _, skip := omitted[key]; skip {
+			continue
+		}
+		t.Setenv(key, value)
+	}
 }
 
 func TestLoad_AllRequiredSet(t *testing.T) {
@@ -55,14 +86,31 @@ func TestLoad_AllRequiredSet(t *testing.T) {
 	if c.TexasImageSha != defaultTexasImageSha {
 		t.Errorf("TexasImageSha = %q, want %q", c.TexasImageSha, defaultTexasImageSha)
 	}
+	if c.OpaImageTag != defaultOpaImageTag {
+		t.Errorf("OpaImageTag = %q, want %q", c.OpaImageTag, defaultOpaImageTag)
+	}
+	if c.OpaImageSha != defaultOpaImageSha {
+		t.Errorf("OpaImageSha = %q, want %q", c.OpaImageSha, defaultOpaImageSha)
+	}
+	if !reflect.DeepEqual(c.OpaAllowedBundleRegistryUrlPrefixes, []string{"http://bundle-source", "oci://bundle-source"}) {
+		t.Errorf(
+			"OpaAllowedBundleRegistryUrlPrefixes = %v, want %v",
+			c.OpaAllowedBundleRegistryUrlPrefixes,
+			[]string{"http://bundle-source", "oci://bundle-source"},
+		)
+	}
 }
 
 func TestLoad_Defaults(t *testing.T) {
-	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
-	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
-	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
+	setAllEnvVarsExcept(
+		t,
+		"ACCESSERATOR_TOKENX_NAME",
+		"ACCESSERATOR_TEXAS_IMAGE_NAME",
+		"ACCESSERATOR_TEXAS_PORT",
+		"ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME",
+		"ACCESSERATOR_OPA_IMAGE_NAME",
+		"ACCESSERATOR_OPA_URL_ENV_VAR_NAME",
+	)
 
 	if err := config.Load(); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -84,13 +132,16 @@ func TestLoad_Defaults(t *testing.T) {
 	if c.TexasUrlEnvVarName != defaultTexasUrlEnvVarName {
 		t.Errorf("TexasUrlEnvVarName = %q, want default %q", c.TexasUrlEnvVarName, defaultTexasUrlEnvVarName)
 	}
+	if c.OpaImageName != defaultOpaImageName {
+		t.Errorf("OpaImageName = %q, want default %q", c.OpaImageName, defaultOpaImageName)
+	}
+	if c.OpaUrlEnvVarName != defaultOpaUrlEnvVarName {
+		t.Errorf("OpaUrlEnvVarName = %q, want default %q", c.OpaUrlEnvVarName, defaultOpaUrlEnvVarName)
+	}
 }
 
 func TestLoad_MissingRunsInProduction(t *testing.T) {
-	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
-	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
+	setAllEnvVarsExcept(t, "ACCESSERATOR_RUNS_IN_PRODUCTION")
 
 	err := config.Load()
 	if err == nil {
@@ -102,10 +153,7 @@ func TestLoad_MissingRunsInProduction(t *testing.T) {
 }
 
 func TestLoad_MissingClusterName(t *testing.T) {
-	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
-	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
+	setAllEnvVarsExcept(t, "ACCESSERATOR_CLUSTER_NAME")
 
 	err := config.Load()
 	if err == nil {
@@ -117,10 +165,7 @@ func TestLoad_MissingClusterName(t *testing.T) {
 }
 
 func TestLoad_MissingTokenxNamespace(t *testing.T) {
-	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
-	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", defaultTexasImageTag)
-	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", defaultTexasImageSha)
+	setAllEnvVarsExcept(t, "ACCESSERATOR_TOKENX_NAMESPACE")
 
 	err := config.Load()
 	if err == nil {
@@ -132,9 +177,7 @@ func TestLoad_MissingTokenxNamespace(t *testing.T) {
 }
 
 func TestLoad_MissingTexasImageTag(t *testing.T) {
-	t.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", defaultRunsInProduction)
-	t.Setenv("ACCESSERATOR_CLUSTER_NAME", defaultClusterName)
-	t.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", defaultTokenxNamespace)
+	setAllEnvVarsExcept(t, "ACCESSERATOR_TEXAS_IMAGE_TAG")
 
 	err := config.Load()
 	if err == nil {
@@ -142,6 +185,42 @@ func TestLoad_MissingTexasImageTag(t *testing.T) {
 	}
 	if got := err.Error(); !contains(got, "ACCESSERATOR_TEXAS_IMAGE_TAG") {
 		t.Errorf("error = %q, want it to mention ACCESSERATOR_TEXAS_IMAGE_TAG", got)
+	}
+}
+
+func TestLoad_MissingOpaImageTag(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_OPA_IMAGE_TAG")
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing OPA_IMAGE_TAG, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_OPA_IMAGE_TAG") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_OPA_IMAGE_TAG", got)
+	}
+}
+
+func TestLoad_MissingOpaImageSha(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_OPA_IMAGE_SHA")
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing OPA_IMAGE_SHA, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_OPA_IMAGE_SHA") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_OPA_IMAGE_SHA", got)
+	}
+}
+
+func TestLoad_MissingOpaAllowedBundleRegistryUrlPrefixes(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES")
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", got)
 	}
 }
 
@@ -156,6 +235,9 @@ func TestLoad_AllRequiredMissing(t *testing.T) {
 		"ACCESSERATOR_TOKENX_NAMESPACE",
 		"ACCESSERATOR_TEXAS_IMAGE_TAG",
 		"ACCESSERATOR_TEXAS_IMAGE_SHA",
+		"ACCESSERATOR_OPA_IMAGE_TAG",
+		"ACCESSERATOR_OPA_IMAGE_SHA",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES",
 		"ACCESSERATOR_RUNS_IN_PRODUCTION",
 	} {
 		if !contains(got, key) {
@@ -184,6 +266,11 @@ func TestLoad_CustomValues(t *testing.T) {
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "123abc")
 	t.Setenv("ACCESSERATOR_TEXAS_PORT", "8080")
 	t.Setenv("ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME", "CUSTOM_URL")
+	t.Setenv("ACCESSERATOR_OPA_IMAGE_NAME", "custom-opa-image")
+	t.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "v1.2.3")
+	t.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "456def")
+	t.Setenv("ACCESSERATOR_OPA_URL_ENV_VAR_NAME", "CUSTOM_OPA_URL")
+	t.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", "https://allowed.example,oci://allowed.example")
 
 	if err := config.Load(); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -209,13 +296,35 @@ func TestLoad_CustomValues(t *testing.T) {
 		t.Errorf("TexasImageTag = %q, want %q", c.TexasImageTag, "v2.0.0")
 	}
 	if c.TexasImageSha != "123abc" {
-		t.Errorf("TexasImageTag = %q, want %q", c.TexasImageTag, "123abc")
+		t.Errorf("TexasImageSha = %q, want %q", c.TexasImageSha, "123abc")
 	}
 	if c.TexasPort != 8080 {
 		t.Errorf("TexasPort = %d, want %d", c.TexasPort, 8080)
 	}
 	if c.TexasUrlEnvVarName != "CUSTOM_URL" {
 		t.Errorf("TexasUrlEnvVarName = %q, want %q", c.TexasUrlEnvVarName, "CUSTOM_URL")
+	}
+	if c.OpaImageName != "custom-opa-image" {
+		t.Errorf("OpaImageName = %q, want %q", c.OpaImageName, "custom-opa-image")
+	}
+	if c.OpaImageTag != "v1.2.3" {
+		t.Errorf("OpaImageTag = %q, want %q", c.OpaImageTag, "v1.2.3")
+	}
+	if c.OpaImageSha != "456def" {
+		t.Errorf("OpaImageSha = %q, want %q", c.OpaImageSha, "456def")
+	}
+	if c.OpaUrlEnvVarName != "CUSTOM_OPA_URL" {
+		t.Errorf("OpaUrlEnvVarName = %q, want %q", c.OpaUrlEnvVarName, "CUSTOM_OPA_URL")
+	}
+	if !reflect.DeepEqual(
+		c.OpaAllowedBundleRegistryUrlPrefixes,
+		[]string{"https://allowed.example", "oci://allowed.example"},
+	) {
+		t.Errorf(
+			"OpaAllowedBundleRegistryUrlPrefixes = %v, want %v",
+			c.OpaAllowedBundleRegistryUrlPrefixes,
+			[]string{"https://allowed.example", "oci://allowed.example"},
+		)
 	}
 }
 
@@ -236,7 +345,7 @@ func TestLoad_DoesNotUpdateGlobalOnError(t *testing.T) {
 
 	// appCfg should still hold the previous valid config
 	after := config.Get()
-	if before != after {
+	if !reflect.DeepEqual(before, after) {
 		t.Errorf("Get() changed after failed Load: before=%+v, after=%+v", before, after)
 	}
 }
@@ -250,7 +359,7 @@ func TestGet_ReturnsConsistentConfig(t *testing.T) {
 
 	c1 := config.Get()
 	c2 := config.Get()
-	if c1 != c2 {
+	if !reflect.DeepEqual(c1, c2) {
 		t.Errorf("Get() returned different values on successive calls")
 	}
 }
