@@ -738,5 +738,197 @@ var _ = Describe("SecurityConfig CRD", func() {
 				})
 			})
 		})
+
+		Describe("When spec.opa is specified", func() {
+			It("should require at least one bundle source to be specified", func() {
+				sc := makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled":    true,
+						"bundleUrls": []map[string]interface{}{},
+					},
+				})
+
+				err := k8sClient.Create(ctx, sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("spec.opa.bundleUrls in body should have at least 1 items"))
+
+				sc = makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled": true,
+						"bundleUrls": []map[string]interface{}{
+							{
+								"name": "opa-bundle-1",
+								"url":  AllowedOpaBundleSourcePrefix + "bundle1:latest",
+							},
+						},
+					},
+				})
+
+				err = k8sClient.Create(ctx, sc)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should require that no more than 20 bundle sources are specified", func() {
+				bundleURLs := make([]map[string]interface{}, 21)
+				for i := 0; i < 21; i++ {
+					bundleURLs[i] = map[string]interface{}{
+						"name": fmt.Sprintf("opa-bundle-%d", i),
+						"url": fmt.Sprintf(
+							"%s/bundle%d:latest",
+							AllowedOpaBundleSourcePrefix,
+							i,
+						),
+					}
+				}
+
+				sc := makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled":    true,
+						"bundleUrls": bundleURLs,
+					},
+				})
+
+				err := k8sClient.Create(ctx, sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("spec.opa.bundleUrls: Too many"))
+
+				bundleURLs = make([]map[string]interface{}, 20)
+				for i := 0; i < 20; i++ {
+					bundleURLs[i] = map[string]interface{}{
+						"name": fmt.Sprintf("opa-bundle-%d", i),
+						"url": fmt.Sprintf(
+							"%s/bundle%d:latest",
+							AllowedOpaBundleSourcePrefix,
+							i,
+						),
+					}
+				}
+
+				sc = makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled":    true,
+						"bundleUrls": bundleURLs,
+					},
+				})
+
+				err = k8sClient.Create(ctx, sc)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should require that all bundle source names are unique", func() {
+				sc := makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled": true,
+						"bundleUrls": []map[string]interface{}{
+							{
+								"name": "opa-bundle",
+								"url":  AllowedOpaBundleSourcePrefix + "bundle1:latest",
+							},
+							{
+								"name": "opa-bundle",
+								"url":  AllowedOpaBundleSourcePrefix + "bundle2:latest",
+							},
+						},
+					},
+				})
+
+				err := k8sClient.Create(ctx, sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("Each bundle name must be unique"))
+			})
+
+			It("should require that all bundle source URLs are unique", func() {
+				sc := makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled": true,
+						"bundleUrls": []map[string]interface{}{
+							{
+								"name": "opa-bundle-a",
+								"url":  AllowedOpaBundleSourcePrefix + "bundle1:latest",
+							},
+							{
+								"name": "opa-bundle-b",
+								"url":  AllowedOpaBundleSourcePrefix + "bundle1:latest",
+							},
+						},
+					},
+				})
+
+				err := k8sClient.Create(ctx, sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("Each bundle URL must be unique"))
+			})
+
+			It("should require bundle source names to satisfy DataKey length constraints", func() {
+				sc := makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled": true,
+						"bundleUrls": []map[string]interface{}{
+							{
+								"name": "",
+								"url":  AllowedOpaBundleSourcePrefix + "bundle1:latest",
+							},
+						},
+					},
+				})
+
+				err := k8sClient.Create(ctx, sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("spec.opa.bundleUrls[0].name"))
+
+				sc = makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled": true,
+						"bundleUrls": []map[string]interface{}{
+							{
+								"name": strings.Repeat("a", 64),
+								"url":  AllowedOpaBundleSourcePrefix + "bundle1:latest",
+							},
+						},
+					},
+				})
+
+				err = k8sClient.Create(ctx, sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("spec.opa.bundleUrls[0].name"))
+
+				sc = makeSecurityConfig(map[string]interface{}{
+					"applicationRef": skiperatorAppName,
+					"opa": map[string]interface{}{
+						"enabled": true,
+						"bundleUrls": []map[string]interface{}{
+							{
+								"name": strings.Repeat("a", 63),
+								"url":  AllowedOpaBundleSourcePrefix + "bundle1:latest",
+							},
+						},
+					},
+				})
+
+				err = k8sClient.Create(ctx, sc)
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
 	})
 })
