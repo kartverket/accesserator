@@ -39,58 +39,42 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	imageURL := fmt.Sprintf("%s:%s@%s", config.Get().TexasImageName, config.Get().TexasImageTag, config.Get().TexasImageSha)
 	envVars := GetTexasEnvVars(securityConfig)
 
-	return corev1.Container{
-		Name:  TexasInitContainerName,
-		Image: imageURL,
-		Ports: []corev1.ContainerPort{
-			{
-				ContainerPort: config.Get().TexasPort,
-				Name:          "http",
-				Protocol:      corev1.ProtocolTCP,
-			},
+	texasContainer := utilities.CommonInitContainer
+	texasContainer.Name = TexasInitContainerName
+	texasContainer.Image = imageURL
+	texasContainer.Ports = []corev1.ContainerPort{
+		{
+			ContainerPort: config.Get().TexasPort,
+			Name:          "http",
+			Protocol:      corev1.ProtocolTCP,
 		},
-		// NOTE: RestartPolicy Always is only available for init containers in Kubernetes v1.33+
-		// https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior
-		RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
-		SecurityContext: &corev1.SecurityContext{
-			AllowPrivilegeEscalation: utilities.Ptr(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-				Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-			},
-			Privileged:             utilities.Ptr(false),
-			ReadOnlyRootFilesystem: utilities.Ptr(true),
-			RunAsGroup:             utilities.Ptr(int64(150)),
-			RunAsNonRoot:           utilities.Ptr(true),
-			RunAsUser:              utilities.Ptr(int64(150)),
-		},
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/healthz",
-					Port: intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: config.Get().TexasProbePort,
-					},
-					Scheme: corev1.URISchemeHTTP,
-				},
-			},
-			InitialDelaySeconds: 2,
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		Env: []corev1.EnvVar{
-			// Texas should be available on localhost
-			{Name: BindAddressEnvVarName, Value: "127.0.0.1:" + fmt.Sprint(config.Get().TexasPort)},
-			// Texas probes must be available on 0.0.0.0 because Istio resolves the pod IP for probe rewrites
-			{Name: ProbeBindAddressEnvVarName, Value: "0.0.0.0:" + fmt.Sprint(config.Get().TexasProbePort)},
-			{Name: TokenXEnabledEnvVarName, Value: envVars.TokenXEnabled},
-			{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
-			{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
-			{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
-		},
-		EnvFrom: envVars.IntegrationSecretsRefs,
 	}
+	texasContainer.ReadinessProbe = &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/healthz",
+				Port: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: config.Get().TexasProbePort,
+				},
+				Scheme: corev1.URISchemeHTTP,
+			},
+		},
+		InitialDelaySeconds: 2,
+	}
+	texasContainer.Env = []corev1.EnvVar{
+		// Texas should be available on localhost
+		{Name: BindAddressEnvVarName, Value: "127.0.0.1:" + fmt.Sprint(config.Get().TexasPort)},
+		// Texas probes must be available on 0.0.0.0 because Istio resolves the pod IP for probe rewrites
+		{Name: ProbeBindAddressEnvVarName, Value: "0.0.0.0:" + fmt.Sprint(config.Get().TexasProbePort)},
+		{Name: TokenXEnabledEnvVarName, Value: envVars.TokenXEnabled},
+		{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
+		{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
+		{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
+	}
+	texasContainer.EnvFrom = envVars.IntegrationSecretsRefs
+
+	return texasContainer
 }
 
 // GetTexasEnvVars resolves the env var values for the Texas container from the SecurityConfig.

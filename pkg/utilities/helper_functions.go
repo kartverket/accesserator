@@ -6,6 +6,7 @@ import (
 	"hash/fnv"
 	"time"
 
+	"github.com/kartverket/accesserator/api/v1alpha"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -132,6 +133,14 @@ func GetSecretDataByKey(
 	return secretData, nil
 }
 
+func GetConfigMap(ctx context.Context, k8sClient client.Client, key client.ObjectKey) (*v1.ConfigMap, error) {
+	var configMap v1.ConfigMap
+	if err := k8sClient.Get(ctx, key, &configMap); err != nil {
+		return nil, err
+	}
+	return &configMap, nil
+}
+
 func GetMaskinportenClient(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -147,6 +156,18 @@ func GetMaskinportenClient(
 		)
 	}
 	return &maskinportenClient, nil
+}
+
+func GetOpaConfigMapName(securityConfigName string) string {
+	return fmt.Sprintf("%s-%s", securityConfigName, OpaConfigMapNameSuffix)
+}
+
+func GetOpaPort(securityConfig v1alpha.SecurityConfig) int32 {
+	opaPort := OpaDefaultPort
+	if securityConfig.Spec.Opa != nil && securityConfig.Spec.Opa.Port != nil {
+		opaPort = *securityConfig.Spec.Opa.Port
+	}
+	return opaPort
 }
 
 // GetMockKubernetesClient returns a fake Kubernetes client with the provided scheme and objects. Only used in testing.
