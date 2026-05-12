@@ -19,6 +19,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,6 +34,8 @@ import (
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+const allowedBundleURLPrefixes = "http://bundle-source"
 
 var (
 	ctx       context.Context
@@ -209,5 +212,46 @@ func buildWebhookManifestsWithKustomize() (string, error) {
 // We split them into mutating vs validating invocation to make intent and failures clearer.
 
 var _ = Describe("SecurityConfig validating webhook", func() {
-	// SecurityConfig webhook does nothing as of now, so nothing to test.
+	It("blocks creation of a SecurityConfig with invalid OPA bundle URLs", func() {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "securityconfig-invalid-opa-bundle-url-",
+			},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		securityConfig := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "security-config",
+				Namespace: ns.Name,
+			},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "myapp",
+				Opa: &v1alpha.OpenPolicyAgentSpec{
+					Enabled: true,
+					BundleURLs: []v1alpha.BundleSource{
+						{
+							Name: "authz-bundle",
+							URL:  "http://not-allowed/bundle:latest",
+						},
+					},
+				},
+			},
+		}
+
+		err := k8sClient.Create(ctx, securityConfig)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("bundle URLs are not allowed"))
+		Expect(err.Error()).To(ContainSubstring("http://not-allowed/bundle:latest"))
+
+		securityConfig.Spec.Opa.BundleURLs = []v1alpha.BundleSource{
+			{
+				Name: "authz-bundle",
+				URL:  allowedBundleURLPrefixes + "/bundle:latest",
+			},
+		}
+		Expect(k8sClient.Create(ctx, securityConfig)).To(Succeed())
+	})
 })
