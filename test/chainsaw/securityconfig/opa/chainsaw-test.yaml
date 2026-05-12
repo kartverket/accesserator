@@ -181,28 +181,30 @@ spec:
               OPA_URL=$(kubectl exec -n chainsaw-opa deploy/app -c app -- printenv OPA_URL)
               if [ -z "$OPA_URL" ]; then echo "❌ OPA_URL is not set"; exit 1; fi
               echo "✅ OPA_URL=$OPA_URL"
-
+              
               echo "⏳ Waiting for OPA bundle hot-reload to allow password 'after update'..."
-              DEADLINE=$((SECONDS + 90))
-
-              while [ "$SECONDS" -lt "$DEADLINE" ]; do
-                sleep 5
-
+              
+              MAX_ATTEMPTS=9  # 9 * 10s = 90s
+              ATTEMPT=0
+              
+              while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
                 RESPONSE=$(kubectl exec -n chainsaw-opa deploy/app -c app -- \
                   curl -s -w "\n%{http_code}" -X POST "$OPA_URL/v1/data/authz/allow" \
                     -H "Content-Type: application/json" \
                     -d "{\"input\":{\"password\":\"after update\"}}")
-
+              
                 BODY=$(echo "$RESPONSE" | sed '$d')
                 STATUS_CODE=$(echo "$RESPONSE" | tail -n 1)
-
+              
                 if [ "$STATUS_CODE" = "200" ] && [ "$BODY" = "{\"result\":true}" ]; then
                   echo "✅ OPA returned {\"result\":true} for password 'after update'"
                   exit 0
                 fi
-
-                echo "Still waiting for OPA hot-reload. Last status=$STATUS_CODE body=$BODY"
+              
+                ATTEMPT=$((ATTEMPT + 1))
+                echo "Still waiting for OPA hot-reload ($ATTEMPT/$MAX_ATTEMPTS). Last status=$STATUS_CODE body=$BODY"
+                sleep 10
               done
-
+              
               echo "❌ Timed out waiting for OPA to return {\"result\":true} for password 'after update'"
               exit 1
