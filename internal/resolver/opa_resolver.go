@@ -24,13 +24,13 @@ const (
 )
 
 type BundleFetcher interface {
-	Fetch(ctx context.Context, reference string) ([]byte, error)
+	Fetch(ctx context.Context, credStore credentials.Store, reference string) ([]byte, error)
 }
 
 type ociBundleFetcher struct{}
 
-func (ociBundleFetcher) Fetch(ctx context.Context, reference string) ([]byte, error) {
-	return fetchOCIBundle(ctx, reference)
+func (ociBundleFetcher) Fetch(ctx context.Context, credStore credentials.Store, reference string) ([]byte, error) {
+	return fetchOCIBundle(ctx, credStore, reference)
 }
 
 var defaultBundleFetcher BundleFetcher = ociBundleFetcher{}
@@ -53,10 +53,16 @@ func ResolveOpaConfigWithFetcher(fetcher BundleFetcher, securityConfig v1alpha.S
 		return nil, fmt.Errorf("invalid OPA bundle URLs: %w", err)
 	}
 
+	// Setup authentication using default credentials (docker config)
+	credStore, err := credentials.NewStoreFromDocker(credentials.StoreOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create credential store: %w", err)
+	}
+
 	bundleBinaryData := make(map[string][]byte)
 	for _, bundle := range securityConfig.Spec.Opa.BundleURLs {
 		fetchCtx, cancel := context.WithTimeout(context.Background(), ociFetchTimeout)
-		bundleFile, err := fetcher.Fetch(fetchCtx, bundle.URL)
+		bundleFile, err := fetcher.Fetch(fetchCtx, credStore, bundle.URL)
 		cancel()
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch OCI bundle from %s: %w", bundle.URL, err)
@@ -73,18 +79,11 @@ func ResolveOpaConfigWithFetcher(fetcher BundleFetcher, securityConfig v1alpha.S
 // fetchOCIBundle fetches an OCI artifact from the given reference and returns its content as bytes.
 // The reference should be in the format: <registry>/<repository>:<tag>
 // Example: ghcr.io/kartverket/accesserator/opa-bundle:latest
-func fetchOCIBundle(ctx context.Context, reference string) ([]byte, error) {
+func fetchOCIBundle(ctx context.Context, credStore credentials.Store, reference string) ([]byte, error) {
 	// Parse the reference to get registry and repository
 	repo, err := remote.NewRepository(reference)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse OCI reference %s: %w", reference, err)
-	}
-
-	// Setup authentication using default credentials (docker config)
-	storeOpts := credentials.StoreOptions{}
-	credStore, err := credentials.NewStoreFromDocker(storeOpts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create credential store: %w", err)
 	}
 
 	repo.Client = &auth.Client{

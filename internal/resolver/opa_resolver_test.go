@@ -10,14 +10,19 @@ import (
 	"github.com/kartverket/accesserator/pkg/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
 type mockBundleFetcher struct {
-	data []byte
-	err  error
+	data      []byte
+	err       error
+	credStore credentials.Store
+	reference string
 }
 
-func (m mockBundleFetcher) Fetch(_ context.Context, _ string) ([]byte, error) {
+func (m *mockBundleFetcher) Fetch(_ context.Context, credStore credentials.Store, reference string) ([]byte, error) {
+	m.credStore = credStore
+	m.reference = reference
 	return m.data, m.err
 }
 
@@ -52,7 +57,7 @@ var _ = Describe("OPA Resolver", func() {
 
 	Describe("ResolveOpaConfigWithFetcher", func() {
 		It("returns bundle data from the injected fetcher", func() {
-			fetcher := mockBundleFetcher{data: []byte("bundle-bytes")}
+			fetcher := &mockBundleFetcher{data: []byte("bundle-bytes")}
 			sc := accesseratorv1alpha.SecurityConfig{
 				Spec: accesseratorv1alpha.SecurityConfigSpec{
 					Opa: &accesseratorv1alpha.OpenPolicyAgentSpec{
@@ -68,10 +73,12 @@ var _ = Describe("OPA Resolver", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Enabled).To(BeTrue())
 			Expect(result.BundleBinaryData).To(HaveKeyWithValue("bundle", []byte("bundle-bytes")))
+			Expect(fetcher.credStore).NotTo(BeNil())
+			Expect(fetcher.reference).To(Equal(allowedPrefix + "repo:tag"))
 		})
 
 		It("propagates errors from the injected fetcher", func() {
-			fetcher := mockBundleFetcher{err: errors.New("fetch-failed")}
+			fetcher := &mockBundleFetcher{err: errors.New("fetch-failed")}
 			sc := accesseratorv1alpha.SecurityConfig{
 				Spec: accesseratorv1alpha.SecurityConfigSpec{
 					Opa: &accesseratorv1alpha.OpenPolicyAgentSpec{
@@ -87,6 +94,8 @@ var _ = Describe("OPA Resolver", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("fetch-failed"))
 			Expect(result).To(BeNil())
+			Expect(fetcher.credStore).NotTo(BeNil())
+			Expect(fetcher.reference).To(Equal(allowedPrefix + "repo:tag"))
 		})
 	})
 })
