@@ -456,6 +456,36 @@ webhook-test-manifests: kustomize ## Build webhook manifests for envtest into we
 	@mkdir -p webhook-tests
 	@"$(KUSTOMIZE)" build config/webhook > webhook-tests/webhook-manifests.yaml
 
+.PHONY: ghcr-secret
+ghcr-secret: ensureaccesseratordeployed
+	@read -p "GitHub username: " USERNAME; \
+	read -s -p "GitHub PAT: " TOKEN; \
+	echo ""; \
+	kubectl create secret docker-registry github-auth \
+		--docker-server=ghcr.io \
+		--docker-username=$$USERNAME \
+		--docker-password=$$TOKEN \
+		--namespace=accesserator-system \
+		--dry-run=client -o yaml | kubectl apply -f -
+	kubectl rollout restart deploy/accesserator -n accesserator-system
+	kubectl rollout status deploy/accesserator -n accesserator-system
+
+.PHONY: ensure-ghcr-secret
+ensure-ghcr-secret:
+	@echo "Checking github-auth secret in namespace accesserator-system..."
+	@if ! kubectl get secret github-auth --namespace=accesserator-system > /dev/null 2>&1; then \
+		echo "ERROR: secret 'github-auth' not found in namespace accesserator-system"; \
+		exit 1; \
+	fi
+	@kubectl get secret github-auth --namespace=accesserator-system \
+		-o jsonpath='{.data.\.dockerconfigjson}' \
+		| base64 -d | jq . > /dev/null 2>&1 \
+		|| (echo "ERROR: secret is not valid JSON"; exit 1)
+	@AUTHS=$$(kubectl get secret github-auth --namespace=accesserator-system \
+		-o jsonpath='{.data.\.dockerconfigjson}' \
+		| base64 -d | jq -r '.auths | keys | join(", ")'); \
+	echo "✅ Secret exists and contains auths for: $$AUTHS"
+
 ##@ Dependencies
 
 .PHONY: istiohelm
