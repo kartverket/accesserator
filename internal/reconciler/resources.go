@@ -10,6 +10,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/opa"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -33,6 +34,7 @@ func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource
 		maskinportenClientControllerResource(scope),
 		maskinportenSecretControllerResource(scope),
 		maskinportenServiceEntryControllerResource(scope),
+		opaConfigMapControllerResource(scope),
 	}
 }
 
@@ -189,6 +191,41 @@ func maskinportenServiceEntryControllerResource(scope *state.Scope) ControllerRe
 					current.Spec.Hosts = desired.Spec.Hosts
 					current.Spec.Ports = desired.Spec.Ports
 					current.Spec.Resolution = desired.Spec.Resolution
+				},
+			},
+		},
+	}
+}
+
+/*
+opaConfigMapControllerResource reconciles a ConfigMap resource with all configured bundles as binary data.
+*/
+func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.ConfigMap] {
+	opaConfigMapObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetOpaConfigMapName(scope.SecurityConfig.Name),
+		Namespace: scope.SecurityConfig.Namespace,
+	}
+
+	return ControllerResourceAdapter[*corev1.ConfigMap]{
+		reconciliation.ReconcilerAdapter[*corev1.ConfigMap]{
+			Func: reconciliation.ResourceReconciler[*corev1.ConfigMap]{
+				ResourceKind:    "ConfigMap",
+				ResourceName:    opaConfigMapObjectMeta.Name,
+				DesiredResource: utilities.Ptr(opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)),
+				Scope:           scope,
+				ShouldUpdate: func(current, desired *corev1.ConfigMap) bool {
+					if len(current.BinaryData) != len(desired.BinaryData) {
+						return true
+					}
+					for key, desiredVal := range desired.BinaryData {
+						if !bytes.Equal(current.BinaryData[key], desiredVal) {
+							return true
+						}
+					}
+					return false
+				},
+				UpdateFields: func(current, desired *corev1.ConfigMap) {
+					current.BinaryData = desired.BinaryData
 				},
 			},
 		},

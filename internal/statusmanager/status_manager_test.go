@@ -414,6 +414,36 @@ var _ = Describe("UpdateSecurityConfigStatus", func() {
 		fakeRecorder = events.NewFakeRecorder(10)
 	})
 
+	Context("when OPA is enabled", func() {
+		It("sets OpaBundleNames from bundle data in sorted order", func() {
+			sc := newTestSecurityConfigForStatusManager()
+			original := sc.DeepCopy()
+
+			k8sClient = fake.NewClientBuilder().
+				WithScheme(newScheme()).
+				WithObjects(sc).
+				WithStatusSubresource(sc).
+				Build()
+
+			scope := &state.Scope{
+				SecurityConfig: *sc,
+				OpaConfig: state.OpaConfig{
+					Enabled: true,
+					BundleBinaryData: map[string][]byte{
+						"bundle-b": []byte("data-b"),
+						"bundle-a": []byte("data-a"),
+					},
+				},
+			}
+
+			statusmanager.UpdateSecurityConfigStatus(ctx, k8sClient, fakeRecorder, scope, original, []reconciliation.ControllerResource{})
+
+			updated := &v1alpha.SecurityConfig{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(sc), updated)).To(Succeed())
+			Expect(updated.Status.OpaBundleNames).To(Equal([]string{"bundle-a", "bundle-b"}))
+		})
+	})
+
 	It("does not emit StatusUpdateSuccess when status is unchanged", func() {
 		sc.Status.Conditions = []metav1.Condition{
 			{

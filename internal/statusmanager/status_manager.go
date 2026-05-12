@@ -3,6 +3,8 @@ package statusmanager
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/state"
@@ -72,6 +74,12 @@ func UpdateSecurityConfigStatus(
 		controllerResources,
 		originalSecurityConfig.Status.Conditions,
 	)
+
+	if scope.OpaConfig.Enabled {
+		sortedBundleNames := slices.Collect(maps.Keys(scope.OpaConfig.BundleBinaryData))
+		slices.Sort(sortedBundleNames)
+		sc.Status.OpaBundleNames = sortedBundleNames
+	}
 
 	if !equality.Semantic.DeepEqual(originalSecurityConfig.Status, sc.Status) {
 		rLog.Debug(fmt.Sprintf("Updating SecurityConfig status with name %s/%s", sc.Namespace, sc.Name))

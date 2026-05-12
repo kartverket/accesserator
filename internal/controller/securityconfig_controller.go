@@ -10,7 +10,6 @@ import (
 	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/internal/statusmanager"
-	"github.com/kartverket/accesserator/internal/validator"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -49,6 +48,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&istionetworkingv1.ServiceEntry{}).
 		Owns(&networkv1.NetworkPolicy{}).
 		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
 		Watches(&v1alpha1.Application{}, eventhandler.HandleSkiperatorApplicationEvent(r.Client)).
 		Watches(&naisiov1.MaskinportenClient{}, eventhandler.HandleMaskinportenClientEvent(r.Client)).
 		Watches(&corev1.Secret{}, eventhandler.HandleSecretEvent(r.Client)).
@@ -63,7 +63,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch
 // +kubebuilder:rbac:groups=nais.io,resources=jwkers;maskinportenclients,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.istio.io,resources=serviceentries,verbs=get;list;watch;create;update;patch;delete
 
@@ -110,8 +110,6 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return reconcile.Result{}, err
 	}
-
-	scope = validator.ValidateSecurityConfig(ctx, r.Client, scope)
 
 	controllerResources := reconciler.ControllerResources(scope)
 
