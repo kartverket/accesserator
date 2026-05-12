@@ -1,0 +1,12 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+spec:
+  opa:
+    enabled: false
+    port: 5000
+    bundleUrls:
+      - name: test-bundle
+        url: ghcr.io/kartverket/accesserator/opa-bundle@sha256:6a2c57525c0bab2c2b22f32fa6aed117b65d49dda52cb4b829ea80d0e2bc5ef5
+  applicationRef: app
