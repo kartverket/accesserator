@@ -1,0 +1,18 @@
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: accesserator-egress
+  namespace: accesserator-system
+spec:
+  exportTo:
+    - .
+    - istio-system
+    - istio-gateways
+  hosts:
+    - ghcr.io
+    - pkg-containers.githubusercontent.com
+  ports:
+    - name: https
+      number: 443
+      protocol: HTTPS
+  resolution: DNS
