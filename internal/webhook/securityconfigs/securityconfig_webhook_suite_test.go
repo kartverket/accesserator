@@ -1,4 +1,4 @@
-package v1alpha_test
+package securityconfigs_test
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	v1 "github.com/kartverket/accesserator/internal/webhook/v1"
-	webhookv1alpha "github.com/kartverket/accesserator/internal/webhook/v1alpha"
+	"github.com/kartverket/accesserator/internal/webhook/pods"
+	"github.com/kartverket/accesserator/internal/webhook/securityconfigs"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -123,9 +123,9 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = v1.SetupPodWebhookWithManager(mgr)
+	err = pods.SetupPodWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
-	err = webhookv1alpha.SetupSecurityConfigWebhookWithManager(mgr)
+	err = securityconfigs.SetupSecurityConfigWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook

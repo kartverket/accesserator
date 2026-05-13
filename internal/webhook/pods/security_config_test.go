@@ -1,10 +1,10 @@
-package v1_test
+package pods_test
 
 import (
 	"context"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	v1 "github.com/kartverket/accesserator/internal/webhook/v1"
+	"github.com/kartverket/accesserator/internal/webhook/pods"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -31,7 +31,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 	Describe("GetSecurityConfigForApplication", func() {
 		It("errors when no SecurityConfig exists for the given application", func() {
-			cfg, err := v1.GetSecurityConfigForApplication(
+			cfg, err := pods.GetSecurityConfigForApplication(
 				ctx,
 				k8sClient,
 				client.ObjectKey{Namespace: "ns", Name: "nonexistent-app"},
@@ -41,7 +41,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 
 		It("errors when multiple SecurityConfigs exist for the given application", func() {
-			cfg, err := v1.GetSecurityConfigForApplication(
+			cfg, err := pods.GetSecurityConfigForApplication(
 				ctx,
 				utilities.GetMockKubernetesClient(
 					scheme,
@@ -71,7 +71,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 
 		It("error when SecurityConfig is not ready", func() {
-			cfg, err := v1.GetSecurityConfigForApplication(
+			cfg, err := pods.GetSecurityConfigForApplication(
 				ctx,
 				utilities.GetMockKubernetesClient(
 					scheme,
@@ -107,7 +107,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			expectedSecurityConfig.Status.Ready = true
 			Expect(mockClient.Update(ctx, expectedSecurityConfig)).To(Succeed())
 
-			cfg, err := v1.GetSecurityConfigForApplication(
+			cfg, err := pods.GetSecurityConfigForApplication(
 				ctx,
 				mockClient,
 				client.ObjectKey{Namespace: "ns", Name: "myapp"},
