@@ -205,13 +205,14 @@ func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapte
 		Name:      utilities.GetOpaConfigMapName(scope.SecurityConfig.Name),
 		Namespace: scope.SecurityConfig.Namespace,
 	}
+	desiredResource := opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)
 
 	return ControllerResourceAdapter[*corev1.ConfigMap]{
 		reconciliation.ReconcilerAdapter[*corev1.ConfigMap]{
 			Func: reconciliation.ResourceReconciler[*corev1.ConfigMap]{
 				ResourceKind:    "ConfigMap",
 				ResourceName:    opaConfigMapObjectMeta.Name,
-				DesiredResource: utilities.Ptr(opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)),
+				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
 				ShouldUpdate: func(current, desired *corev1.ConfigMap) bool {
 					if len(current.BinaryData) != len(desired.BinaryData) {
