@@ -22,7 +22,6 @@ const (
 	MaskinportenTestJwksUri       = "https://test.maskinporten.no/jwk"
 
 	OpaConfigMapNameSuffix = "opa"
-	OpaDefaultPort         = int32(8181)
 )
 
 var (

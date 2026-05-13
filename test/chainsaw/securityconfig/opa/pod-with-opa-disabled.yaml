@@ -13,7 +13,7 @@ spec:
   containers:
     - env:
         - name: OPA_URL
-          value: http://localhost:5000
+          value: http://localhost:3010
       name: app
   initContainers:
     - name: istio-init
@@ -22,7 +22,7 @@ spec:
       args:
         - run
         - --server
-        - --addr=0.0.0.0:5000
+        - --addr=0.0.0.0:3010
       command:
         - opa
 status:

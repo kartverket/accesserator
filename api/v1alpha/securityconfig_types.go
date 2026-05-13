@@ -184,12 +184,6 @@ type OpenPolicyAgentSpec struct {
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
 
-	// Port specifies the port on which the OPA sidecar will listen for incoming requests.
-	// If not set OPA will default to listening on port 8181.
-	//
-	// +kubebuilder:validation:Optional
-	Port *int32 `json:"port,omitempty"`
-
 	// BundleURLs is a list of URLs pointing to OPA bundles containing compiled rego policies.
 	//
 	// +kubebuilder:validation:Required

@@ -25,6 +25,7 @@ type Config struct {
 	OpaImageName                        string   `split_words:"true" default:"openpolicyagent/opa"`
 	OpaImageTag                         string   `split_words:"true"`
 	OpaImageSha                         string   `split_words:"true"`
+	OpaImagePort                        int32    `split_words:"true" default:"3010"`
 	OpaUrlEnvVarName                    string   `split_words:"true" default:"OPA_URL"`
 	OpaAllowedBundleRegistryUrlPrefixes []string `split_words:"true"`
 }

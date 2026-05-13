@@ -19,12 +19,11 @@ const (
 // GetOpaContainer builds the OPA sidecar container for the given SecurityConfig.
 func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	imageURL := fmt.Sprintf("%s:%s", config.Get().OpaImageName, config.Get().OpaImageTag)
-	opaPort := utilities.GetOpaPort(securityConfig)
 
 	opaContainerArgs := []string{
 		"run",
 		"--server",
-		fmt.Sprintf("--addr=0.0.0.0:%d", opaPort),
+		fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
 	}
 	if securityConfig.Spec.Opa != nil && securityConfig.Spec.Opa.Enabled {
 		for _, opaBundleName := range securityConfig.Status.OpaBundleNames {
@@ -42,7 +41,7 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	opaContainer.Image = imageURL
 	opaContainer.Ports = []corev1.ContainerPort{
 		{
-			ContainerPort: opaPort,
+			ContainerPort: config.Get().OpaImagePort,
 			Name:          "http",
 			Protocol:      corev1.ProtocolTCP,
 		},
@@ -64,8 +63,8 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 }
 
 // GetOpaUrlEnvVarValue returns the value that OPA_URL should be set to on the app container.
-func GetOpaUrlEnvVarValue(securityConfig v1alpha.SecurityConfig) string {
-	return fmt.Sprintf("http://localhost:%d", utilities.GetOpaPort(securityConfig))
+func GetOpaUrlEnvVarValue() string {
+	return fmt.Sprintf("http://localhost:%d", config.Get().OpaImagePort)
 }
 
 // IsOpaContainerEqual compares the fields relevant to Accesserator between two containers.
@@ -140,7 +139,7 @@ func MutatePodWithOpaURLEnvVar(pod *corev1.Pod, securityConfig v1alpha.SecurityC
 			}
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  config.Get().OpaUrlEnvVarName,
-				Value: GetOpaUrlEnvVarValue(securityConfig),
+				Value: GetOpaUrlEnvVarValue(),
 			})
 			return nil
 		}
@@ -199,7 +198,7 @@ func ValidateOpaInitContainer(pod corev1.Pod, sidecarContainer corev1.Container)
 }
 
 func ValidateOpaURLEnvVar(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
-	expectedValue := GetOpaUrlEnvVarValue(securityConfig)
+	expectedValue := GetOpaUrlEnvVarValue()
 	for _, container := range pod.Spec.Containers {
 		if container.Name == string(securityConfig.Spec.ApplicationRef) {
 			for _, env := range container.Env {

@@ -20,7 +20,6 @@ var _ = Describe("opa.go unit tests", func() {
 	)
 
 	newSecurityConfig := func(opaEnabled bool) v1alpha.SecurityConfig {
-		opaPort := int32(8181)
 		return v1alpha.SecurityConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: securityConfigName,
@@ -29,7 +28,6 @@ var _ = Describe("opa.go unit tests", func() {
 				ApplicationRef: applicationRef,
 				Opa: &v1alpha.OpenPolicyAgentSpec{
 					Enabled: opaEnabled,
-					Port:    &opaPort,
 					BundleURLs: []v1alpha.BundleSource{
 						{Name: "bundle-a", URL: "http://bundle-source/bundle-a:latest"},
 						{Name: "bundle-b", URL: "http://bundle-source/bundle-b:latest"},
@@ -54,7 +52,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
-				"--addr=0.0.0.0:8181",
+				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
 			}))
 			Expect(c.Args).NotTo(ContainElement("--bundle"))
 			Expect(c.Args).NotTo(ContainElement("--watch"))
@@ -80,7 +78,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
-				fmt.Sprintf("--addr=0.0.0.0:%d", utilities.OpaDefaultPort),
+				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
 			}))
 			Expect(c.Args).NotTo(ContainElement("--bundle"))
 			Expect(c.Args).NotTo(ContainElement("--watch"))
@@ -100,7 +98,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
-				"--addr=0.0.0.0:8181",
+				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
 				"--bundle",
 				fmt.Sprintf("%s/%s", pods.OpaBundleMountPath, "bundle-a"),
 				"--bundle",
@@ -108,7 +106,7 @@ var _ = Describe("opa.go unit tests", func() {
 				"--watch",
 			}))
 			Expect(c.Ports).To(ContainElement(corev1.ContainerPort{
-				ContainerPort: 8181,
+				ContainerPort: config.Get().OpaImagePort,
 				Name:          "http",
 				Protocol:      corev1.ProtocolTCP,
 			}))
@@ -122,7 +120,9 @@ var _ = Describe("opa.go unit tests", func() {
 
 	Describe("GetOpaUrlEnvVarValue", func() {
 		It("returns the localhost OPA URL using the configured OPA port", func() {
-			Expect(pods.GetOpaUrlEnvVarValue(newSecurityConfig(true))).To(Equal("http://localhost:8181"))
+			Expect(pods.GetOpaUrlEnvVarValue()).To(Equal(
+				fmt.Sprintf("http://localhost:%d", config.Get().OpaImagePort),
+			))
 		})
 	})
 
@@ -189,7 +189,7 @@ var _ = Describe("opa.go unit tests", func() {
 						{
 							Name: applicationRef,
 							Env: []corev1.EnvVar{
-								{Name: config.Get().OpaUrlEnvVarName, Value: pods.GetOpaUrlEnvVarValue(securityConfig)},
+								{Name: config.Get().OpaUrlEnvVarName, Value: pods.GetOpaUrlEnvVarValue()},
 							},
 						},
 					},
@@ -211,7 +211,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(pods.MutatePodWithOpaURLEnvVar(&pod, securityConfig)).To(Succeed())
 			Expect(pod.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{
 				Name:  config.Get().OpaUrlEnvVarName,
-				Value: pods.GetOpaUrlEnvVarValue(securityConfig),
+				Value: pods.GetOpaUrlEnvVarValue(),
 			}))
 		})
 	})
@@ -264,7 +264,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(pods.IsOpaContainerEqual(pods.GetOpaContainer(securityConfig), pod.Spec.InitContainers[0])).To(BeTrue())
 			Expect(pod.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{
 				Name:  config.Get().OpaUrlEnvVarName,
-				Value: pods.GetOpaUrlEnvVarValue(securityConfig),
+				Value: pods.GetOpaUrlEnvVarValue(),
 			}))
 			Expect(pod.Spec.Volumes).To(ContainElement(pods.GetOpaBundleVolume(securityConfig.Name)))
 		})
@@ -355,7 +355,7 @@ var _ = Describe("opa.go unit tests", func() {
 					config.Get().OpaUrlEnvVarName,
 					pod.Namespace,
 					pod.Name,
-					pods.GetOpaUrlEnvVarValue(securityConfig),
+					pods.GetOpaUrlEnvVarValue(),
 					"incorrect-value",
 				)))
 		})
@@ -368,7 +368,7 @@ var _ = Describe("opa.go unit tests", func() {
 						{
 							Name: applicationRef,
 							Env: []corev1.EnvVar{
-								{Name: config.Get().OpaUrlEnvVarName, Value: pods.GetOpaUrlEnvVarValue(securityConfig)},
+								{Name: config.Get().OpaUrlEnvVarName, Value: pods.GetOpaUrlEnvVarValue()},
 							},
 						},
 					},

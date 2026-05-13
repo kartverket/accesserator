@@ -212,12 +212,6 @@ spec:
                     description: Enabled indicates whether OPA should be configured
                       for the application.
                     type: boolean
-                  port:
-                    description: |-
-                      Port specifies the port on which the OPA sidecar will listen for incoming requests.
-                      If not set OPA will default to listening on port 8181.
-                    format: int32
-                    type: integer
                 required:
                 - bundleUrls
                 - enabled

@@ -164,35 +164,6 @@ var _ = Describe("Helper Functions", func() {
 		})
 	})
 
-	Describe("GetOpaPort", func() {
-		It("should return the default OPA port when no custom port is configured", func() {
-			securityConfig := v1alpha.SecurityConfig{
-				Spec: v1alpha.SecurityConfigSpec{
-					Opa: &v1alpha.OpenPolicyAgentSpec{},
-				},
-			}
-
-			result := utilities.GetOpaPort(securityConfig)
-
-			Expect(result).To(Equal(utilities.OpaDefaultPort))
-		})
-
-		It("should return the configured OPA port when custom port is configured", func() {
-			customPort := int32(9191)
-			securityConfig := v1alpha.SecurityConfig{
-				Spec: v1alpha.SecurityConfigSpec{
-					Opa: &v1alpha.OpenPolicyAgentSpec{
-						Port: &customPort,
-					},
-				},
-			}
-
-			result := utilities.GetOpaPort(securityConfig)
-
-			Expect(result).To(Equal(customPort))
-		})
-	})
-
 	Describe("GetMockKubernetesClient", func() {
 		It("should return a non-nil client", func() {
 			scheme := runtime.NewScheme()
