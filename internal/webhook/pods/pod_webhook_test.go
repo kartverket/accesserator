@@ -292,6 +292,30 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(pods.ParseAccesseratorServices("texas, texxxas")).To(Equal([]pods.ServiceType{pods.Texas}))
 		})
 
+		It("returns [opa] when annotation is 'opa'", func() {
+			Expect(pods.ParseAccesseratorServices("opa")).To(Equal([]pods.ServiceType{pods.Opa}))
+		})
+
+		It("returns [opa] when annotation is 'something ,opa, something else'", func() {
+			Expect(pods.ParseAccesseratorServices("something ,opa, something else")).To(Equal([]pods.ServiceType{pods.Opa}))
+		})
+
+		It("returns [opa] when annotation is 'opa, opa'", func() {
+			Expect(pods.ParseAccesseratorServices("opa, opa")).To(Equal([]pods.ServiceType{pods.Opa}))
+		})
+
+		It("returns [texas, opa] when annotation is 'texas, opa'", func() {
+			Expect(pods.ParseAccesseratorServices("texas, opa")).To(Equal([]pods.ServiceType{pods.Texas, pods.Opa}))
+		})
+
+		It("returns [texas, opa] when annotation is 'texas, oppa, opa'", func() {
+			Expect(pods.ParseAccesseratorServices("texas, oppa, opa")).To(Equal([]pods.ServiceType{pods.Texas, pods.Opa}))
+		})
+
+		It("returns [texas, opa] when annotation is 'texas, opa, opa'", func() {
+			Expect(pods.ParseAccesseratorServices("texas, opa, opa")).To(Equal([]pods.ServiceType{pods.Texas, pods.Opa}))
+		})
+
 		It("returns [] when annotation is 'something, something else'", func() {
 			Expect(pods.ParseAccesseratorServices("something, something else")).To(BeEmpty())
 		})
