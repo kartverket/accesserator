@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kartverket/accesserator/internal/webhook/pods"
+	"github.com/kartverket/accesserator/internal/webhook/securityconfigs"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
@@ -43,7 +45,6 @@ import (
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/controller"
-	webhookv1 "github.com/kartverket/accesserator/internal/webhook/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -214,8 +215,12 @@ func main() {
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := webhookv1.SetupPodWebhookWithManager(mgr); err != nil {
+		if err := pods.SetupPodWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
+			os.Exit(1)
+		}
+		if err := securityconfigs.SetupSecurityConfigWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "SecurityConfig")
 			os.Exit(1)
 		}
 	}

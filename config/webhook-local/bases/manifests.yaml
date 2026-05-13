@@ -82,4 +82,21 @@ webhooks:
           object != null &&
           object.metadata != null &&
           ('labels' in object.metadata) &&
-          ('application.skiperator.no/app-name' in object.metadata.labels)    
+          ('application.skiperator.no/app-name' in object.metadata.labels)
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      url: https://host.docker.internal:9443/validate-accesserator-kartverket-no-v1alpha-securityconfig
+    name: vsecurityconfig-v1alpha.kb.io
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - accesserator.kartverket.no
+        apiVersions:
+          - v1alpha
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - securityconfigs
+    sideEffects: None

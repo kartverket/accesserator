@@ -1,4 +1,4 @@
-package v1_test
+package pods_test
 
 import (
 	"context"
@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	v1 "github.com/kartverket/accesserator/internal/webhook/v1"
+	"github.com/kartverket/accesserator/internal/webhook/pods"
+	"github.com/kartverket/accesserator/internal/webhook/securityconfigs"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -51,7 +52,7 @@ const skiperatorAppName = "skiperator-app"
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Webhook Suite")
+	RunSpecs(t, "Pod Webhook Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -127,7 +128,9 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = v1.SetupPodWebhookWithManager(mgr)
+	err = pods.SetupPodWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+	err = securityconfigs.SetupSecurityConfigWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook
@@ -212,7 +215,7 @@ func getWebhookNamespace(name string, webhookEnabled bool) *corev1.Namespace {
 		},
 	}
 	if webhookEnabled {
-		ns.Labels[v1.CreatedBySkipNamespaceLabel] = v1.CreatedBySkipNamespaceLabelValue
+		ns.Labels[pods.CreatedBySkipNamespaceLabel] = pods.CreatedBySkipNamespaceLabelValue
 	}
 	return ns
 }
@@ -264,10 +267,10 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Name:      "pod-webhook-create",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					v1.AccesseratorServicesAnnotation: "Texas",
+					pods.AccesseratorServicesAnnotation: "Texas",
 				},
 				Labels: map[string]string{
-					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+					pods.SkiperatorApplicationRefLabel: skiperatorAppName,
 				},
 			},
 			skiperatorAppName,
@@ -291,7 +294,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Name:      "pod-webhook-create",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					v1.AccesseratorServicesAnnotation: "Texas",
+					pods.AccesseratorServicesAnnotation: "Texas",
 				},
 			},
 			skiperatorAppName,
@@ -300,7 +303,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 			pod.Labels = make(map[string]string)
 		}
 
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[pods.SkiperatorApplicationRefLabel] = skiperatorAppName
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 
 		mutatedPod := &corev1.Pod{}
@@ -308,7 +311,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 		Expect(getErr).NotTo(HaveOccurred())
 
 		Expect(mutatedPod.Spec.InitContainers).NotTo(BeNil())
-		Expect(mutatedPod.Spec.InitContainers).To(ContainElement(HaveField("Name", Equal(v1.TexasInitContainerName))))
+		Expect(mutatedPod.Spec.InitContainers).To(ContainElement(HaveField("Name", Equal(pods.TexasInitContainerName))))
 	})
 
 	It("does not inject a Texas sidecar as an init container when pod is updated to inject Texas", func() {
@@ -323,10 +326,10 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Name:      "pod-webhook-update",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					v1.AccesseratorVerifyAnnotationKey: v1.AccesseratorVerifyAnnotationValue,
+					pods.AccesseratorVerifyAnnotationKey: pods.AccesseratorVerifyAnnotationValue,
 				},
 				Labels: map[string]string{
-					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+					pods.SkiperatorApplicationRefLabel: skiperatorAppName,
 				},
 			},
 			skiperatorAppName,
@@ -339,7 +342,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 		if updatedPod.Annotations == nil {
 			updatedPod.Annotations = make(map[string]string)
 		}
-		updatedPod.Annotations[v1.AccesseratorServicesAnnotation] = "Texas"
+		updatedPod.Annotations[pods.AccesseratorServicesAnnotation] = "Texas"
 		Expect(k8sClient.Update(ctx, updatedPod)).To(Succeed())
 
 		// Re-fetch the pod to check the actual state after the pod is updated
@@ -359,7 +362,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Name:      "pod-webhook-delete",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					v1.AccesseratorVerifyAnnotationValue: v1.AccesseratorVerifyAnnotationValue,
+					pods.AccesseratorVerifyAnnotationValue: pods.AccesseratorVerifyAnnotationValue,
 				},
 			},
 			"c",

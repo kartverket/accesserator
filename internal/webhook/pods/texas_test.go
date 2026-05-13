@@ -1,10 +1,10 @@
-package v1_test
+package pods_test
 
 import (
 	"fmt"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	v1 "github.com/kartverket/accesserator/internal/webhook/v1"
+	"github.com/kartverket/accesserator/internal/webhook/pods"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
@@ -34,12 +34,12 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					JwkerSecretName: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
 				},
 			}
-			c := v1.GetTexasContainer(securityConfig)
+			c := pods.GetTexasContainer(securityConfig)
 			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s@%s", config.Get().TexasImageName, config.Get().TexasImageTag, config.Get().TexasImageSha)))
 			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
 			Expect(c.SecurityContext).ToNot(BeNil())
 			Expect(c.Env).NotTo(BeEmpty())
-			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.TokenXEnabledEnvVarName, Value: "true"}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.TokenXEnabledEnvVarName, Value: "true"}))
 			Expect(c.EnvFrom).NotTo(BeEmpty())
 			Expect(c.EnvFrom).To(
 				ContainElement(
@@ -75,13 +75,13 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
 				},
 			}
-			c := v1.GetTexasContainer(securityConfig)
+			c := pods.GetTexasContainer(securityConfig)
 			Expect(c.ReadinessProbe).ToNot(BeNil())
 			Expect(c.ReadinessProbe.HTTPGet).ToNot(BeNil())
 			Expect(c.ReadinessProbe.HTTPGet.Path).To(Equal("/healthz"))
 			Expect(c.ReadinessProbe.HTTPGet.Port).To(Equal(intstr.FromInt32(config.Get().TexasProbePort)))
 			Expect(c.Env).NotTo(BeEmpty())
-			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.MaskinportenEnabledEnvVarName, Value: "true"}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.MaskinportenEnabledEnvVarName, Value: "true"}))
 			Expect(c.EnvFrom).NotTo(BeEmpty())
 			Expect(c.EnvFrom).To(
 				ContainElement(
@@ -121,14 +121,14 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
 				},
 			}
-			c := v1.GetTexasContainer(securityConfig)
+			c := pods.GetTexasContainer(securityConfig)
 			Expect(c.ReadinessProbe).ToNot(BeNil())
 			Expect(c.ReadinessProbe.HTTPGet).ToNot(BeNil())
 			Expect(c.ReadinessProbe.HTTPGet.Path).To(Equal("/healthz"))
 			Expect(c.ReadinessProbe.HTTPGet.Port).To(Equal(intstr.FromInt32(config.Get().TexasProbePort)))
 			Expect(c.Env).NotTo(BeEmpty())
-			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.TokenXEnabledEnvVarName, Value: "true"}))
-			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: v1.MaskinportenEnabledEnvVarName, Value: "true"}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.TokenXEnabledEnvVarName, Value: "true"}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.MaskinportenEnabledEnvVarName, Value: "true"}))
 			Expect(c.EnvFrom).NotTo(BeEmpty())
 			Expect(c.EnvFrom).To(
 				ContainElement(
@@ -162,7 +162,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					ApplicationRef: applicationRef,
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.TokenXEnabled).To(Equal("false"))
 			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
 		})
@@ -176,7 +176,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.TokenXEnabled).To(Equal("false"))
 			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
 		})
@@ -193,7 +193,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					JwkerSecretName: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.TokenXEnabled).To(Equal("true"))
 			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
 				corev1.EnvFromSource{
@@ -212,7 +212,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					ApplicationRef: applicationRef,
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.MaskinportenEnabled).To(Equal("false"))
 			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
 		})
@@ -226,7 +226,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.MaskinportenEnabled).To(Equal("false"))
 			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
 		})
@@ -252,7 +252,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
 			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
 				corev1.EnvFromSource{
@@ -290,7 +290,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
 			Expect(envVars.TokenXEnabled).To(Equal("true"))
 			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
@@ -338,7 +338,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
 				},
 			}
-			envVars := v1.GetTexasEnvVars(securityConfig)
+			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
 			Expect(envVars.TokenXEnabled).To(Equal("false"))
 			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
@@ -383,12 +383,12 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 					ApplicationRef: applicationRef,
 				}}
-			a := v1.GetTexasContainer(securityConfig)
-			b := v1.GetTexasContainer(securityConfig)
-			Expect(v1.IsTexasContainerEqual(a, b)).To(BeTrue())
+			a := pods.GetTexasContainer(securityConfig)
+			b := pods.GetTexasContainer(securityConfig)
+			Expect(pods.IsTexasContainerEqual(a, b)).To(BeTrue())
 
 			b.Env = append(b.Env, corev1.EnvVar{Name: "DUMMY_ENV_VAR", Value: "dummy"})
-			Expect(v1.IsTexasContainerEqual(a, b)).To(BeFalse())
+			Expect(pods.IsTexasContainerEqual(a, b)).To(BeFalse())
 		})
 	})
 
@@ -402,11 +402,11 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			pod := &corev1.Pod{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
-						v1.GetTexasContainer(securityConfig),
+						pods.GetTexasContainer(securityConfig),
 					},
 				},
 			}
-			Expect(v1.MutatePodWithTexasInitContainer(pod, v1.GetTexasContainer(securityConfig))).To(MatchError(fmt.Sprintf("pod already has an init container named %s", v1.TexasInitContainerName)))
+			Expect(pods.MutatePodWithTexasInitContainer(pod, pods.GetTexasContainer(securityConfig))).To(MatchError(fmt.Sprintf("pod already has an init container named %s", pods.TexasInitContainerName)))
 		})
 
 		It("mutates the pod with the Texas init container when no init container with the same name exists", func() {
@@ -422,9 +422,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			Expect(v1.MutatePodWithTexasInitContainer(&pod, v1.GetTexasContainer(securityConfig))).To(Succeed())
+			Expect(pods.MutatePodWithTexasInitContainer(&pod, pods.GetTexasContainer(securityConfig))).To(Succeed())
 			Expect(pod.Spec.InitContainers).To(HaveLen(1))
-			Expect(v1.IsTexasContainerEqual(v1.GetTexasContainer(securityConfig), pod.Spec.InitContainers[0])).To(BeTrue())
+			Expect(pods.IsTexasContainerEqual(pods.GetTexasContainer(securityConfig), pod.Spec.InitContainers[0])).To(BeTrue())
 		})
 	})
 
@@ -436,13 +436,13 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						{
 							Name: applicationRef,
 							Env: []corev1.EnvVar{
-								{Name: config.Get().TexasUrlEnvVarName, Value: v1.GetTexasUrlEnvVarValue()},
+								{Name: config.Get().TexasUrlEnvVarName, Value: pods.GetTexasUrlEnvVarValue()},
 							},
 						},
 					},
 				},
 			}
-			Expect(v1.MutatePodWithTexasURLEnvVar(&pod, applicationRef)).To(MatchError(fmt.Sprintf("container %s already has env var %s", applicationRef, config.Get().TexasUrlEnvVarName)))
+			Expect(pods.MutatePodWithTexasURLEnvVar(&pod, applicationRef)).To(MatchError(fmt.Sprintf("container %s already has env var %s", applicationRef, config.Get().TexasUrlEnvVarName)))
 		})
 
 		It("mutates the pod with the Texas URL env var when the target container does not already have it", func() {
@@ -453,8 +453,8 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			Expect(v1.MutatePodWithTexasURLEnvVar(&pod, applicationRef)).To(Succeed())
-			Expect(pod.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: config.Get().TexasUrlEnvVarName, Value: v1.GetTexasUrlEnvVarValue()}))
+			Expect(pods.MutatePodWithTexasURLEnvVar(&pod, applicationRef)).To(Succeed())
+			Expect(pod.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: config.Get().TexasUrlEnvVarName, Value: pods.GetTexasUrlEnvVarValue()}))
 		})
 	})
 
@@ -465,13 +465,13 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					ApplicationRef: applicationRef,
 				},
 			}
-			texasInitContainer := v1.GetTexasContainer(securityConfig)
+			texasInitContainer := pods.GetTexasContainer(securityConfig)
 			pod := corev1.Pod{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{},
 				},
 			}
-			Expect(v1.ValidateTexasInitContainer(pod, texasInitContainer)).
+			Expect(pods.ValidateTexasInitContainer(pod, texasInitContainer)).
 				To(
 					MatchError(
 						fmt.Sprintf(
@@ -489,7 +489,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					ApplicationRef: applicationRef,
 				},
 			}
-			texasInitContainer := v1.GetTexasContainer(securityConfig)
+			texasInitContainer := pods.GetTexasContainer(securityConfig)
 			incorrectlyConfiguredContainer := texasInitContainer
 			incorrectlyConfiguredContainer.Image = "incorrect-image"
 			pod := corev1.Pod{
@@ -497,7 +497,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					InitContainers: []corev1.Container{incorrectlyConfiguredContainer},
 				},
 			}
-			Expect(v1.ValidateTexasInitContainer(pod, texasInitContainer)).
+			Expect(pods.ValidateTexasInitContainer(pod, texasInitContainer)).
 				To(
 					MatchError(
 						fmt.Sprintf(
@@ -515,13 +515,13 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					ApplicationRef: applicationRef,
 				},
 			}
-			texasInitContainer := v1.GetTexasContainer(securityConfig)
+			texasInitContainer := pods.GetTexasContainer(securityConfig)
 			pod := corev1.Pod{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{texasInitContainer},
 				},
 			}
-			Expect(v1.ValidateTexasInitContainer(pod, texasInitContainer)).To(Succeed())
+			Expect(pods.ValidateTexasInitContainer(pod, texasInitContainer)).To(Succeed())
 		})
 	})
 
@@ -540,7 +540,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			Expect(v1.ValidateTexasURLEnvVar(pod, securityConfig)).
+			Expect(pods.ValidateTexasURLEnvVar(pod, securityConfig)).
 				To(
 					MatchError(
 						fmt.Sprintf(
@@ -572,7 +572,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			Expect(v1.ValidateTexasURLEnvVar(pod, securityConfig)).
+			Expect(pods.ValidateTexasURLEnvVar(pod, securityConfig)).
 				To(
 					MatchError(
 						fmt.Sprintf(
@@ -598,13 +598,13 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						{
 							Name: applicationRef,
 							Env: []corev1.EnvVar{
-								{Name: config.Get().TexasUrlEnvVarName, Value: v1.GetTexasUrlEnvVarValue()},
+								{Name: config.Get().TexasUrlEnvVarName, Value: pods.GetTexasUrlEnvVarValue()},
 							},
 						},
 					},
 				},
 			}
-			Expect(v1.ValidateTexasURLEnvVar(pod, securityConfig)).To(Succeed())
+			Expect(pods.ValidateTexasURLEnvVar(pod, securityConfig)).To(Succeed())
 		})
 	})
 })
