@@ -633,7 +633,6 @@ var _ = Describe("SecurityConfigController Validation", func() {
 	Context("When reconciling a resource", func() {
 		const (
 			securityConfigName = "test-resource"
-			skiperatorAppName  = "test-app"
 			namespaceName      = "default"
 		)
 
@@ -651,36 +650,6 @@ var _ = Describe("SecurityConfigController Validation", func() {
 
 			By("Cleanup the specific resource instance SecurityConfig")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-
-		It("Should be invalid if referenced Skiperator Application does not exist", func() {
-			securityConfig := &accesseratorv1alpha.SecurityConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      securityConfigName,
-					Namespace: namespaceName,
-				},
-				Spec: accesseratorv1alpha.SecurityConfigSpec{
-					ApplicationRef: skiperatorAppName,
-				},
-			}
-			Expect(k8sClient.Create(ctx, securityConfig)).To(Succeed())
-
-			fakeRecorder := events.NewFakeRecorder(100)
-			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).ToNot(HaveOccurred())
-
-			By("Verifying that SecurityConfig transitioned to PhaseInvalid")
-			Eventually(func() (accesseratorv1alpha.Phase, error) {
-				sc := &accesseratorv1alpha.SecurityConfig{}
-				if err := k8sClient.Get(ctx, typeNamespacedName, sc); err != nil {
-					return "", err
-				}
-				return sc.Status.Phase, nil
-			}).Should(Equal(accesseratorv1alpha.PhaseInvalid))
 		})
 	})
 })

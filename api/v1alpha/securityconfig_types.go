@@ -38,6 +38,12 @@ type SecurityConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Maskinporten *MaskinportenSpec `json:"maskinporten,omitempty"`
 
+	// Opa specifies whether to configure the open policy agent capability for an application referred to by `applicationRef`.
+	// The configuration includes which bundles compiled from rego policies, and how often OPA should check for updates to these bundles.
+	//
+	// +kubebuilder:validation:Optional
+	Opa *OpenPolicyAgentSpec `json:"opa,omitempty"`
+
 	// ApplicationRef is a reference to the name of the SKIP application for which this SecurityConfig applies.
 	//
 	// +kubebuilder:validation:Required
@@ -169,6 +175,49 @@ type MaskinportenClientRef struct {
 	Name ResourceName `json:"name"`
 }
 
+// OpenPolicyAgentSpec defines the OPA sidecar configuration.
+//
+// +kubebuilder:object:generate=true
+type OpenPolicyAgentSpec struct {
+	// Enabled indicates whether OPA should be configured for the application.
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// BundleURLs is a list of URLs pointing to OPA bundles containing compiled rego policies.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=20
+	// +kubebuilder:validation:XValidation:rule="self.all(x, self.filter(y, y.name == x.name).size() == 1)",message="Each bundle name must be unique"
+	// +kubebuilder:validation:XValidation:rule="self.all(x, self.filter(y, y.url == x.url).size() == 1)",message="Each bundle URL must be unique"
+	BundleURLs []BundleSource `json:"bundleUrls"`
+}
+
+// BundleSource defines a source for an OPA bundle.
+//
+// +kubebuilder:object:generate=true
+type BundleSource struct {
+	// Name specifies a human-readable name for the OPA bundle.
+	// It is used to differentiate between bundles which is used by OPA.
+	//
+	// +kubebuilder:validation:Required
+	Name DataKey `json:"name"`
+
+	// URL is the OCI registry location of the OPA bundle.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=253
+	URL string `json:"url"`
+}
+
+// DataKey is a type for keys within Kubernetes secrets and configmaps.
+//
+// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$`
+// +kubebuilder:validation:MaxLength=63
+// +kubebuilder:validation:MinLength=1
+type DataKey string
+
 // ResourceName is a type for Kubernetes resource names.
 //
 // +kubebuilder:validation:MaxLength=253
@@ -205,10 +254,7 @@ type SecretKeySelector struct {
 	// Key is the key within the secret whose value should be used.
 	//
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$`
-	// +kubebuilder:validation:MaxLength=253
-	// +kubebuilder:validation:MinLength=1
-	Key string `json:"key"`
+	Key DataKey `json:"key"`
 }
 
 // SecurityConfigStatus defines the observed state of SecurityConfig.
@@ -219,7 +265,14 @@ type SecurityConfigStatus struct {
 	Message                 string             `json:"message,omitempty"`
 	JwkerSecretName         string             `json:"jwkerSecretName,omitempty"`
 	MaskinportenSectretName string             `json:"maskinportenSecretName,omitempty"`
+	OpaBundleSource         *OpaBundleSource   `json:"opaBundleSource,omitempty"`
 	Ready                   bool               `json:"ready"`
+}
+
+// OpaBundleSource defines the source of OPA bundles used for policy evaluation.
+type OpaBundleSource struct {
+	ConfigMapName string   `json:"configMapName,omitempty"`
+	BundleNames   []string `json:"bundleNames,omitempty"`
 }
 
 type Phase string
@@ -280,22 +333,10 @@ func (s *SecurityConfigStatus) SetPhaseInvalid(msg string) {
 	s.Message = msg
 }
 
-func SetConditionInvalid(cond *metav1.Condition, msg string) {
-	cond.Status = metav1.ConditionFalse
-	cond.Reason = "InvalidConfiguration"
-	cond.Message = msg
-}
-
 func (s *SecurityConfigStatus) SetPhasePending(msg string) {
 	s.Phase = PhasePending
 	s.Ready = false
 	s.Message = msg
-}
-
-func SetConditionPending(cond *metav1.Condition, msg string) {
-	cond.Status = metav1.ConditionUnknown
-	cond.Reason = "ReconciliationPending"
-	cond.Message = msg
 }
 
 func (s *SecurityConfigStatus) SetPhaseFailed(msg string) {
@@ -304,20 +345,8 @@ func (s *SecurityConfigStatus) SetPhaseFailed(msg string) {
 	s.Message = msg
 }
 
-func SetConditionFailed(cond *metav1.Condition, msg string) {
-	cond.Status = metav1.ConditionFalse
-	cond.Reason = "ReconciliationFailed"
-	cond.Message = msg
-}
-
 func (s *SecurityConfigStatus) SetPhaseReady(msg string) {
 	s.Phase = PhaseReady
 	s.Ready = true
 	s.Message = msg
-}
-
-func SetConditionReady(cond *metav1.Condition, msg string) {
-	cond.Status = metav1.ConditionTrue
-	cond.Reason = "ReconciliationSuccess"
-	cond.Message = msg
 }

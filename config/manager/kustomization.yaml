@@ -9,6 +9,7 @@ resources:
 - base/podmonitor.yaml
 - base/serviceaccount.yaml
 - base/service.yaml
+- base/serviceentry.yaml
 - base/webhook-certificate.yaml
 - base/webhook-issuer.yaml
 

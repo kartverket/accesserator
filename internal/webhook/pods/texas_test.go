@@ -406,7 +406,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 			}
-			Expect(pods.MutatePodWithTexasInitContainer(pod, pods.GetTexasContainer(securityConfig))).To(MatchError(fmt.Sprintf("pod already has an init container named %s", pods.TexasInitContainerName)))
+			Expect(pods.MutatePodWithTexasInitContainer(pod, pods.GetTexasContainer(securityConfig))).To(MatchError(fmt.Sprintf("pod already has a container named %s", pods.TexasInitContainerName)))
 		})
 
 		It("mutates the pod with the Texas init container when no init container with the same name exists", func() {

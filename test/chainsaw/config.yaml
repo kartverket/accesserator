@@ -10,4 +10,4 @@ spec:
     apply: 20s
     cleanup: 60s
     error: 60s
-    exec: 20s
+    exec: 90s

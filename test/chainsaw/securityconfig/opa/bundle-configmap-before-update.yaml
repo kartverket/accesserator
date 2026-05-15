@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-config-opa
+binaryData:
+  test-bundle: H4sIAAAAAAAA/+yXT4/aMBDFudafYuReV2HMLqyExLforaoiN5mA2xBH9gS0RXz3Kg7dP8kBKhq2K/l3CUEP5gX5PeNprlknP7ytJqOBiLhADFccXhHx/tVrnKBSOFcTwPEsvdB41m6CV8/qP9wH4XAU720h8o5ME1vrqW548ytxtLZjzDiXf/Xw2Mv/TM0eYv5vQa2zn3pNEFaAEGZbW8fQroRkp4TIqdBNyaDL0u5huYJCl56E6O5NAQfxyVR1w0mtvd9bl8NqBfI7FdYRNHWumaSIHfPf8ir/KZPnMUrgTP7VbDHv5f9eLeYx/7fgTP5P9+FP4knyGb6QZ+CNZsisc5QxPIc/9IIHnWXkvWgXVBreSveGN+lJnj7LuwLpdp+uUlodhEYB7eEg/0jlst8qR3F8a2bvbLV+sZJTZeitlZyqp85J0PZ9VJbhUi/hC4YeaFvz04UegvYaD8PxW+O9ufhHOKn/0sJgaNWU5YUTW+kVT9x+/Bh3k3/JNNnqyhTkebwZZ89/jzg4/y0w9v8tOEhHO+ONreRSqgQTlHfSWcteLr/KkEv57U62G0K6I9cJVYxgJBKJfHR+BwAA///d1B7bABYAAA==

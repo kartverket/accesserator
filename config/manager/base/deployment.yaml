@@ -26,6 +26,8 @@ spec:
           env:
             - name: GOMEMLIMIT
               value: "230MiB"
+            - name: DOCKER_CONFIG
+              value: /tmp/github-auth
           envFrom:
             - configMapRef:
                 name: accesserator-env
@@ -73,6 +75,9 @@ spec:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: webhook-certs
               readOnly: true
+            - name: docker-config
+              mountPath: /tmp/github-auth
+              readOnly: true
       imagePullSecrets:
         - name: github-auth
       priorityClassName: skip-critical
@@ -85,3 +90,10 @@ spec:
           secret:
             defaultMode: 420
             secretName: webhook-server-cert
+        - name: docker-config
+          secret:
+            secretName: github-auth
+            optional: true
+            items:
+              - key: .dockerconfigjson
+                path: config.json

@@ -23,6 +23,8 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const AllowedOpaBundleSourcePrefix = "http://bundle-source"
+
 var (
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -56,6 +58,12 @@ var _ = BeforeSuite(func() {
 	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "a-random-tag")
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")
+	Expect(err).NotTo(HaveOccurred())
+	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")
+	Expect(err).NotTo(HaveOccurred())
+	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")
+	Expect(err).NotTo(HaveOccurred())
+	err = os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", AllowedOpaBundleSourcePrefix)
 	Expect(err).NotTo(HaveOccurred())
 	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())

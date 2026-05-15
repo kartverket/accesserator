@@ -21,6 +21,13 @@ type Config struct {
 	TexasPort          int32  `split_words:"true" default:"3000"`
 	TexasProbePort     int32  `split_words:"true" default:"3001"`
 	TexasUrlEnvVarName string `split_words:"true" default:"TEXAS_URL"`
+
+	OpaImageName                        string   `split_words:"true" default:"openpolicyagent/opa"`
+	OpaImageTag                         string   `split_words:"true"`
+	OpaImageSha                         string   `split_words:"true"`
+	OpaImagePort                        int32    `split_words:"true" default:"3010"`
+	OpaUrlEnvVarName                    string   `split_words:"true" default:"OPA_URL"`
+	OpaAllowedBundleRegistryUrlPrefixes []string `split_words:"true"`
 }
 
 var appCfg Config
@@ -46,6 +53,15 @@ func Load() error {
 	}
 	if cfg.TexasImageSha == "" {
 		missing = append(missing, "ACCESSERATOR_TEXAS_IMAGE_SHA")
+	}
+	if cfg.OpaImageTag == "" {
+		missing = append(missing, "ACCESSERATOR_OPA_IMAGE_TAG")
+	}
+	if cfg.OpaImageSha == "" {
+		missing = append(missing, "ACCESSERATOR_OPA_IMAGE_SHA")
+	}
+	if len(cfg.OpaAllowedBundleRegistryUrlPrefixes) == 0 {
+		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))

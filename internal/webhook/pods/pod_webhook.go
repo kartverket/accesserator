@@ -28,6 +28,7 @@ const (
 	AccesseratorVerifyAnnotationValue   = "true"
 
 	Texas ServiceType = iota
+	Opa
 )
 
 // ServiceType identifies a security sidecar service managed by Accesserator.
@@ -37,6 +38,8 @@ func (serviceType ServiceType) String() string {
 	switch serviceType {
 	case Texas:
 		return TexasInitContainerName
+	case Opa:
+		return OpaInitContainerName
 	default:
 		return "unknown"
 	}
@@ -115,6 +118,10 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 				Name:      podSecurityConfig.AppName,
 			}, "serviceType", svc.ServiceType.String())
 			if mutateErr := svc.MutateFunc(pod, podSecurityConfig.SecurityConfig); mutateErr != nil {
+				podlog.Error(mutateErr, "Mutation failed for Pod", "pod", types.NamespacedName{
+					Namespace: pod.GetNamespace(),
+					Name:      pod.GetGenerateName(),
+				}, "serviceType", svc.ServiceType.String())
 				return mutateErr
 			}
 		}
@@ -190,6 +197,10 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 				Name:      pod.Name,
 			}, "serviceType", svc.ServiceType.String())
 			if validateErr := svc.ValidateFunc(*pod, podSecurityConfig.SecurityConfig); validateErr != nil {
+				podlog.Error(validateErr, "Validation failed for Pod", "pod", types.NamespacedName{
+					Namespace: pod.GetNamespace(),
+					Name:      pod.GetName(),
+				}, "serviceType", svc.ServiceType.String())
 				return nil, validateErr
 			}
 		}
@@ -249,7 +260,10 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 
 	var serviceTypes []ServiceType
 	if hasServices {
-		serviceTypes = ParseAccesseratorServices(servicesAnnotation)
+		serviceTypes, err = ParseAccesseratorServices(servicesAnnotation)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if len(serviceTypes) == 0 {
@@ -304,7 +318,7 @@ func BuildAccesseratorServices(serviceTypes []ServiceType, securityConfig v1alph
 
 // ParseAccesseratorServices parses the comma-separated services annotation value into
 // a slice of recognised ServiceTypes, ignoring unknown values.
-func ParseAccesseratorServices(annotationValue string) []ServiceType {
+func ParseAccesseratorServices(annotationValue string) ([]ServiceType, error) {
 	var services []ServiceType
 	for _, s := range strings.Split(annotationValue, ",") {
 		switch strings.ToLower(strings.TrimSpace(s)) {
@@ -312,9 +326,17 @@ func ParseAccesseratorServices(annotationValue string) []ServiceType {
 			if !slices.Contains(services, Texas) {
 				services = append(services, Texas)
 			}
+		case Opa.String():
+			if !slices.Contains(services, Opa) {
+				services = append(services, Opa)
+			}
+		default:
+			err := fmt.Errorf("unknown service type '%s'", s)
+			podlog.Error(err, "failed to parse accesserator services", "annotationValue", annotationValue)
+			return nil, err
 		}
 	}
-	return services
+	return services, nil
 }
 
 // GetServiceContainer returns the resolved sidecar container for the given service type.
@@ -322,6 +344,9 @@ func GetServiceContainer(st ServiceType, securityConfig v1alpha.SecurityConfig) 
 	switch st {
 	case Texas:
 		c := GetTexasContainer(securityConfig)
+		return &c, nil
+	case Opa:
+		c := GetOpaContainer(securityConfig)
 		return &c, nil
 	default:
 		return nil, fmt.Errorf("unknown service type '%s'", st)
@@ -335,6 +360,10 @@ func GetServiceValidationFunc(st ServiceType, expectedSidecarContainer corev1.Co
 		return func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
 			return ValidateTexasOnPod(pod, securityConfig, expectedSidecarContainer)
 		}, nil
+	case Opa:
+		return func(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
+			return ValidateOpaOnPod(pod, securityConfig, expectedSidecarContainer)
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown service type '%s'", st)
 	}
@@ -346,6 +375,10 @@ func GetServiceMutationFunc(st ServiceType) (func(*corev1.Pod, v1alpha.SecurityC
 	case Texas:
 		return func(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
 			return MutateTexasOnPod(pod, securityConfig)
+		}, nil
+	case Opa:
+		return func(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
+			return MutateOpaOnPod(pod, securityConfig)
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown service type '%s'", st)

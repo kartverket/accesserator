@@ -156,6 +156,14 @@ var _ = Describe("Helper Functions", func() {
 		})
 	})
 
+	Describe("GetOpaConfigMapName", func() {
+		It("should return security config name with OPA config map suffix", func() {
+			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.OpaConfigMapNameSuffix)
+			result := utilities.GetOpaConfigMapName(secConfigName)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
 	Describe("GetMockKubernetesClient", func() {
 		It("should return a non-nil client", func() {
 			scheme := runtime.NewScheme()

@@ -85,11 +85,11 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 }
 
 func GetMaskinportenSecretData(ctx context.Context, k8sClient client.Client, secretRef v1alpha.SecretRef, namespace string) (*map[string][]byte, error) {
-	clientIdData, clientIdErr := utilities.GetSecretDataByKey(ctx, k8sClient, string(secretRef.ClientID.Name), namespace, secretRef.ClientID.Key)
+	clientIdData, clientIdErr := utilities.GetSecretDataByKey(ctx, k8sClient, string(secretRef.ClientID.Name), namespace, string(secretRef.ClientID.Key))
 	if clientIdErr != nil {
 		return nil, clientIdErr
 	}
-	clientJwkData, clientJwkErr := utilities.GetSecretDataByKey(ctx, k8sClient, string(secretRef.ClientJWK.Name), namespace, secretRef.ClientJWK.Key)
+	clientJwkData, clientJwkErr := utilities.GetSecretDataByKey(ctx, k8sClient, string(secretRef.ClientJWK.Name), namespace, string(secretRef.ClientJWK.Key))
 	if clientJwkErr != nil {
 		return nil, clientJwkErr
 	}

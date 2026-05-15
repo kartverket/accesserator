@@ -1,0 +1,210 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: opa
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-opa
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+        istio.io/rev: default
+  steps:
+    - try:
+        # Create plain Application
+        - create:
+            file: skiperator-application.yaml
+
+        # Create SecurityConfig with OPA disabled and with OPA policy where input.password is "before update"
+        - create:
+            file: securityconfig-opa-disabled.yaml
+
+        # Verify that no OPA ConfigMap is created when OPA is disabled
+        - error:
+            file: bundle-configmap-before-update.yaml
+
+        # Verify that the Application pod does not have OPA sidecar
+        - error:
+            file: pod-with-opa-enabled.yaml
+        - error:
+            file: pod-with-opa-disabled.yaml
+        - assert:
+            file: pod-without-opa.yaml
+        - script:
+            content: |
+              # Verify that OPA_URL is not set
+              kubectl exec -n chainsaw-opa deploy/app -c app -- printenv OPA_URL && exit 1 || exit 0
+
+        # Update Application to have OPA sidecar
+        - patch:
+            resource:
+              apiVersion: skiperator.kartverket.no/v1alpha1
+              kind: Application
+              metadata:
+                name: app
+              spec:
+                podSettings:
+                  annotations:
+                    accesserator.kartverket.no/services: "opa"
+
+        # Verify that the Application pod now has OPA sidecar
+        - error:
+            file: pod-without-opa.yaml
+        - assert:
+            file: pod-with-opa-disabled.yaml
+
+        # Verify that OPA is disabled in the sidecar
+        - script:
+            content: |
+              # Verify OPA_URL is set
+              OPA_URL=$(kubectl exec -n chainsaw-opa deploy/app -c app -- printenv OPA_URL)
+              if [ -z "$OPA_URL" ]; then echo "❌ OPA_URL is not set"; exit 1; fi
+              echo "✅ OPA_URL=$OPA_URL"
+              
+              # Call OPA allow endpoint and verify that OPA is disabled (returns 200 OK with empty JSON body)
+              RESPONSE=$(kubectl exec -n chainsaw-opa deploy/app -c app -- \
+                curl -s -w "\n%{http_code}" -X POST "$OPA_URL/v1/data/authz/allow" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"input\":{\"password\":\"before update\"}}")
+              
+              BODY=$(echo "$RESPONSE" | sed '$d')
+              STATUS_CODE=$(echo "$RESPONSE" | tail -n 1)
+              
+              if [ "$STATUS_CODE" != "200" ]; then
+                echo "❌ Expected HTTP 200 OK, got: $STATUS_CODE"
+                echo "Response body: $BODY"
+                exit 1
+              fi
+              
+              if [ "$BODY" != "{}" ]; then
+                echo "❌ Expected empty JSON body {}, got: $BODY"
+                exit 1
+              fi
+              
+              echo "✅ OPA returned HTTP 200 OK with empty JSON body"
+
+        # Update SecurityConfig to enable OPA
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  enabled: true
+        - assert:
+            file: bundle-configmap-before-update.yaml
+        - script:
+            content: |
+              kubectl rollout restart deploy/app -n chainsaw-opa
+              kubectl rollout status deploy/app -n chainsaw-opa
+        - error:
+            file: pod-without-opa.yaml
+        - assert:
+            file: pod-with-opa-enabled.yaml
+
+        # Verify that input.password: "before update" returns result: true
+        - script:
+            content: |
+              # Verify OPA_URL is set
+              OPA_URL=$(kubectl exec -n chainsaw-opa deploy/app -c app -- printenv OPA_URL)
+              if [ -z "$OPA_URL" ]; then echo "❌ OPA_URL is not set"; exit 1; fi
+              echo "✅ OPA_URL=$OPA_URL"
+
+              RESPONSE=$(kubectl exec -n chainsaw-opa deploy/app -c app -- \
+                curl -s -w "\n%{http_code}" -X POST "$OPA_URL/v1/data/authz/allow" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"input\":{\"password\":\"wrong input\"}}")
+
+              BODY=$(echo "$RESPONSE" | sed '$d')
+              STATUS_CODE=$(echo "$RESPONSE" | tail -n 1)
+
+              if [ "$STATUS_CODE" != "200" ]; then
+                echo "❌ Expected HTTP 200 OK for wrong input, got: $STATUS_CODE"
+                echo "Response body: $BODY"
+                exit 1
+              fi
+
+              if [ "$BODY" != "{\"result\":false}" ]; then
+                echo "❌ Expected {\"result\":false} for wrong input, got: $BODY"
+                exit 1
+              fi
+
+              RESPONSE=$(kubectl exec -n chainsaw-opa deploy/app -c app -- \
+                curl -s -w "\n%{http_code}" -X POST "$OPA_URL/v1/data/authz/allow" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"input\":{\"password\":\"before update\"}}")
+
+              BODY=$(echo "$RESPONSE" | sed '$d')
+              STATUS_CODE=$(echo "$RESPONSE" | tail -n 1)
+
+              if [ "$STATUS_CODE" != "200" ]; then
+                echo "❌ Expected HTTP 200 OK for before update, got: $STATUS_CODE"
+                echo "Response body: $BODY"
+                exit 1
+              fi
+
+              if [ "$BODY" != "{\"result\":true}" ]; then
+                echo "❌ Expected {\"result\":true} for before update, got: $BODY"
+                exit 1
+              fi
+
+              echo "✅ OPA returned expected authorization results"
+
+        # Hot reload OPA bundle with new policy where input.password is "after update"
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  bundleUrls:
+                    - name: test-bundle
+                      url: ghcr.io/kartverket/accesserator/opa-bundle@sha256:4aa8fc74fb5265b33174cca45c4fa0728a0d4c6738ff7197997c159257e204f0
+        - assert:
+            file: bundle-configmap-after-update.yaml
+
+        # Sleep for a bit to allow OPA to reload the bundle
+        - script:
+            content: |
+              sleep 30
+
+        # Verify that the new bundle is eventually loaded and that input.password: "after update" returns result: true
+        - script:
+            content: |
+              OPA_URL=$(kubectl exec -n chainsaw-opa deploy/app -c app -- printenv OPA_URL)
+              if [ -z "$OPA_URL" ]; then echo "❌ OPA_URL is not set"; exit 1; fi
+              echo "✅ OPA_URL=$OPA_URL"
+              
+              echo "⏳ Waiting for OPA bundle hot-reload to allow password 'after update'..."
+              
+              MAX_ATTEMPTS=9  # 9 * 10s = 90s
+              ATTEMPT=0
+              
+              while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
+                RESPONSE=$(kubectl exec -n chainsaw-opa deploy/app -c app -- \
+                  curl -s -w "\n%{http_code}" -X POST "$OPA_URL/v1/data/authz/allow" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"input\":{\"password\":\"after update\"}}")
+              
+                BODY=$(echo "$RESPONSE" | sed '$d')
+                STATUS_CODE=$(echo "$RESPONSE" | tail -n 1)
+              
+                if [ "$STATUS_CODE" = "200" ] && [ "$BODY" = "{\"result\":true}" ]; then
+                  echo "✅ OPA returned {\"result\":true} for password 'after update'"
+                  exit 0
+                fi
+              
+                ATTEMPT=$((ATTEMPT + 1))
+                echo "Still waiting for OPA hot-reload ($ATTEMPT/$MAX_ATTEMPTS). Last status=$STATUS_CODE body=$BODY"
+                sleep 10
+              done
+              
+              echo "❌ Timed out waiting for OPA to return {\"result\":true} for password 'after update'"
+              exit 1

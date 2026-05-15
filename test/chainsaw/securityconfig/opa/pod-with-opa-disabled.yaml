@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: app
+    app.kubernetes.io/managed-by: skiperator
+    app.kubernetes.io/name: app
+    app.kubernetes.io/version: latest
+    application.skiperator.no/app: app
+    application.skiperator.no/app-name: app
+    skiperator.kartverket.no/controller: application
+spec:
+  containers:
+    - env:
+        - name: OPA_URL
+          value: http://localhost:3010
+      name: app
+  initContainers:
+    - name: istio-init
+    - name: istio-proxy
+    - name: opa
+      args:
+        - run
+        - --server
+        - --addr=0.0.0.0:3010
+      command:
+        - opa
+status:
+  containerStatuses:
+    - name: app
+      ready: true
+  initContainerStatuses:
+    - name: istio-init
+      ready: true
+    - name: istio-proxy
+      ready: true
+    - name: opa
+      ready: true
+  phase: Running

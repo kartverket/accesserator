@@ -20,9 +20,6 @@ const (
 	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
 	AzureEnabledEnvVarName        = "AZURE_ENABLED"
 	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
-
-	IstioProbeRewritePathPattern = "/app-health/%s/readyz"
-	IstioProbeRewritePort        = 15020
 )
 
 // TexasEnvVars holds the resolved environment variable values for the Texas sidecar.
@@ -39,58 +36,42 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	imageURL := fmt.Sprintf("%s:%s@%s", config.Get().TexasImageName, config.Get().TexasImageTag, config.Get().TexasImageSha)
 	envVars := GetTexasEnvVars(securityConfig)
 
-	return corev1.Container{
-		Name:  TexasInitContainerName,
-		Image: imageURL,
-		Ports: []corev1.ContainerPort{
-			{
-				ContainerPort: config.Get().TexasPort,
-				Name:          "http",
-				Protocol:      corev1.ProtocolTCP,
-			},
+	texasContainer := utilities.CommonInitContainer
+	texasContainer.Name = TexasInitContainerName
+	texasContainer.Image = imageURL
+	texasContainer.Ports = []corev1.ContainerPort{
+		{
+			ContainerPort: config.Get().TexasPort,
+			Name:          "http",
+			Protocol:      corev1.ProtocolTCP,
 		},
-		// NOTE: RestartPolicy Always is only available for init containers in Kubernetes v1.33+
-		// https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior
-		RestartPolicy: utilities.Ptr(corev1.ContainerRestartPolicyAlways),
-		SecurityContext: &corev1.SecurityContext{
-			AllowPrivilegeEscalation: utilities.Ptr(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-				Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-			},
-			Privileged:             utilities.Ptr(false),
-			ReadOnlyRootFilesystem: utilities.Ptr(true),
-			RunAsGroup:             utilities.Ptr(int64(150)),
-			RunAsNonRoot:           utilities.Ptr(true),
-			RunAsUser:              utilities.Ptr(int64(150)),
-		},
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/healthz",
-					Port: intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: config.Get().TexasProbePort,
-					},
-					Scheme: corev1.URISchemeHTTP,
-				},
-			},
-			InitialDelaySeconds: 2,
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-		Env: []corev1.EnvVar{
-			// Texas should be available on localhost
-			{Name: BindAddressEnvVarName, Value: "127.0.0.1:" + fmt.Sprint(config.Get().TexasPort)},
-			// Texas probes must be available on 0.0.0.0 because Istio resolves the pod IP for probe rewrites
-			{Name: ProbeBindAddressEnvVarName, Value: "0.0.0.0:" + fmt.Sprint(config.Get().TexasProbePort)},
-			{Name: TokenXEnabledEnvVarName, Value: envVars.TokenXEnabled},
-			{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
-			{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
-			{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
-		},
-		EnvFrom: envVars.IntegrationSecretsRefs,
 	}
+	texasContainer.ReadinessProbe = &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/healthz",
+				Port: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: config.Get().TexasProbePort,
+				},
+				Scheme: corev1.URISchemeHTTP,
+			},
+		},
+		InitialDelaySeconds: 2,
+	}
+	texasContainer.Env = []corev1.EnvVar{
+		// Texas should be available on localhost
+		{Name: BindAddressEnvVarName, Value: "127.0.0.1:" + fmt.Sprint(config.Get().TexasPort)},
+		// Texas probes must be available on 0.0.0.0 because Istio resolves the pod IP for probe rewrites
+		{Name: ProbeBindAddressEnvVarName, Value: "0.0.0.0:" + fmt.Sprint(config.Get().TexasProbePort)},
+		{Name: TokenXEnabledEnvVarName, Value: envVars.TokenXEnabled},
+		{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
+		{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
+		{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
+	}
+	texasContainer.EnvFrom = envVars.IntegrationSecretsRefs
+
+	return texasContainer
 }
 
 // GetTexasEnvVars resolves the env var values for the Texas container from the SecurityConfig.
@@ -144,40 +125,11 @@ func IsTexasContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.SecurityContext, actual.SecurityContext) &&
 		reflect.DeepEqual(expected.TerminationMessagePath, actual.TerminationMessagePath) &&
 		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy) &&
-		assertReadiness(expected.ReadinessProbe, actual.ReadinessProbe)
-}
-
-func assertReadiness(expected *corev1.Probe, actual *corev1.Probe) bool {
-	// We expect to always have a HTTPGet readiness probe
-	if expected == nil ||
-		actual == nil ||
-		expected.HTTPGet == nil ||
-		actual.HTTPGet == nil {
-		return false
-	}
-
-	// Fields not explicitly set are given default values by Kubernetes
-	if (expected.InitialDelaySeconds != 0 && expected.InitialDelaySeconds != actual.InitialDelaySeconds) ||
-		(expected.TimeoutSeconds != 0 && expected.TimeoutSeconds != actual.TimeoutSeconds) ||
-		(expected.PeriodSeconds != 0 && expected.PeriodSeconds != actual.PeriodSeconds) ||
-		(expected.SuccessThreshold != 0 && expected.SuccessThreshold != actual.SuccessThreshold) ||
-		(expected.FailureThreshold != 0 && expected.FailureThreshold != actual.FailureThreshold) ||
-		(expected.TerminationGracePeriodSeconds != nil &&
-			expected.TerminationGracePeriodSeconds != actual.TerminationGracePeriodSeconds) {
-		return false
-	}
-
-	// Istio rewrites readiness probes for all containers, in order to bypass mTLS requirements.
-	// ReadinessProbe configuration is thus dependent on whether Istio is running or not.
-	if actual.HTTPGet.Path == fmt.Sprintf(IstioProbeRewritePathPattern, TexasInitContainerName) &&
-		actual.HTTPGet.Port.IntVal == IstioProbeRewritePort {
-		return true
-	}
-	if expected.HTTPGet.Path == actual.HTTPGet.Path && reflect.DeepEqual(expected.HTTPGet.Port, actual.HTTPGet.Port) {
-		return true
-	}
-
-	return false
+		utilities.AssertContainerProbe(
+			actual.Name,
+			expected.ReadinessProbe,
+			actual.ReadinessProbe,
+		)
 }
 
 // MutateTexasOnPod adds the Texas init container and TEXAS_URL env var to the pod spec.
@@ -194,10 +146,10 @@ func MutateTexasOnPod(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) er
 
 func MutatePodWithTexasInitContainer(pod *corev1.Pod, sidecarContainer corev1.Container) error {
 	// Check if the init container already exists
-	for _, initContainer := range pod.Spec.InitContainers {
+	for _, initContainer := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if initContainer.Name == TexasInitContainerName {
 			// This should never happen
-			return fmt.Errorf("pod already has an init container named %s", TexasInitContainerName)
+			return fmt.Errorf("pod already has a container named %s", TexasInitContainerName)
 		}
 	}
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, sidecarContainer)

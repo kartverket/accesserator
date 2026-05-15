@@ -24,6 +24,12 @@ The local Kubernetes cluster will have the following components installed and co
 
 ### Run on your host machine
 
+In order for accesserator to work properly with OPA, you need to login with docker to be able to fetch OPA bundles from ghcr.io. 
+This can be done by running the following command in the terminal:
+```bash
+docker login ghcr.io
+```
+
 To run accesserator with the local cluster, you can press `Run` on the run configuration called `Run accesserator` (if you have the project open in a JetBrains IDE), 
 or run the following command in the terminal (where you previously activated the [Flox environment](#getting-started)):
 ```bash
@@ -31,6 +37,12 @@ make run-local
 ```
 
 ### Run in the local cluster
+
+In order for accesserator to work properly with OPA, you need to login with docker to be able to fetch OPA bundles from ghcr.io.
+This can be done by running the following command in the terminal:
+```bash
+make ghcr-secret
+```
 
 To run accesserator in the local cluster, you need to build and deploy a local image of accesserator to the cluster. You can do this by running the following command in the terminal (where you previously activated the [Flox environment](#getting-started)):
 ```bash

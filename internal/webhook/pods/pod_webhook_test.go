@@ -280,20 +280,48 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(pods.ParseAccesseratorServices("texas")).To(Equal([]pods.ServiceType{pods.Texas}))
 		})
 
-		It("returns [texas] when annotation is 'something ,texas, something else'", func() {
-			Expect(pods.ParseAccesseratorServices("something ,texas, something else")).To(Equal([]pods.ServiceType{pods.Texas}))
-		})
-
 		It("returns [texas] when annotation is 'texas, texas'", func() {
 			Expect(pods.ParseAccesseratorServices("texas, texas")).To(Equal([]pods.ServiceType{pods.Texas}))
 		})
 
-		It("returns [texas] when annotation is 'texas, texxxas'", func() {
-			Expect(pods.ParseAccesseratorServices("texas, texxxas")).To(Equal([]pods.ServiceType{pods.Texas}))
+		It("returns [opa] when annotation is 'opa'", func() {
+			Expect(pods.ParseAccesseratorServices("opa")).To(Equal([]pods.ServiceType{pods.Opa}))
 		})
 
-		It("returns [] when annotation is 'something, something else'", func() {
-			Expect(pods.ParseAccesseratorServices("something, something else")).To(BeEmpty())
+		It("returns [opa] when annotation is 'opa, opa'", func() {
+			Expect(pods.ParseAccesseratorServices("opa, opa")).To(Equal([]pods.ServiceType{pods.Opa}))
+		})
+
+		It("returns [texas, opa] when annotation is 'texas, opa'", func() {
+			Expect(pods.ParseAccesseratorServices("texas, opa")).To(Equal([]pods.ServiceType{pods.Texas, pods.Opa}))
+		})
+
+		It("returns [texas, opa] when annotation is 'texas, opa, opa'", func() {
+			Expect(pods.ParseAccesseratorServices("texas, opa, opa")).To(Equal([]pods.ServiceType{pods.Texas, pods.Opa}))
+		})
+
+		It("returns an error when annotation contains an unknown service", func() {
+			services, err := pods.ParseAccesseratorServices("something ,texas, something else")
+			Expect(err).To(HaveOccurred())
+			Expect(services).To(BeNil())
+		})
+
+		It("returns an error when annotation contains a misspelled texas", func() {
+			services, err := pods.ParseAccesseratorServices("texas, texxxas")
+			Expect(err).To(HaveOccurred())
+			Expect(services).To(BeNil())
+		})
+
+		It("returns an error when annotation contains a misspelled opa", func() {
+			services, err := pods.ParseAccesseratorServices("texas, oppa, opa")
+			Expect(err).To(HaveOccurred())
+			Expect(services).To(BeNil())
+		})
+
+		It("returns an error when annotation contains only unknown services", func() {
+			services, err := pods.ParseAccesseratorServices("something, something else")
+			Expect(err).To(HaveOccurred())
+			Expect(services).To(BeNil())
 		})
 	})
 

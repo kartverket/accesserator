@@ -1,7 +1,6 @@
 package reconciler
 
 import (
-	"bytes"
 	"reflect"
 
 	"github.com/kartverket/accesserator/internal/state"
@@ -10,6 +9,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/opa"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -33,6 +33,7 @@ func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource
 		maskinportenClientControllerResource(scope),
 		maskinportenSecretControllerResource(scope),
 		maskinportenServiceEntryControllerResource(scope),
+		opaConfigMapControllerResource(scope),
 	}
 }
 
@@ -140,21 +141,8 @@ func maskinportenSecretControllerResource(scope *state.Scope) ControllerResource
 				ResourceName:    maskinportenSecretObjectMeta.Name,
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate: func(current, desired *corev1.Secret) bool {
-					if len(current.Data) != len(desired.Data) {
-						return true
-					}
-					for key, desiredVal := range desired.Data {
-						if !bytes.Equal(current.Data[key], desiredVal) {
-							return true
-						}
-					}
-					return false
-				},
-				UpdateFields: func(current, desired *corev1.Secret) {
-					current.Data = desired.Data
-					current.Type = desired.Type
-				},
+				ShouldUpdate:    SecretShouldUpdateFunc,
+				UpdateFields:    secretUpdateFieldsFunc,
 			},
 		},
 	}
@@ -193,4 +181,53 @@ func maskinportenServiceEntryControllerResource(scope *state.Scope) ControllerRe
 			},
 		},
 	}
+}
+
+/*
+opaConfigMapControllerResource reconciles a ConfigMap resource with all configured bundles as binary data.
+*/
+func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.ConfigMap] {
+	opaConfigMapObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetOpaConfigMapName(scope.SecurityConfig.Name),
+		Namespace: scope.SecurityConfig.Namespace,
+	}
+	desiredResource := opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)
+
+	return ControllerResourceAdapter[*corev1.ConfigMap]{
+		reconciliation.ReconcilerAdapter[*corev1.ConfigMap]{
+			Func: reconciliation.ResourceReconciler[*corev1.ConfigMap]{
+				ResourceKind:    "ConfigMap",
+				ResourceName:    opaConfigMapObjectMeta.Name,
+				DesiredResource: utilities.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    ConfigMapShouldUpdateFunc,
+				UpdateFields:    configMapUpdateFieldsFunc,
+			},
+		},
+	}
+}
+
+func ConfigMapShouldUpdateFunc(current, desired *corev1.ConfigMap) bool {
+	return !equality.Semantic.DeepEqual(current.BinaryData, desired.BinaryData) ||
+		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable)
+}
+
+func configMapUpdateFieldsFunc(current, desired *corev1.ConfigMap) {
+	current.BinaryData = desired.BinaryData
+	current.Data = desired.Data
+	current.Immutable = desired.Immutable
+}
+
+func SecretShouldUpdateFunc(current, desired *corev1.Secret) bool {
+	return !equality.Semantic.DeepEqual(current.StringData, desired.StringData) ||
+		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable)
+}
+
+func secretUpdateFieldsFunc(current, desired *corev1.Secret) {
+	current.StringData = desired.StringData
+	current.Data = desired.Data
+	current.Immutable = desired.Immutable
+	current.Type = desired.Type
 }

@@ -3,6 +3,7 @@ package securityconfigs
 import (
 	"context"
 
+	"github.com/kartverket/accesserator/internal/resolver"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -34,18 +35,30 @@ var _ admission.Validator[*accesseratorv1alpha.SecurityConfig] = &SecurityConfig
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type SecurityConfig.
 func (v *SecurityConfigCustomValidator) ValidateCreate(_ context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) (admission.Warnings, error) {
 	securityconfiglog.Info("Validation for SecurityConfig upon creation", "name", securityConfig.GetName())
-	return nil, nil
+	return validateSecurityConfig(securityConfig)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type SecurityConfig.
 func (v *SecurityConfigCustomValidator) ValidateUpdate(_ context.Context, _, newSecurityConfig *accesseratorv1alpha.SecurityConfig) (admission.Warnings, error) {
 	securityconfiglog.Info("Validation for SecurityConfig upon update", "name", newSecurityConfig.GetName())
-	return nil, nil
+	return validateSecurityConfig(newSecurityConfig)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type SecurityConfig.
 func (v *SecurityConfigCustomValidator) ValidateDelete(_ context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) (admission.Warnings, error) {
 	securityconfiglog.Info("Validation for SecurityConfig upon deletion", "name", securityConfig.GetName())
 	securityconfiglog.Info("Currently no validation logic implemented for SecurityConfig deletion")
+	return nil, nil
+}
+
+func validateSecurityConfig(securityConfig *accesseratorv1alpha.SecurityConfig) (admission.Warnings, error) {
+	if securityConfig.Spec.Opa == nil {
+		return nil, nil
+	}
+
+	if err := resolver.ValidateBundleURLs(securityConfig.Spec.Opa.BundleURLs); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }

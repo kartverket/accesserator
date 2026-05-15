@@ -125,7 +125,7 @@ spec:
                           key:
                             description: Key is the key within the secret whose value
                               should be used.
-                            maxLength: 253
+                            maxLength: 63
                             minLength: 1
                             pattern: ^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$
                             type: string
@@ -146,7 +146,7 @@ spec:
                           key:
                             description: Key is the key within the secret whose value
                               should be used.
-                            maxLength: 253
+                            maxLength: 63
                             minLength: 1
                             pattern: ^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$
                             type: string
@@ -171,6 +171,51 @@ spec:
                 - message: At most one of client, clientRef, or secretRef may be specified.
                   rule: '[has(self.client), has(self.clientRef), has(self.secretRef)].filter(x,
                     x).size() <= 1'
+              opa:
+                description: |-
+                  Opa specifies whether to configure the open policy agent capability for an application referred to by `applicationRef`.
+                  The configuration includes which bundles compiled from rego policies, and how often OPA should check for updates to these bundles.
+                properties:
+                  bundleUrls:
+                    description: BundleURLs is a list of URLs pointing to OPA bundles
+                      containing compiled rego policies.
+                    items:
+                      description: BundleSource defines a source for an OPA bundle.
+                      properties:
+                        name:
+                          description: |-
+                            Name specifies a human-readable name for the OPA bundle.
+                            It is used to differentiate between bundles which is used by OPA.
+                          maxLength: 63
+                          minLength: 1
+                          pattern: ^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$
+                          type: string
+                        url:
+                          description: URL is the OCI registry location of the OPA
+                            bundle.
+                          maxLength: 253
+                          type: string
+                      required:
+                      - name
+                      - url
+                      type: object
+                    maxItems: 20
+                    minItems: 1
+                    type: array
+                    x-kubernetes-validations:
+                    - message: Each bundle name must be unique
+                      rule: self.all(x, self.filter(y, y.name == x.name).size() ==
+                        1)
+                    - message: Each bundle URL must be unique
+                      rule: self.all(x, self.filter(y, y.url == x.url).size() == 1)
+                  enabled:
+                    description: Enabled indicates whether OPA should be configured
+                      for the application.
+                    type: boolean
+                required:
+                - bundleUrls
+                - enabled
+                type: object
               tokenx:
                 description: |-
                   Tokenx specifies whether to configure the token exchange capability for an application referred to by `applicationRef`.
@@ -296,6 +341,17 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
+              opaBundleSource:
+                description: OpaBundleSource defines the source of OPA bundles used
+                  for policy evaluation.
+                properties:
+                  bundleNames:
+                    items:
+                      type: string
+                    type: array
+                  configMapName:
+                    type: string
+                type: object
               phase:
                 type: string
               ready:

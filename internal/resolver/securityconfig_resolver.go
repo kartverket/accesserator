@@ -20,9 +20,15 @@ func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securit
 		return nil, fmt.Errorf("failed to resolve Maskinporten config: %w", maskinportenConfigResolveErr)
 	}
 
+	opaConfig, opaConfigResolveErr := ResolveOpaConfig(securityConfig)
+	if opaConfigResolveErr != nil {
+		return nil, fmt.Errorf("failed to resolve OPA config: %w", opaConfigResolveErr)
+	}
+
 	return &state.Scope{
 		SecurityConfig:     securityConfig,
 		TokenXConfig:       *tokenxConfig,
 		MaskinportenConfig: *maskinportenConfig,
+		OpaConfig:          *opaConfig,
 	}, nil
 }
