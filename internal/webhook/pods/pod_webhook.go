@@ -260,7 +260,10 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 
 	var serviceTypes []ServiceType
 	if hasServices {
-		serviceTypes = ParseAccesseratorServices(servicesAnnotation)
+		serviceTypes, err = ParseAccesseratorServices(servicesAnnotation)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if len(serviceTypes) == 0 {
@@ -315,7 +318,7 @@ func BuildAccesseratorServices(serviceTypes []ServiceType, securityConfig v1alph
 
 // ParseAccesseratorServices parses the comma-separated services annotation value into
 // a slice of recognised ServiceTypes, ignoring unknown values.
-func ParseAccesseratorServices(annotationValue string) []ServiceType {
+func ParseAccesseratorServices(annotationValue string) ([]ServiceType, error) {
 	var services []ServiceType
 	for _, s := range strings.Split(annotationValue, ",") {
 		switch strings.ToLower(strings.TrimSpace(s)) {
@@ -327,9 +330,13 @@ func ParseAccesseratorServices(annotationValue string) []ServiceType {
 			if !slices.Contains(services, Opa) {
 				services = append(services, Opa)
 			}
+		default:
+			err := fmt.Errorf("unknown service type '%s'", s)
+			podlog.Error(err, "failed to parse accesserator services", "annotationValue", annotationValue)
+			return nil, err
 		}
 	}
-	return services
+	return services, nil
 }
 
 // GetServiceContainer returns the resolved sidecar container for the given service type.
