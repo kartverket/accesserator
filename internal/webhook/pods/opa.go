@@ -167,6 +167,10 @@ func MutatePodWithOpaURLEnvVar(pod *corev1.Pod, securityConfig v1alpha.SecurityC
 }
 
 func MutatePodWithOpaBundleVolume(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
+	// Do not mount volume if Opa is not enabled
+	if securityConfig.Spec.Opa == nil || !securityConfig.Spec.Opa.Enabled {
+		return nil
+	}
 	// Check if the volume already exists
 	for _, volume := range pod.Spec.Volumes {
 		if volume.Name == OpaBundleVolumeName {
@@ -241,6 +245,9 @@ func ValidateOpaURLEnvVar(pod corev1.Pod, securityConfig v1alpha.SecurityConfig)
 }
 
 func ValidateOpaBundleVolume(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
+	if securityConfig.Spec.Opa == nil || !securityConfig.Spec.Opa.Enabled {
+		return nil
+	}
 	expectedConfigMapName := securityConfig.Status.OpaBundleSource.ConfigMapName
 	for _, volume := range pod.Spec.Volumes {
 		if volume.Name == OpaBundleVolumeName {
