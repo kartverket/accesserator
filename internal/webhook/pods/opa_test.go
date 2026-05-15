@@ -35,7 +35,10 @@ var _ = Describe("opa.go unit tests", func() {
 				},
 			},
 			Status: v1alpha.SecurityConfigStatus{
-				OpaBundleNames: []string{"bundle-a", "bundle-b"},
+				OpaBundleSource: &v1alpha.OpaBundleSource{
+					ConfigMapName: utilities.GetOpaConfigMapName(securityConfigName),
+					BundleNames:   []string{"bundle-a", "bundle-b"},
+				},
 			},
 		}
 	}
@@ -47,7 +50,12 @@ var _ = Describe("opa.go unit tests", func() {
 			c := pods.GetOpaContainer(securityConfig)
 
 			Expect(c.Name).To(Equal(pods.OpaInitContainerName))
-			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s", config.Get().OpaImageName, config.Get().OpaImageTag)))
+			Expect(c.Image).To(Equal(fmt.Sprintf(
+				"%s:%s@%s",
+				config.Get().OpaImageName,
+				config.Get().OpaImageTag,
+				config.Get().OpaImageSha,
+			)))
 			Expect(c.Command).To(Equal([]string{"opa"}))
 			Expect(c.Args).To(Equal([]string{
 				"run",
@@ -68,7 +76,10 @@ var _ = Describe("opa.go unit tests", func() {
 					ApplicationRef: applicationRef,
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					OpaBundleNames: []string{"bundle-a", "bundle-b"},
+					OpaBundleSource: &v1alpha.OpaBundleSource{
+						ConfigMapName: utilities.GetOpaConfigMapName(securityConfigName),
+						BundleNames:   []string{"bundle-a", "bundle-b"},
+					},
 				},
 			}
 
@@ -91,7 +102,12 @@ var _ = Describe("opa.go unit tests", func() {
 			c := pods.GetOpaContainer(securityConfig)
 
 			Expect(c.Name).To(Equal(pods.OpaInitContainerName))
-			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s", config.Get().OpaImageName, config.Get().OpaImageTag)))
+			Expect(c.Image).To(Equal(fmt.Sprintf(
+				"%s:%s@%s",
+				config.Get().OpaImageName,
+				config.Get().OpaImageTag,
+				config.Get().OpaImageSha,
+			)))
 			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
 			Expect(c.SecurityContext).ToNot(BeNil())
 			Expect(c.Command).To(Equal([]string{"opa"}))
@@ -222,7 +238,7 @@ var _ = Describe("opa.go unit tests", func() {
 			pod := corev1.Pod{
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{
-						pods.GetOpaBundleVolume(securityConfig.Name),
+						pods.GetOpaBundleVolume(securityConfig.Status.OpaBundleSource.ConfigMapName),
 					},
 				},
 			}
@@ -236,17 +252,11 @@ var _ = Describe("opa.go unit tests", func() {
 			pod := corev1.Pod{}
 
 			Expect(pods.MutatePodWithOpaBundleVolume(&pod, securityConfig)).To(Succeed())
-			Expect(pod.Spec.Volumes).To(ContainElement(pods.GetOpaBundleVolume(securityConfig.Name)))
-		})
-	})
-
-	Describe("GetOpaBundleVolume", func() {
-		It("returns a volume backed by the OPA ConfigMap for the SecurityConfig", func() {
-			volume := pods.GetOpaBundleVolume(securityConfigName)
-
-			Expect(volume.Name).To(Equal(pods.OpaBundleVolumeName))
-			Expect(volume.ConfigMap).NotTo(BeNil())
-			Expect(volume.ConfigMap.LocalObjectReference.Name).To(Equal(utilities.GetOpaConfigMapName(securityConfigName)))
+			Expect(pod.Spec.Volumes).To(ContainElement(
+				pods.GetOpaBundleVolume(
+					securityConfig.Status.OpaBundleSource.ConfigMapName,
+				),
+			))
 		})
 	})
 
@@ -266,7 +276,11 @@ var _ = Describe("opa.go unit tests", func() {
 				Name:  config.Get().OpaUrlEnvVarName,
 				Value: pods.GetOpaUrlEnvVarValue(),
 			}))
-			Expect(pod.Spec.Volumes).To(ContainElement(pods.GetOpaBundleVolume(securityConfig.Name)))
+			Expect(pod.Spec.Volumes).To(ContainElement(
+				pods.GetOpaBundleVolume(
+					securityConfig.Status.OpaBundleSource.ConfigMapName,
+				),
+			))
 		})
 	})
 
@@ -424,7 +438,9 @@ var _ = Describe("opa.go unit tests", func() {
 			pod := corev1.Pod{
 				Spec: corev1.PodSpec{
 					Volumes: []corev1.Volume{
-						pods.GetOpaBundleVolume(securityConfig.Name),
+						pods.GetOpaBundleVolume(
+							securityConfig.Status.OpaBundleSource.ConfigMapName,
+						),
 					},
 				},
 			}

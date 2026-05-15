@@ -341,10 +341,17 @@ spec:
               observedGeneration:
                 format: int64
                 type: integer
-              opaBundleNames:
-                items:
-                  type: string
-                type: array
+              opaBundleSource:
+                description: OpaBundleSource defines the source of OPA bundles used
+                  for policy evaluation.
+                properties:
+                  bundleNames:
+                    items:
+                      type: string
+                    type: array
+                  configMapName:
+                    type: string
+                type: object
               phase:
                 type: string
               ready:

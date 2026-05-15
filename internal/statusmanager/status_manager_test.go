@@ -415,7 +415,7 @@ var _ = Describe("UpdateSecurityConfigStatus", func() {
 	})
 
 	Context("when OPA is enabled", func() {
-		It("sets OpaBundleNames from bundle data in sorted order", func() {
+		It("sets OpaBundleSource from bundle data in sorted order", func() {
 			sc := newTestSecurityConfigForStatusManager()
 			original := sc.DeepCopy()
 
@@ -440,7 +440,8 @@ var _ = Describe("UpdateSecurityConfigStatus", func() {
 
 			updated := &v1alpha.SecurityConfig{}
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(sc), updated)).To(Succeed())
-			Expect(updated.Status.OpaBundleNames).To(Equal([]string{"bundle-a", "bundle-b"}))
+			Expect(updated.Status.OpaBundleSource.ConfigMapName).To(Equal(utilities.GetOpaConfigMapName(scope.SecurityConfig.Name)))
+			Expect(updated.Status.OpaBundleSource.BundleNames).To(Equal([]string{"bundle-a", "bundle-b"}))
 		})
 	})
 

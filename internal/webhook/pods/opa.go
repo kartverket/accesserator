@@ -18,7 +18,7 @@ const (
 
 // GetOpaContainer builds the OPA sidecar container for the given SecurityConfig.
 func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
-	imageURL := fmt.Sprintf("%s:%s", config.Get().OpaImageName, config.Get().OpaImageTag)
+	imageURL := fmt.Sprintf("%s:%s@%s", config.Get().OpaImageName, config.Get().OpaImageTag, config.Get().OpaImageSha)
 
 	opaContainerArgs := []string{
 		"run",
@@ -26,7 +26,7 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 		fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
 	}
 	if securityConfig.Spec.Opa != nil && securityConfig.Spec.Opa.Enabled {
-		for _, opaBundleName := range securityConfig.Status.OpaBundleNames {
+		for _, opaBundleName := range securityConfig.Status.OpaBundleSource.BundleNames {
 			opaContainerArgs = append(
 				opaContainerArgs,
 				"--bundle",
@@ -154,17 +154,19 @@ func MutatePodWithOpaBundleVolume(pod *corev1.Pod, securityConfig v1alpha.Securi
 			return fmt.Errorf("pod already has a volume named %s", OpaBundleVolumeName)
 		}
 	}
-	pod.Spec.Volumes = append(pod.Spec.Volumes, GetOpaBundleVolume(securityConfig.Name))
+	pod.Spec.Volumes = append(pod.Spec.Volumes, GetOpaBundleVolume(
+		securityConfig.Status.OpaBundleSource.ConfigMapName,
+	))
 	return nil
 }
 
-func GetOpaBundleVolume(securityConfigName string) corev1.Volume {
+func GetOpaBundleVolume(configMapName string) corev1.Volume {
 	return corev1.Volume{
 		Name: OpaBundleVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: utilities.GetOpaConfigMapName(securityConfigName),
+					Name: configMapName,
 				},
 			},
 		},
@@ -220,7 +222,7 @@ func ValidateOpaURLEnvVar(pod corev1.Pod, securityConfig v1alpha.SecurityConfig)
 }
 
 func ValidateOpaBundleVolume(pod corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
-	expectedConfigMapName := utilities.GetOpaConfigMapName(securityConfig.Name)
+	expectedConfigMapName := securityConfig.Status.OpaBundleSource.ConfigMapName
 	for _, volume := range pod.Spec.Volumes {
 		if volume.Name == OpaBundleVolumeName {
 			if volume.ConfigMap != nil &&

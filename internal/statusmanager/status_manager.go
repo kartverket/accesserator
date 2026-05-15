@@ -76,9 +76,12 @@ func UpdateSecurityConfigStatus(
 	)
 
 	if scope.OpaConfig.Enabled {
-		sortedBundleNames := slices.Collect(maps.Keys(scope.OpaConfig.BundleBinaryData))
-		slices.Sort(sortedBundleNames)
-		sc.Status.OpaBundleNames = sortedBundleNames
+		bundleNames := slices.Collect(maps.Keys(scope.OpaConfig.BundleBinaryData))
+		slices.Sort(bundleNames)
+		sc.Status.OpaBundleSource = &v1alpha.OpaBundleSource{
+			ConfigMapName: utilities.GetOpaConfigMapName(scope.SecurityConfig.Name),
+			BundleNames:   bundleNames,
+		}
 	}
 
 	if !equality.Semantic.DeepEqual(originalSecurityConfig.Status, sc.Status) {

@@ -265,8 +265,14 @@ type SecurityConfigStatus struct {
 	Message                 string             `json:"message,omitempty"`
 	JwkerSecretName         string             `json:"jwkerSecretName,omitempty"`
 	MaskinportenSectretName string             `json:"maskinportenSecretName,omitempty"`
-	OpaBundleNames          []string           `json:"opaBundleNames,omitempty"`
+	OpaBundleSource         *OpaBundleSource   `json:"opaBundleSource,omitempty"`
 	Ready                   bool               `json:"ready"`
+}
+
+// OpaBundleSource defines the source of OPA bundles used for policy evaluation.
+type OpaBundleSource struct {
+	ConfigMapName string   `json:"configMapName,omitempty"`
+	BundleNames   []string `json:"bundleNames,omitempty"`
 }
 
 type Phase string
