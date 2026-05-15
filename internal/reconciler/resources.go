@@ -1,7 +1,6 @@
 package reconciler
 
 import (
-	"bytes"
 	"reflect"
 
 	"github.com/kartverket/accesserator/internal/state"
@@ -142,21 +141,8 @@ func maskinportenSecretControllerResource(scope *state.Scope) ControllerResource
 				ResourceName:    maskinportenSecretObjectMeta.Name,
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate: func(current, desired *corev1.Secret) bool {
-					if len(current.Data) != len(desired.Data) {
-						return true
-					}
-					for key, desiredVal := range desired.Data {
-						if !bytes.Equal(current.Data[key], desiredVal) {
-							return true
-						}
-					}
-					return false
-				},
-				UpdateFields: func(current, desired *corev1.Secret) {
-					current.Data = desired.Data
-					current.Type = desired.Type
-				},
+				ShouldUpdate:    SecretShouldUpdateFunc,
+				UpdateFields:    secretUpdateFieldsFunc,
 			},
 		},
 	}
@@ -214,21 +200,34 @@ func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapte
 				ResourceName:    opaConfigMapObjectMeta.Name,
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate: func(current, desired *corev1.ConfigMap) bool {
-					if len(current.BinaryData) != len(desired.BinaryData) {
-						return true
-					}
-					for key, desiredVal := range desired.BinaryData {
-						if !bytes.Equal(current.BinaryData[key], desiredVal) {
-							return true
-						}
-					}
-					return false
-				},
-				UpdateFields: func(current, desired *corev1.ConfigMap) {
-					current.BinaryData = desired.BinaryData
-				},
+				ShouldUpdate:    ConfigMapShouldUpdateFunc,
+				UpdateFields:    configMapUpdateFieldsFunc,
 			},
 		},
 	}
+}
+
+func ConfigMapShouldUpdateFunc(current, desired *corev1.ConfigMap) bool {
+	return !equality.Semantic.DeepEqual(current.BinaryData, desired.BinaryData) ||
+		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable)
+}
+
+func configMapUpdateFieldsFunc(current, desired *corev1.ConfigMap) {
+	current.BinaryData = desired.BinaryData
+	current.Data = desired.Data
+	current.Immutable = desired.Immutable
+}
+
+func SecretShouldUpdateFunc(current, desired *corev1.Secret) bool {
+	return !equality.Semantic.DeepEqual(current.StringData, desired.StringData) ||
+		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable)
+}
+
+func secretUpdateFieldsFunc(current, desired *corev1.Secret) {
+	current.StringData = desired.StringData
+	current.Data = desired.Data
+	current.Immutable = desired.Immutable
+	current.Type = desired.Type
 }
