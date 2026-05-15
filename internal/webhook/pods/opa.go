@@ -8,6 +8,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -46,6 +47,19 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 			Protocol:      corev1.ProtocolTCP,
 		},
 	}
+	opaContainer.ReadinessProbe = &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/health?bundles=true&plugins=true",
+				Port: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: config.Get().OpaImagePort,
+				},
+				Scheme: corev1.URISchemeHTTP,
+			},
+		},
+		InitialDelaySeconds: 2,
+	}
 	opaContainer.Command = []string{"opa"}
 	opaContainer.Args = opaContainerArgs
 
@@ -78,7 +92,12 @@ func IsOpaContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.Ports, actual.Ports) &&
 		reflect.DeepEqual(expected.SecurityContext, actual.SecurityContext) &&
 		reflect.DeepEqual(expected.TerminationMessagePath, actual.TerminationMessagePath) &&
-		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy)
+		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy) &&
+		utilities.AssertContainerProbe(
+			actual.Name,
+			expected.ReadinessProbe,
+			actual.ReadinessProbe,
+		)
 }
 
 // isVolumeMountsEqual checks that all expected VolumeMounts exist in actual.

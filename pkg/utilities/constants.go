@@ -22,6 +22,9 @@ const (
 	MaskinportenTestJwksUri       = "https://test.maskinporten.no/jwk"
 
 	OpaConfigMapNameSuffix = "opa"
+
+	IstioReadinessProbeRewritePathPattern = "/app-health/%s/readyz"
+	IstioProbeRewritePort                 = 15020
 )
 
 var (

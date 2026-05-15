@@ -20,9 +20,6 @@ const (
 	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
 	AzureEnabledEnvVarName        = "AZURE_ENABLED"
 	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
-
-	IstioProbeRewritePathPattern = "/app-health/%s/readyz"
-	IstioProbeRewritePort        = 15020
 )
 
 // TexasEnvVars holds the resolved environment variable values for the Texas sidecar.
@@ -128,40 +125,11 @@ func IsTexasContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.SecurityContext, actual.SecurityContext) &&
 		reflect.DeepEqual(expected.TerminationMessagePath, actual.TerminationMessagePath) &&
 		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy) &&
-		assertReadiness(expected.ReadinessProbe, actual.ReadinessProbe)
-}
-
-func assertReadiness(expected *corev1.Probe, actual *corev1.Probe) bool {
-	// We expect to always have a HTTPGet readiness probe
-	if expected == nil ||
-		actual == nil ||
-		expected.HTTPGet == nil ||
-		actual.HTTPGet == nil {
-		return false
-	}
-
-	// Fields not explicitly set are given default values by Kubernetes
-	if (expected.InitialDelaySeconds != 0 && expected.InitialDelaySeconds != actual.InitialDelaySeconds) ||
-		(expected.TimeoutSeconds != 0 && expected.TimeoutSeconds != actual.TimeoutSeconds) ||
-		(expected.PeriodSeconds != 0 && expected.PeriodSeconds != actual.PeriodSeconds) ||
-		(expected.SuccessThreshold != 0 && expected.SuccessThreshold != actual.SuccessThreshold) ||
-		(expected.FailureThreshold != 0 && expected.FailureThreshold != actual.FailureThreshold) ||
-		(expected.TerminationGracePeriodSeconds != nil &&
-			expected.TerminationGracePeriodSeconds != actual.TerminationGracePeriodSeconds) {
-		return false
-	}
-
-	// Istio rewrites readiness probes for all containers, in order to bypass mTLS requirements.
-	// ReadinessProbe configuration is thus dependent on whether Istio is running or not.
-	if actual.HTTPGet.Path == fmt.Sprintf(IstioProbeRewritePathPattern, TexasInitContainerName) &&
-		actual.HTTPGet.Port.IntVal == IstioProbeRewritePort {
-		return true
-	}
-	if expected.HTTPGet.Path == actual.HTTPGet.Path && reflect.DeepEqual(expected.HTTPGet.Port, actual.HTTPGet.Port) {
-		return true
-	}
-
-	return false
+		utilities.AssertContainerProbe(
+			actual.Name,
+			expected.ReadinessProbe,
+			actual.ReadinessProbe,
+		)
 }
 
 // MutateTexasOnPod adds the Texas init container and TEXAS_URL env var to the pod spec.

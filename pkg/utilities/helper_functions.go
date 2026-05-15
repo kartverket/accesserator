@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"reflect"
 	"time"
 
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -93,8 +94,8 @@ func GetMaskinportenServiceEntryName(securityConfigName string) string {
 	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
 }
 
-func GetSecret(ctx context.Context, k8sClient client.Client, key client.ObjectKey) (*v1.Secret, error) {
-	var secret v1.Secret
+func GetSecret(ctx context.Context, k8sClient client.Client, key client.ObjectKey) (*corev1.Secret, error) {
+	var secret corev1.Secret
 	if err := k8sClient.Get(ctx, key, &secret); err != nil {
 		return nil, fmt.Errorf("failed to get Secret %s/%s: %w", key.Name, key.Namespace, err)
 	}
@@ -171,4 +172,40 @@ func UniqueSliceElements[T comparable](inputSlice []T) []T {
 		}
 	}
 	return uniqueSlice
+}
+
+func AssertContainerProbe(
+	containerName string,
+	expected *corev1.Probe,
+	actual *corev1.Probe) bool {
+	// We expect to always have an HTTP GET probe
+	if expected == nil ||
+		actual == nil ||
+		expected.HTTPGet == nil ||
+		actual.HTTPGet == nil {
+		return false
+	}
+
+	// Kubernetes gives Fields not explicitly set default values
+	if (expected.InitialDelaySeconds != 0 && expected.InitialDelaySeconds != actual.InitialDelaySeconds) ||
+		(expected.TimeoutSeconds != 0 && expected.TimeoutSeconds != actual.TimeoutSeconds) ||
+		(expected.PeriodSeconds != 0 && expected.PeriodSeconds != actual.PeriodSeconds) ||
+		(expected.SuccessThreshold != 0 && expected.SuccessThreshold != actual.SuccessThreshold) ||
+		(expected.FailureThreshold != 0 && expected.FailureThreshold != actual.FailureThreshold) ||
+		(expected.TerminationGracePeriodSeconds != nil &&
+			expected.TerminationGracePeriodSeconds != actual.TerminationGracePeriodSeconds) {
+		return false
+	}
+
+	// Istio rewrites probes for all containers to bypass mTLS requirements.
+	// ReadinessProbe configuration is thus dependent on whether Istio is running or not.
+	if actual.HTTPGet.Path == fmt.Sprintf(IstioReadinessProbeRewritePathPattern, containerName) &&
+		actual.HTTPGet.Port.IntVal == IstioProbeRewritePort {
+		return true
+	}
+	if expected.HTTPGet.Path == actual.HTTPGet.Path && reflect.DeepEqual(expected.HTTPGet.Port, actual.HTTPGet.Port) {
+		return true
+	}
+
+	return false
 }
