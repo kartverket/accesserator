@@ -178,10 +178,10 @@ func MutateTexasOnPod(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) er
 
 func MutatePodWithTexasInitContainer(pod *corev1.Pod, sidecarContainer corev1.Container) error {
 	// Check if the init container already exists
-	for _, initContainer := range pod.Spec.InitContainers {
+	for _, initContainer := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		if initContainer.Name == TexasInitContainerName {
 			// This should never happen
-			return fmt.Errorf("pod already has an init container named %s", TexasInitContainerName)
+			return fmt.Errorf("pod already has a container named %s", TexasInitContainerName)
 		}
 	}
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, sidecarContainer)

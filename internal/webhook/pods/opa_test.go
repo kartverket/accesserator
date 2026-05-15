@@ -179,7 +179,7 @@ var _ = Describe("opa.go unit tests", func() {
 			}
 
 			Expect(pods.MutatePodWithOpaInitContainer(pod, pods.GetOpaContainer(securityConfig))).
-				To(MatchError(fmt.Sprintf("pod already has an init container named %s", pods.OpaInitContainerName)))
+				To(MatchError(fmt.Sprintf("pod already has a container named %s", pods.OpaInitContainerName)))
 		})
 
 		It("mutates the pod with the OPA init container when no init container with the same name exists", func() {
