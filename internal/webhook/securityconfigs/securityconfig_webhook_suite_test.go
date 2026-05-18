@@ -77,6 +77,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")
 	Expect(err).NotTo(HaveOccurred())
+	err = os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")
+	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")
@@ -253,5 +255,46 @@ var _ = Describe("SecurityConfig validating webhook", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, securityConfig)).To(Succeed())
+	})
+
+	It("blocks creation of a SecurityConfig with 'spec.opa' defined when ACCESSERATOR_OPA_ENABLED is false", func() {
+		Expect(os.Setenv("ACCESSERATOR_OPA_ENABLED", "false")).To(Succeed())
+		Expect(config.Load()).To(Succeed())
+
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "securityconfig-opa-disabled",
+			},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() {
+			_ = k8sClient.Delete(ctx, ns)
+			Expect(os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")).To(Succeed())
+			Expect(config.Load()).To(Succeed())
+		})
+
+		securityConfig := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "security-config",
+				Namespace: ns.Name,
+			},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "myapp",
+				Opa: &v1alpha.OpenPolicyAgentSpec{
+					Enabled: true,
+					BundleURLs: []v1alpha.BundleSource{
+						{
+							Name: "authz-bundle",
+							URL:  allowedBundleURLPrefixes + "/bundle:latest",
+						},
+					},
+				},
+			},
+		}
+
+		err := k8sClient.Create(ctx, securityConfig)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set"))
 	})
 })

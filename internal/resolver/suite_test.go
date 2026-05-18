@@ -60,6 +60,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "test-sha")
 	Expect(err).NotTo(HaveOccurred())
+	err = os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")
+	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")

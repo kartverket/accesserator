@@ -22,6 +22,7 @@ type Config struct {
 	TexasProbePort     int32  `split_words:"true" default:"3001"`
 	TexasUrlEnvVarName string `split_words:"true" default:"TEXAS_URL"`
 
+	OpaEnabled                          bool     `split_words:"true" default:"false"`
 	OpaImageName                        string   `split_words:"true" default:"openpolicyagent/opa"`
 	OpaImageTag                         string   `split_words:"true"`
 	OpaImageSha                         string   `split_words:"true"`

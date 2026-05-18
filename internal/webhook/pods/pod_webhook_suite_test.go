@@ -79,6 +79,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")
 	Expect(err).NotTo(HaveOccurred())
+	err = os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")
+	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")
 	Expect(err).NotTo(HaveOccurred())
 	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")
@@ -273,7 +275,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Name:      "pod-webhook-create",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					pods.AccesseratorServicesAnnotation: "Texas",
+					pods.AccesseratorServicesAnnotation: pods.Texas.String(),
 				},
 				Labels: map[string]string{
 					pods.SkiperatorApplicationRefLabel: skiperatorAppName,
@@ -300,7 +302,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 				Name:      "pod-webhook-create",
 				Namespace: ns.Name,
 				Annotations: map[string]string{
-					pods.AccesseratorServicesAnnotation: "Texas",
+					pods.AccesseratorServicesAnnotation: pods.Texas.String(),
 				},
 			},
 			skiperatorAppName,
@@ -348,7 +350,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 		if updatedPod.Annotations == nil {
 			updatedPod.Annotations = make(map[string]string)
 		}
-		updatedPod.Annotations[pods.AccesseratorServicesAnnotation] = "Texas"
+		updatedPod.Annotations[pods.AccesseratorServicesAnnotation] = pods.Texas.String()
 		Expect(k8sClient.Update(ctx, updatedPod)).To(Succeed())
 
 		// Re-fetch the pod to check the actual state after the pod is updated

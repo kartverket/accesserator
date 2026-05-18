@@ -98,4 +98,29 @@ var _ = Describe("OPA Resolver", func() {
 			Expect(fetcher.reference).To(Equal(allowedPrefix + "repo:tag"))
 		})
 	})
+
+	It("throws an error when ACCESSERATOR_OPA_ENABLED is set to 'false' and a SecurityConfig with 'spec.opa' is provided", func() {
+		Expect(os.Setenv("ACCESSERATOR_OPA_ENABLED", "false")).To(Succeed())
+		Expect(config.Load()).To(Succeed())
+		DeferCleanup(func() {
+			Expect(os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")).To(Succeed())
+			Expect(config.Load()).To(Succeed())
+		})
+
+		sc := accesseratorv1alpha.SecurityConfig{
+			Spec: accesseratorv1alpha.SecurityConfigSpec{
+				Opa: &accesseratorv1alpha.OpenPolicyAgentSpec{
+					Enabled: false,
+					BundleURLs: []accesseratorv1alpha.BundleSource{
+						{Name: "bundle", URL: allowedPrefix + "repo:tag"},
+					},
+				},
+			},
+		}
+		_, err := resolver.ResolveOpaConfig(sc)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(
+			"OPA is not enabled on this cluster and 'spec.opa' can therefore not be set",
+		))
+	})
 })
