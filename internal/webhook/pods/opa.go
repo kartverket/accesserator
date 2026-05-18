@@ -24,7 +24,7 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	opaContainerArgs := []string{
 		"run",
 		"--server",
-		fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
+		fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaPort),
 	}
 	if securityConfig.Spec.Opa != nil && securityConfig.Spec.Opa.Enabled {
 		for _, opaBundleName := range securityConfig.Status.OpaBundleSource.BundleNames {
@@ -42,7 +42,7 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	opaContainer.Image = imageURL
 	opaContainer.Ports = []corev1.ContainerPort{
 		{
-			ContainerPort: config.Get().OpaImagePort,
+			ContainerPort: config.Get().OpaPort,
 			Name:          "http",
 			Protocol:      corev1.ProtocolTCP,
 		},
@@ -53,7 +53,7 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 				Path: "/health?bundles=true&plugins=true",
 				Port: intstr.IntOrString{
 					Type:   intstr.Int,
-					IntVal: config.Get().OpaImagePort,
+					IntVal: config.Get().OpaPort,
 				},
 				Scheme: corev1.URISchemeHTTP,
 			},
@@ -78,7 +78,7 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 
 // GetOpaUrlEnvVarValue returns the value that OPA_URL should be set to on the app container.
 func GetOpaUrlEnvVarValue() string {
-	return fmt.Sprintf("http://localhost:%d", config.Get().OpaImagePort)
+	return fmt.Sprintf("http://localhost:%d", config.Get().OpaPort)
 }
 
 // IsOpaContainerEqual compares the fields relevant to Accesserator between two containers.

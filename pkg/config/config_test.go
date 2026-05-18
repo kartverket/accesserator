@@ -21,6 +21,7 @@ const (
 	defaultOpaImageName                        = "openpolicyagent/opa"
 	defaultOpaImageTag                         = "latest"
 	defaultOpaImageSha                         = "def456"
+	defaultOpaPort                             = int32(3010)
 	defaultOpaUrlEnvVarName                    = "OPA_URL"
 	defaultOpaAllowedBundleRegistryUrlPrefixes = "http://bundle-source,oci://bundle-source"
 	defaultRunsInProduction                    = "false"
@@ -40,6 +41,7 @@ var defaultEnvVars = map[string]string{
 	"ACCESSERATOR_OPA_IMAGE_NAME":                           defaultOpaImageName,
 	"ACCESSERATOR_OPA_IMAGE_TAG":                            defaultOpaImageTag,
 	"ACCESSERATOR_OPA_IMAGE_SHA":                            defaultOpaImageSha,
+	"ACCESSERATOR_OPA_PORT":                                 fmt.Sprintf("%d", defaultOpaPort),
 	"ACCESSERATOR_OPA_URL_ENV_VAR_NAME":                     defaultOpaUrlEnvVarName,
 	"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES": defaultOpaAllowedBundleRegistryUrlPrefixes,
 }
