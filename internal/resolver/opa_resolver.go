@@ -38,6 +38,9 @@ var defaultBundleFetcher BundleFetcher = ociBundleFetcher{}
 // ResolveOpaConfig resolves the OPA configuration from the SecurityConfig.
 // It fetches bundle files from OCI registries and returns them as byte slices.
 func ResolveOpaConfig(securityConfig v1alpha.SecurityConfig) (*state.OpaConfig, error) {
+	if securityConfig.Spec.Opa != nil && !config.Get().OpaEnabled {
+		return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
+	}
 	return ResolveOpaConfigWithFetcher(defaultBundleFetcher, securityConfig)
 }
 

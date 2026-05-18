@@ -2,8 +2,10 @@ package securityconfigs
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/kartverket/accesserator/internal/resolver"
+	"github.com/kartverket/accesserator/pkg/config"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -54,6 +56,10 @@ func (v *SecurityConfigCustomValidator) ValidateDelete(_ context.Context, securi
 func validateSecurityConfig(securityConfig *accesseratorv1alpha.SecurityConfig) (admission.Warnings, error) {
 	if securityConfig.Spec.Opa == nil {
 		return nil, nil
+	}
+
+	if securityConfig.Spec.Opa != nil && !config.Get().OpaEnabled {
+		return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
 	}
 
 	if err := resolver.ValidateBundleURLs(securityConfig.Spec.Opa.BundleURLs); err != nil {

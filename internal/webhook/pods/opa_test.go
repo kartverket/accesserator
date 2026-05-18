@@ -60,7 +60,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
-				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
+				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaPort),
 			}))
 			Expect(c.Args).NotTo(ContainElement("--bundle"))
 			Expect(c.Args).NotTo(ContainElement("--watch"))
@@ -89,7 +89,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
-				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
+				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaPort),
 			}))
 			Expect(c.Args).NotTo(ContainElement("--bundle"))
 			Expect(c.Args).NotTo(ContainElement("--watch"))
@@ -114,7 +114,7 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
-				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaImagePort),
+				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaPort),
 				"--bundle",
 				fmt.Sprintf("%s/%s", pods.OpaBundleMountPath, "bundle-a"),
 				"--bundle",
@@ -122,7 +122,7 @@ var _ = Describe("opa.go unit tests", func() {
 				"--watch",
 			}))
 			Expect(c.Ports).To(ContainElement(corev1.ContainerPort{
-				ContainerPort: config.Get().OpaImagePort,
+				ContainerPort: config.Get().OpaPort,
 				Name:          "http",
 				Protocol:      corev1.ProtocolTCP,
 			}))
@@ -137,7 +137,7 @@ var _ = Describe("opa.go unit tests", func() {
 	Describe("GetOpaUrlEnvVarValue", func() {
 		It("returns the localhost OPA URL using the configured OPA port", func() {
 			Expect(pods.GetOpaUrlEnvVarValue()).To(Equal(
-				fmt.Sprintf("http://localhost:%d", config.Get().OpaImagePort),
+				fmt.Sprintf("http://localhost:%d", config.Get().OpaPort),
 			))
 		})
 	})

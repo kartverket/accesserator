@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -328,6 +329,9 @@ func ParseAccesseratorServices(annotationValue string) ([]ServiceType, error) {
 			}
 		case Opa.String():
 			if !slices.Contains(services, Opa) {
+				if !config.Get().OpaEnabled {
+					return nil, fmt.Errorf("service '%s' is not enabled on this cluster", Opa.String())
+				}
 				services = append(services, Opa)
 			}
 		default:
