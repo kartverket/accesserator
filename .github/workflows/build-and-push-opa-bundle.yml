@@ -35,9 +35,10 @@ jobs:
 
   build:
     needs: tags
-    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@0d48cb9787844c2f4dde7e01f8679fb0b68ddea7
+    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@2a48ed92e60552c1240b6969002e8b8ec0ab91f5
     with:
       artifactName: ${{ github.repository }}/opa-bundle
       rego-path: .opa
       test-path: .opa
+      lint: true
       additional-tags: ${{ needs.tags.outputs.branch }}
