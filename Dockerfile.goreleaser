@@ -1,4 +1,9 @@
+FROM golang:1.25.7 AS base
+# Needed for ca-certs
+
 FROM scratch
+
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY accesserator /accesserator
 USER 65532:65532
