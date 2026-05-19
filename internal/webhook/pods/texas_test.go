@@ -409,6 +409,30 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(pods.MutatePodWithTexasInitContainer(pod, pods.GetTexasContainer(securityConfig))).To(MatchError(fmt.Sprintf("pod already has a container named %s", pods.TexasInitContainerName)))
 		})
 
+		It("returns an error when the pod already has container on texas port", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+				},
+			}
+			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name: "dummy",
+						Ports: []corev1.ContainerPort{
+							{
+								ContainerPort: config.Get().TexasPort,
+							},
+						},
+					}},
+				},
+			}
+
+			sidecarContainer := pods.GetTexasContainer(securityConfig)
+			Expect(pods.MutatePodWithTexasInitContainer(pod, sidecarContainer)).
+				To(MatchError(fmt.Sprintf("pod already has a port on %d", sidecarContainer.Ports[0].ContainerPort)))
+		})
+
 		It("mutates the pod with the Texas init container when no init container with the same name exists", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{

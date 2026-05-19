@@ -135,13 +135,13 @@ func MutateOpaOnPod(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) erro
 }
 
 func MutatePodWithOpaInitContainer(pod *corev1.Pod, sidecarContainer corev1.Container) error {
-	// Check if the init container already exists
-	for _, initContainer := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		if initContainer.Name == OpaInitContainerName {
-			// This should never happen
-			return fmt.Errorf("pod already has a container named %s", OpaInitContainerName)
-		}
+	if err := EnsureUnusedContainerName(pod, sidecarContainer); err != nil {
+		return err
 	}
+	if err := EnsureUnusedContainerPorts(pod, sidecarContainer); err != nil {
+		return err
+	}
+
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, sidecarContainer)
 	return nil
 }
@@ -149,15 +149,13 @@ func MutatePodWithOpaInitContainer(pod *corev1.Pod, sidecarContainer corev1.Cont
 func MutatePodWithOpaURLEnvVar(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) error {
 	for i, container := range pod.Spec.Containers {
 		if container.Name == string(securityConfig.Spec.ApplicationRef) {
-			// Check if the env var already exists
-			for _, env := range container.Env {
-				if env.Name == config.Get().OpaUrlEnvVarName {
-					// This should never happen
-					return fmt.Errorf("container %s already has env var %s", container.Name, config.Get().OpaUrlEnvVarName)
-				}
+			envVarName := config.Get().OpaUrlEnvVarName
+			if err := EnsureUnusedEnvVar(container, envVarName); err != nil {
+				return err
 			}
+
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
-				Name:  config.Get().OpaUrlEnvVarName,
+				Name:  envVarName,
 				Value: GetOpaUrlEnvVarValue(),
 			})
 			return nil
