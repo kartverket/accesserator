@@ -45,6 +45,11 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 			Name:          "http",
 			Protocol:      corev1.ProtocolTCP,
 		},
+		{
+			ContainerPort: config.Get().TexasProbePort,
+			Name:          "probe",
+			Protocol:      corev1.ProtocolTCP,
+		},
 	}
 	texasContainer.ReadinessProbe = &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
