@@ -14,11 +14,30 @@ permissions:
   id-token: write
 
 jobs:
+  tags:
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.compute.outputs.branch }}
+    steps:
+      - id: compute
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          # `head_ref` is set on pull_request events; on push it's empty.
+          if [[ -n "$HEAD_REF" ]]; then
+            tag="$HEAD_REF"
+          else
+            tag="$REF_NAME"
+          fi
+          # OCI tags can't contain `/`, so replace with `-`.
+          echo "branch=${tag//\//-}" >> "$GITHUB_OUTPUT"
+
   build:
-    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@65cef73f7e7ca23a212b55200a3d50ea118075e6
+    needs: tags
+    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@0d48cb9787844c2f4dde7e01f8679fb0b68ddea7
     with:
-      artifactName: something-random
+      artifactName: ${{ github.repository }}/opa-bundle
       rego-path: .opa
       test-path: .opa
-      additional-tags: |
-        ${{ github.ref == 'refs/heads/main' && 'latest' || '' }}
+      additional-tags: ${{ needs.tags.outputs.branch }}
