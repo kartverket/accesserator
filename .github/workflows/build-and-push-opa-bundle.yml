@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   build:
-    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@8f2e58e1deb2e50de341dbda2b330b692a2bd92a
+    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@65cef73f7e7ca23a212b55200a3d50ea118075e6
     with:
-      name: ${{ github.repository }}/opa-bunde
+      artifactName: something-random
       rego-path: .opa
       test-path: .opa
       additional-tags: |
