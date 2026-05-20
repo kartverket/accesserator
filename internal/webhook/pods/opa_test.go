@@ -182,6 +182,26 @@ var _ = Describe("opa.go unit tests", func() {
 				To(MatchError(fmt.Sprintf("pod already has a container named %s", pods.OpaInitContainerName)))
 		})
 
+		It("returns an error when the pod already has container on opa port", func() {
+			securityConfig := newSecurityConfig(true)
+			pod := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name: "dummy",
+						Ports: []corev1.ContainerPort{
+							{
+								ContainerPort: config.Get().OpaPort,
+							},
+						},
+					}},
+				},
+			}
+
+			sidecarContainer := pods.GetOpaContainer(securityConfig)
+			Expect(pods.MutatePodWithOpaInitContainer(pod, sidecarContainer)).
+				To(MatchError(fmt.Sprintf("pod already has a port on %d", sidecarContainer.Ports[0].ContainerPort)))
+		})
+
 		It("mutates the pod with the OPA init container when no init container with the same name exists", func() {
 			securityConfig := newSecurityConfig(true)
 			pod := corev1.Pod{

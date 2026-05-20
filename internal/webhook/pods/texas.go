@@ -45,6 +45,11 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 			Name:          "http",
 			Protocol:      corev1.ProtocolTCP,
 		},
+		{
+			ContainerPort: config.Get().TexasProbePort,
+			Name:          "probe",
+			Protocol:      corev1.ProtocolTCP,
+		},
 	}
 	texasContainer.ReadinessProbe = &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
@@ -145,13 +150,13 @@ func MutateTexasOnPod(pod *corev1.Pod, securityConfig v1alpha.SecurityConfig) er
 }
 
 func MutatePodWithTexasInitContainer(pod *corev1.Pod, sidecarContainer corev1.Container) error {
-	// Check if the init container already exists
-	for _, initContainer := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		if initContainer.Name == TexasInitContainerName {
-			// This should never happen
-			return fmt.Errorf("pod already has a container named %s", TexasInitContainerName)
-		}
+	if err := EnsureUnusedContainerName(pod, sidecarContainer); err != nil {
+		return err
 	}
+	if err := EnsureUnusedContainerPorts(pod, sidecarContainer); err != nil {
+		return err
+	}
+
 	pod.Spec.InitContainers = append(pod.Spec.InitContainers, sidecarContainer)
 	return nil
 }
@@ -159,15 +164,13 @@ func MutatePodWithTexasInitContainer(pod *corev1.Pod, sidecarContainer corev1.Co
 func MutatePodWithTexasURLEnvVar(pod *corev1.Pod, applicationRef string) error {
 	for i, container := range pod.Spec.Containers {
 		if container.Name == applicationRef {
-			// Check if the env var already exists
-			for _, env := range container.Env {
-				if env.Name == config.Get().TexasUrlEnvVarName {
-					// This should never happen
-					return fmt.Errorf("container %s already has env var %s", container.Name, config.Get().TexasUrlEnvVarName)
-				}
+			envVarName := config.Get().TexasUrlEnvVarName
+			if err := EnsureUnusedEnvVar(container, envVarName); err != nil {
+				return err
 			}
+
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
-				Name:  config.Get().TexasUrlEnvVarName,
+				Name:  envVarName,
 				Value: GetTexasUrlEnvVarValue(),
 			})
 			return nil

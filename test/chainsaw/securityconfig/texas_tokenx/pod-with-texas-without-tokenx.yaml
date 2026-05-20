@@ -37,6 +37,9 @@ spec:
         - containerPort: 3000
           name: http
           protocol: TCP
+        - containerPort: 3001
+          name: probe
+          protocol: TCP
       resources: {}
       restartPolicy: Always
       securityContext:
