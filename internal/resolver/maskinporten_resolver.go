@@ -27,7 +27,7 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 		}, nil
 	}
 
-	maskinportenConfigType, err := DetermineMaskinportenConfigType(securityConfig)
+	maskinportenConfigType, err := utilities.DetermineConfigType(securityConfig.Spec.Maskinporten)
 	if err != nil {
 		return nil, err
 	}
@@ -108,25 +108,4 @@ func GetMaskinportenSecretData(ctx context.Context, k8sClient client.Client, sec
 	secretData[MaskinportenTokenEndpointEnvVar] = []byte(utilities.MaskinportenTestTokenEndpoint)
 	secretData[MaskinportenJwksUriEnvVar] = []byte(utilities.MaskinportenTestJwksUri)
 	return &secretData, nil
-}
-
-func DetermineMaskinportenConfigType(securityConfig v1alpha.SecurityConfig) (*state.MaskinportenConfigType, error) {
-	multipleConfigsErr := fmt.Errorf("multiple Maskinporten config sources cannot be used at the same time")
-	if securityConfig.Spec.Maskinporten.Client != nil {
-		if securityConfig.Spec.Maskinporten.ClientRef != nil || securityConfig.Spec.Maskinporten.SecretRef != nil {
-			return nil, multipleConfigsErr
-		}
-		return utilities.Ptr(state.InlineClient), nil
-	} else if securityConfig.Spec.Maskinporten.ClientRef != nil {
-		if securityConfig.Spec.Maskinporten.Client != nil || securityConfig.Spec.Maskinporten.SecretRef != nil {
-			return nil, multipleConfigsErr
-		}
-		return utilities.Ptr(state.ClientRef), nil
-	} else if securityConfig.Spec.Maskinporten.SecretRef != nil {
-		if securityConfig.Spec.Maskinporten.Client != nil || securityConfig.Spec.Maskinporten.ClientRef != nil {
-			return nil, multipleConfigsErr
-		}
-		return utilities.Ptr(state.SecretRef), nil
-	}
-	return utilities.Ptr(state.None), nil
 }

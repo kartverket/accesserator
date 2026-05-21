@@ -133,7 +133,7 @@ type MaskinportenSpec struct {
 	// Use this when a MaskinportenClient exists, and you want to reference it.
 	//
 	// +kubebuilder:validation:Optional
-	ClientRef *MaskinportenClientRef `json:"clientRef,omitempty"`
+	ClientRef *ResourceRef `json:"clientRef,omitempty"`
 
 	// SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
 	// Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
@@ -141,6 +141,16 @@ type MaskinportenSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	SecretRef *SecretRef `json:"secretRef,omitempty"`
+}
+
+func (spec MaskinportenSpec) GetClient() *MaskinportenClientSpec {
+	return spec.Client
+}
+func (spec MaskinportenSpec) GetClientRef() *ResourceRef {
+	return spec.ClientRef
+}
+func (spec MaskinportenSpec) GetSecretRef() *SecretRef {
+	return spec.SecretRef
 }
 
 // MaskinportenClientSpec defines the inline configuration for a [MaskinportenClient](https://github.com/nais/digdirator?tab=readme-ov-file#digdirator).
@@ -173,7 +183,6 @@ type MaskinportenScope struct {
 	ConsumedScopes []naisiov1.ConsumedScope `json:"consumes"`
 }
 
-// MaskinportenClientRef defines a reference to an existing MaskinportenClient by name.
 // EntraIDSpec defines the configuration for Entra ID.
 //
 // At most one of `client`, `clientRef`, or `secretRef` may be specified.
@@ -205,6 +214,16 @@ type EntraIDSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	SecretRef *SecretRef `json:"secretRef,omitempty"`
+}
+
+func (spec EntraIDSpec) GetClient() *AzureAdApplicationSpec {
+	return spec.Client
+}
+func (spec EntraIDSpec) GetClientRef() *ResourceRef {
+	return spec.ClientRef
+}
+func (spec EntraIDSpec) GetSecretRef() *SecretRef {
+	return spec.SecretRef
 }
 
 // AzureAdApplicationSpec defines the inline configuration for a [AzureAdApplication](https://github.com/nais/azurerator?tab=readme-ov-file#azurerator).
@@ -247,10 +266,12 @@ type AzureAdApplicationSpec struct {
 	// +kubebuilder:validation:Optional
 	SinglePageApplication *bool `json:"singlePageApplication,omitempty"`
 }
+
+// ResourceRef defines a reference to an existing resource by name.
 //
 // +kubebuilder:object:generate=true
-type MaskinportenClientRef struct {
-	// Name of the referenced MaskinportenClient.
+type ResourceRef struct {
+	// Name of the referenced resource.
 	//
 	// +kubebuilder:validation:Required
 	Name ResourceName `json:"name"`

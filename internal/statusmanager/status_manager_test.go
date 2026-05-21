@@ -226,7 +226,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 						ApplicationRef: "my-app",
 						Maskinporten: &v1alpha.MaskinportenSpec{
 							Enabled: true,
-							ClientRef: &v1alpha.MaskinportenClientRef{
+							ClientRef: &v1alpha.ResourceRef{
 								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
 							},
 						},
@@ -305,7 +305,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 						ApplicationRef: "my-app",
 						Maskinporten: &v1alpha.MaskinportenSpec{
 							Enabled: true,
-							ClientRef: &v1alpha.MaskinportenClientRef{
+							ClientRef: &v1alpha.ResourceRef{
 								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
 							},
 						},
@@ -338,7 +338,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 						ApplicationRef: "my-app",
 						Maskinporten: &v1alpha.MaskinportenSpec{
 							Enabled: true,
-							ClientRef: &v1alpha.MaskinportenClientRef{
+							ClientRef: &v1alpha.ResourceRef{
 								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
 							},
 						},

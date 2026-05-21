@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	InlineClient MaskinportenConfigType = iota
+	InlineClient ConfigType = iota
 	ClientRef
 	SecretRef
 	None
 )
 
-type MaskinportenConfigType int
+type ConfigType int
 
 type Scope struct {
 	SecurityConfig         v1alpha.SecurityConfig
@@ -35,9 +35,9 @@ type TokenXConfig struct {
 
 type MaskinportenConfig struct {
 	Enabled    bool
-	Type       MaskinportenConfigType
+	Type       ConfigType
 	ClientSpec *naisiov1.MaskinportenClientSpec
-	ClientRef  *v1alpha.MaskinportenClientRef
+	ClientRef  *v1alpha.ResourceRef
 	SecretData *map[string][]byte
 }
 

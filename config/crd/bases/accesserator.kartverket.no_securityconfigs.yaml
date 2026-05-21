@@ -271,7 +271,7 @@ spec:
                       Use this when a MaskinportenClient exists, and you want to reference it.
                     properties:
                       name:
-                        description: Name of the referenced MaskinportenClient.
+                        description: Name of the referenced resource.
                         maxLength: 253
                         minLength: 1
                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
