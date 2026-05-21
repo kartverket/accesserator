@@ -1,0 +1,9 @@
+apiVersion: nais.io/v1
+kind: AzureAdApplication
+metadata:
+  name: app-entraid
+spec:
+  secretName: security-config-entraid
+status:
+  synchronizationSecretName: security-config-entraid
+  synchronizationState: Synchronized

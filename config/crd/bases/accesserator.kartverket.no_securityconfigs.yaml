@@ -503,6 +503,8 @@ spec:
                   - type
                   type: object
                 type: array
+              entraIdSecretName:
+                type: string
               jwkerSecretName:
                 type: string
               maskinportenSecretName:

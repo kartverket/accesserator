@@ -86,6 +86,9 @@ var _ = Describe("ControllerResources", func() {
 					"MaskinportenClient",
 					"Secret",
 					"ServiceEntry",
+					"AzureAdApplication",
+					"Secret",
+					"ServiceEntry",
 					"ConfigMap",
 				),
 			)
@@ -93,26 +96,25 @@ var _ = Describe("ControllerResources", func() {
 
 		It("returns resources with correct names", func() {
 			resources := reconciler.ControllerResources(scope)
-			namesByKind := make(map[string]string, len(resources))
-			for _, r := range resources {
-				namesByKind[r.GetResourceKind()] = r.GetResourceName()
+
+			resourceKindsAndNames := make([]string, len(resources))
+			for i, r := range resources {
+				resourceKindsAndNames[i] = fmt.Sprintf("%s/%s", r.GetResourceKind(), r.GetResourceName())
 			}
 
-			Expect(namesByKind["Jwker"]).To(Equal(
-				utilities.GetJwkerName(string(securityConfig.Spec.ApplicationRef)),
-			))
-			Expect(namesByKind["NetworkPolicy"]).To(Equal(
-				utilities.GetTokenxEgressName(scope.SecurityConfig.Name, config.Get().TokenxName),
-			))
-			Expect(namesByKind["MaskinportenClient"]).To(Equal(
-				utilities.GetMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
-			))
-			Expect(namesByKind["Secret"]).To(Equal(
-				utilities.GetMaskinportenSecretFromSecretRefName(securityConfig.Name),
-			))
-			Expect(namesByKind["ServiceEntry"]).To(Equal(
-				utilities.GetMaskinportenServiceEntryName(securityConfig.Name),
-			))
+			Expect(resourceKindsAndNames).To(
+				ConsistOf(
+					fmt.Sprintf("%s/%s", "Jwker", utilities.GetJwkerName(string(securityConfig.Spec.ApplicationRef))),
+					fmt.Sprintf("%s/%s", "NetworkPolicy", utilities.GetTokenxEgressName(scope.SecurityConfig.Name, config.Get().TokenxName)),
+					fmt.Sprintf("%s/%s", "MaskinportenClient", utilities.GetMaskinportenClientName(string(securityConfig.Spec.ApplicationRef))),
+					fmt.Sprintf("%s/%s", "Secret", utilities.GetMaskinportenSecretFromSecretRefName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.GetMaskinportenServiceEntryName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "AzureAdApplication", utilities.GetAzureAdApplicationName(string(securityConfig.Spec.ApplicationRef))),
+					fmt.Sprintf("%s/%s", "Secret", utilities.GetAzureAdSecretFromSecretRefName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.GetAzureAdServiceEntryName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "ConfigMap", utilities.GetOpaConfigMapName(securityConfig.Name)),
+				),
+			)
 		})
 	})
 })

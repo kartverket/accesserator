@@ -22,6 +22,8 @@ type Config struct {
 	TexasProbePort     int32  `split_words:"true" default:"3001"`
 	TexasUrlEnvVarName string `split_words:"true" default:"TEXAS_URL"`
 
+	EntraTenantId string `split_words:"true"`
+
 	OpaEnabled                          bool     `split_words:"true" default:"false"`
 	OpaImageName                        string   `split_words:"true" default:"openpolicyagent/opa"`
 	OpaImageTag                         string   `split_words:"true"`
@@ -54,6 +56,9 @@ func Load() error {
 	}
 	if cfg.TexasImageSha == "" {
 		missing = append(missing, "ACCESSERATOR_TEXAS_IMAGE_SHA")
+	}
+	if cfg.EntraTenantId == "" {
+		missing = append(missing, "ACCESSERATOR_ENTRA_TENANT_ID")
 	}
 	if cfg.OpaImageTag == "" {
 		missing = append(missing, "ACCESSERATOR_OPA_IMAGE_TAG")

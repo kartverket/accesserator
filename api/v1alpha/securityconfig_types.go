@@ -361,14 +361,15 @@ type SecretKeySelector struct {
 
 // SecurityConfigStatus defines the observed state of SecurityConfig.
 type SecurityConfigStatus struct {
-	ObservedGeneration      int64              `json:"observedGeneration,omitempty"`
-	Conditions              []metav1.Condition `json:"conditions,omitempty"`
-	Phase                   Phase              `json:"phase,omitempty"`
-	Message                 string             `json:"message,omitempty"`
-	JwkerSecretName         string             `json:"jwkerSecretName,omitempty"`
-	MaskinportenSectretName string             `json:"maskinportenSecretName,omitempty"`
-	OpaBundleSource         *OpaBundleSource   `json:"opaBundleSource,omitempty"`
-	Ready                   bool               `json:"ready"`
+	ObservedGeneration     int64              `json:"observedGeneration,omitempty"`
+	Conditions             []metav1.Condition `json:"conditions,omitempty"`
+	Phase                  Phase              `json:"phase,omitempty"`
+	Message                string             `json:"message,omitempty"`
+	JwkerSecretName        string             `json:"jwkerSecretName,omitempty"`
+	MaskinportenSecretName string             `json:"maskinportenSecretName,omitempty"`
+	EntraIdSecretName      string             `json:"entraIdSecretName,omitempty"`
+	OpaBundleSource        *OpaBundleSource   `json:"opaBundleSource,omitempty"`
+	Ready                  bool               `json:"ready"`
 }
 
 // OpaBundleSource defines the source of OPA bundles used for policy evaluation.

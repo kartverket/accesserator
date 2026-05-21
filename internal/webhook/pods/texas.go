@@ -105,10 +105,23 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 			},
 		})
 	}
+
+	entraIdEnabled := "false"
+	if securityConfig.Spec.EntraID != nil && securityConfig.Spec.EntraID.Enabled {
+		entraIdEnabled = "true"
+		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: securityConfig.Status.EntraIdSecretName,
+				},
+			},
+		})
+	}
+
 	return TexasEnvVars{
 		TokenXEnabled:          tokenxEnabled,
 		MaskinportenEnabled:    maskinportenEnabled,
-		AzureEnabled:           "false",
+		AzureEnabled:           entraIdEnabled,
 		IdportenEnabled:        "false",
 		IntegrationSecretsRefs: integrationSecrets,
 	}

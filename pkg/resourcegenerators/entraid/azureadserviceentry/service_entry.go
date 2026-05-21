@@ -1,8 +1,7 @@
-package maskinportenserviceentry
+package azureadserviceentry
 
 import (
 	"github.com/kartverket/accesserator/internal/state"
-	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	istioapiv1 "istio.io/api/networking/v1"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -14,16 +13,9 @@ const (
 	IstiodNamesapce       = "istio-system"
 )
 
-func GetDesired(objectMeta v1.ObjectMeta, maskinportenConfig state.MaskinportenConfig) *istionetworkingv1.ServiceEntry {
-	if !maskinportenConfig.Enabled {
+func GetDesired(objectMeta v1.ObjectMeta, entraIdConfig state.EntraIdConfig) *istionetworkingv1.ServiceEntry {
+	if !entraIdConfig.Enabled {
 		return nil
-	}
-
-	var maskinportenHost string
-	if *config.Get().RunsInProduction {
-		maskinportenHost = utilities.MaskinportenProdHost
-	} else {
-		maskinportenHost = utilities.MaskinportenTestHost
 	}
 
 	return &istionetworkingv1.ServiceEntry{
@@ -35,7 +27,7 @@ func GetDesired(objectMeta v1.ObjectMeta, maskinportenConfig state.MaskinportenC
 				IstiodNamesapce,
 			},
 			Hosts: []string{
-				maskinportenHost,
+				utilities.EntraIdHost,
 			},
 			Ports: []*istioapiv1.ServicePort{
 				{

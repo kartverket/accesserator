@@ -17,6 +17,7 @@ const (
 	defaultTexasImageSha                       = "abc123"
 	defaultTexasPort                           = int32(3000)
 	defaultTexasUrlEnvVarName                  = "TEXAS_URL"
+	defaultEntraTenantId                       = "7f74c8a2-43ce-46b2-b0e8-b6306cba73a3"
 	defaultOpaEnabled                          = "false"
 	defaultOpaImageName                        = "openpolicyagent/opa"
 	defaultOpaImageTag                         = "latest"
@@ -37,6 +38,7 @@ var defaultEnvVars = map[string]string{
 	"ACCESSERATOR_TEXAS_IMAGE_SHA":                          defaultTexasImageSha,
 	"ACCESSERATOR_TEXAS_PORT":                               fmt.Sprintf("%d", defaultTexasPort),
 	"ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME":                   defaultTexasUrlEnvVarName,
+	"ACCESSERATOR_ENTRA_TENANT_ID":                          defaultEntraTenantId,
 	"ACCESSERATOR_OPA_ENABLED":                              defaultOpaEnabled,
 	"ACCESSERATOR_OPA_IMAGE_NAME":                           defaultOpaImageName,
 	"ACCESSERATOR_OPA_IMAGE_TAG":                            defaultOpaImageTag,
@@ -89,6 +91,9 @@ func TestLoad_AllRequiredSet(t *testing.T) {
 	}
 	if c.TexasImageSha != defaultTexasImageSha {
 		t.Errorf("TexasImageSha = %q, want %q", c.TexasImageSha, defaultTexasImageSha)
+	}
+	if c.EntraTenantId != defaultEntraTenantId {
+		t.Errorf("EntraTenantId = %q, want %q", c.EntraTenantId, defaultEntraTenantId)
 	}
 	if c.OpaImageTag != defaultOpaImageTag {
 		t.Errorf("OpaImageTag = %q, want %q", c.OpaImageTag, defaultOpaImageTag)
@@ -192,6 +197,18 @@ func TestLoad_MissingTexasImageTag(t *testing.T) {
 	}
 }
 
+func TestLoad_MissingEntraTenantId(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_ENTRA_TENANT_ID")
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing ENTRA_TENANT_ID, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_ENTRA_TENANT_ID") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_ENTRA_TENANT_ID", got)
+	}
+}
+
 func TestLoad_MissingOpaImageTag(t *testing.T) {
 	setAllEnvVarsExcept(t, "ACCESSERATOR_OPA_IMAGE_TAG")
 
@@ -239,6 +256,7 @@ func TestLoad_AllRequiredMissing(t *testing.T) {
 		"ACCESSERATOR_TOKENX_NAMESPACE",
 		"ACCESSERATOR_TEXAS_IMAGE_TAG",
 		"ACCESSERATOR_TEXAS_IMAGE_SHA",
+		"ACCESSERATOR_ENTRA_TENANT_ID",
 		"ACCESSERATOR_OPA_IMAGE_TAG",
 		"ACCESSERATOR_OPA_IMAGE_SHA",
 		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES",
@@ -270,6 +288,7 @@ func TestLoad_CustomValues(t *testing.T) {
 	t.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "123abc")
 	t.Setenv("ACCESSERATOR_TEXAS_PORT", "8080")
 	t.Setenv("ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME", "CUSTOM_URL")
+	t.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "custom-entra-tenant-id")
 	t.Setenv("ACCESSERATOR_OPA_IMAGE_NAME", "custom-opa-image")
 	t.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "v1.2.3")
 	t.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "456def")
@@ -307,6 +326,9 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 	if c.TexasUrlEnvVarName != "CUSTOM_URL" {
 		t.Errorf("TexasUrlEnvVarName = %q, want %q", c.TexasUrlEnvVarName, "CUSTOM_URL")
+	}
+	if c.EntraTenantId != "custom-entra-tenant-id" {
+		t.Errorf("EntraTenantId = %q, want %q", c.EntraTenantId, "custom-entra-tenant-id")
 	}
 	if c.OpaImageName != "custom-opa-image" {
 		t.Errorf("OpaImageName = %q, want %q", c.OpaImageName, "custom-opa-image")

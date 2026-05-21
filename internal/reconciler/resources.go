@@ -6,6 +6,9 @@ import (
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadapplication"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadsecret"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadserviceentry"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
@@ -33,6 +36,9 @@ func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource
 		maskinportenClientControllerResource(scope),
 		maskinportenSecretControllerResource(scope),
 		maskinportenServiceEntryControllerResource(scope),
+		azureAdApplicationControllerResource(scope),
+		azureAdSecretControllerResource(scope),
+		azureAdServiceEntryControllerResource(scope),
 		opaConfigMapControllerResource(scope),
 	}
 }
@@ -157,7 +163,7 @@ func maskinportenServiceEntryControllerResource(scope *state.Scope) ControllerRe
 		Name:      utilities.GetMaskinportenServiceEntryName(scope.SecurityConfig.Name),
 		Namespace: scope.SecurityConfig.Namespace,
 	}
-	desiredResource := maskinportenserviceentry.GetDesired(maskinportenServiceEntryObjectMeta, scope.MaskinportenConfig.Enabled)
+	desiredResource := maskinportenserviceentry.GetDesired(maskinportenServiceEntryObjectMeta, scope.MaskinportenConfig)
 
 	return ControllerResourceAdapter[*istionetworkingv1.ServiceEntry]{
 		reconciliation.ReconcilerAdapter[*istionetworkingv1.ServiceEntry]{
@@ -166,18 +172,85 @@ func maskinportenServiceEntryControllerResource(scope *state.Scope) ControllerRe
 				ResourceName:    maskinportenServiceEntryObjectMeta.Name,
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate: func(current, desired *istionetworkingv1.ServiceEntry) bool {
-					return !reflect.DeepEqual(current.Spec.GetExportTo(), desired.Spec.GetExportTo()) ||
-						!reflect.DeepEqual(current.Spec.GetHosts(), desired.Spec.GetHosts()) ||
-						!reflect.DeepEqual(current.Spec.GetPorts(), desired.Spec.GetPorts()) ||
-						!reflect.DeepEqual(current.Spec.GetResolution(), desired.Spec.GetResolution())
+				ShouldUpdate:    ServiceEntryShouldUpdateFunc,
+				UpdateFields:    serviceEntryUpdateFieldsFunc,
+			},
+		},
+	}
+}
+
+/*
+azureAdApplicationControllerResource reconciles a AzureAdApplication resources, which registers a client through
+Azure's API with corresponding secret that may be used to fetch Entra ID tokens.
+*/
+func azureAdApplicationControllerResource(scope *state.Scope) ControllerResourceAdapter[*naisiov1.AzureAdApplication] {
+	azureAdApplicationObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetAzureAdApplicationName(string(scope.SecurityConfig.Spec.ApplicationRef)),
+		Namespace: scope.SecurityConfig.Namespace,
+	}
+	desiredResource := azureadapplication.GetDesired(azureAdApplicationObjectMeta, scope.EntraIdConfig)
+
+	return ControllerResourceAdapter[*naisiov1.AzureAdApplication]{
+		reconciliation.ReconcilerAdapter[*naisiov1.AzureAdApplication]{
+			Func: reconciliation.ResourceReconciler[*naisiov1.AzureAdApplication]{
+				ResourceKind:    "AzureAdApplication",
+				ResourceName:    azureAdApplicationObjectMeta.Name,
+				DesiredResource: utilities.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate: func(current, desired *naisiov1.AzureAdApplication) bool {
+					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
 				},
-				UpdateFields: func(current, desired *istionetworkingv1.ServiceEntry) {
-					current.Spec.ExportTo = desired.Spec.ExportTo
-					current.Spec.Hosts = desired.Spec.Hosts
-					current.Spec.Ports = desired.Spec.Ports
-					current.Spec.Resolution = desired.Spec.Resolution
+				UpdateFields: func(current, desired *naisiov1.AzureAdApplication) {
+					current.Spec = desired.Spec
 				},
+			},
+		},
+	}
+}
+
+/*
+azureAdSecretControllerResource reconciles a Secret resource based on an existing Entra ID client registration.
+*/
+func azureAdSecretControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.Secret] {
+	azureAdSecretObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetAzureAdSecretFromSecretRefName(scope.SecurityConfig.Name),
+		Namespace: scope.SecurityConfig.Namespace,
+	}
+	desiredResource := azureadsecret.GetDesired(azureAdSecretObjectMeta, scope.EntraIdConfig)
+
+	return ControllerResourceAdapter[*corev1.Secret]{
+		reconciliation.ReconcilerAdapter[*corev1.Secret]{
+			Func: reconciliation.ResourceReconciler[*corev1.Secret]{
+				ResourceKind:    "Secret",
+				ResourceName:    azureAdSecretObjectMeta.Name,
+				DesiredResource: utilities.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    SecretShouldUpdateFunc,
+				UpdateFields:    secretUpdateFieldsFunc,
+			},
+		},
+	}
+}
+
+/*
+azureAdServiceEntryControllerResource reconciles a ServiceEntry resource which allows access to the Entra ID API.
+*/
+func azureAdServiceEntryControllerResource(scope *state.Scope) ControllerResourceAdapter[*istionetworkingv1.ServiceEntry] {
+	azureAdServiceEntryObjectMeta := metav1.ObjectMeta{
+		Name:      utilities.GetAzureAdServiceEntryName(scope.SecurityConfig.Name),
+		Namespace: scope.SecurityConfig.Namespace,
+	}
+	desiredResource := azureadserviceentry.GetDesired(azureAdServiceEntryObjectMeta, scope.EntraIdConfig)
+
+	return ControllerResourceAdapter[*istionetworkingv1.ServiceEntry]{
+		reconciliation.ReconcilerAdapter[*istionetworkingv1.ServiceEntry]{
+			Func: reconciliation.ResourceReconciler[*istionetworkingv1.ServiceEntry]{
+				ResourceKind:    "ServiceEntry",
+				ResourceName:    azureAdServiceEntryObjectMeta.Name,
+				DesiredResource: utilities.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    ServiceEntryShouldUpdateFunc,
+				UpdateFields:    serviceEntryUpdateFieldsFunc,
 			},
 		},
 	}
@@ -230,4 +303,18 @@ func secretUpdateFieldsFunc(current, desired *corev1.Secret) {
 	current.Data = desired.Data
 	current.Immutable = desired.Immutable
 	current.Type = desired.Type
+}
+
+func ServiceEntryShouldUpdateFunc(current, desired *istionetworkingv1.ServiceEntry) bool {
+	return !reflect.DeepEqual(current.Spec.GetExportTo(), desired.Spec.GetExportTo()) ||
+		!reflect.DeepEqual(current.Spec.GetHosts(), desired.Spec.GetHosts()) ||
+		!reflect.DeepEqual(current.Spec.GetPorts(), desired.Spec.GetPorts()) ||
+		!reflect.DeepEqual(current.Spec.GetResolution(), desired.Spec.GetResolution())
+}
+
+func serviceEntryUpdateFieldsFunc(current, desired *istionetworkingv1.ServiceEntry) {
+	current.Spec.ExportTo = desired.Spec.ExportTo
+	current.Spec.Hosts = desired.Spec.Hosts
+	current.Spec.Ports = desired.Spec.Ports
+	current.Spec.Resolution = desired.Spec.Resolution
 }

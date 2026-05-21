@@ -1,0 +1,125 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: texas-entraid
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-texas-entraid
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+        istio.io/rev: default
+  steps:
+    - try:
+        - script:
+            content: |
+              ENV_FILE=../../../../hack/mock_controller/.env.example
+              if [ ! -f "$ENV_FILE" ]; then
+                echo "⚠️  hack/mock_controller/.env.example not found."
+                exit 1
+              fi
+              echo "⏳ Replacing mock-controller-env secret from $ENV_FILE"
+              kubectl create secret generic mock-controller-env \
+                --from-env-file="$ENV_FILE" \
+                -n mock-controller-system \
+                --dry-run=client -o yaml | kubectl apply -f -
+              kubectl rollout restart deployment/mock-controller -n mock-controller-system
+              kubectl rollout status deployment/mock-controller -n mock-controller-system --timeout=30s
+              echo "✅ mock-controller-env secret replaced and mock-controller restarted"
+        - create:
+            file: skiperator-application.yaml
+        - create:
+            file: securityconfig-entraid-disabled.yaml
+        - error:
+            file: pod-with-texas-without-entraid.yaml
+        - error:
+            file: pod-with-texas-with-entraid.yaml
+        - assert:
+            file: pod-without-texas.yaml
+        - script:
+            content: | 
+              # Verify that TEXAS_URL is not set and assert that the number of containers in the app is 2.
+              kubectl exec -n chainsaw-texas-entraid deploy/app -c app -- printenv TEXAS_URL && exit 1 || exit 0
+        - patch:
+            resource:
+              apiVersion: skiperator.kartverket.no/v1alpha1
+              kind: Application
+              metadata:
+                name: app
+              spec:
+                podSettings:
+                  annotations:
+                    accesserator.kartverket.no/services: "texas"
+        - error:
+            file: pod-with-texas-with-entraid.yaml
+        - error:
+            file: pod-without-texas.yaml
+        - assert:
+            file: pod-with-texas-without-entraid.yaml
+        - script:
+            content: |
+              # Verify TEXAS_URL is set
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas-entraid deploy/app -c app -- printenv TEXAS_URL)
+              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set"; exit 1; fi
+              echo "✅ TEXAS_URL=$TEXAS_URL"
+
+              # Call texas token and verify entraid is disabled
+              RESPONSE=$(kubectl exec -n chainsaw-texas-entraid deploy/app -c app -- \
+                curl -sX POST $TEXAS_URL/api/v1/token \
+                  -H "Content-Type: application/json" \
+                  -d "{\"identity_provider\":\"entra_id\",\"target\":\"other-client/.default\"}")
+              ERROR=$(echo "$RESPONSE" | jq -r '.error // empty')
+              if [ "$ERROR" != "invalid_request" ]; then echo "❌ Expected invalid_request error, got: $ERROR"; exit 1; fi
+              ERROR_DESC=$(echo "$RESPONSE" | jq -r '.error_description // empty')
+              if [ "$ERROR_DESC" != "identity provider 'entra_id' is not enabled" ]; then echo "❌ Unexpected error_description: $ERROR_DESC"; exit 1; fi
+              echo "✅ Texas correctly reports entraid is not enabled"
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                entraid:
+                  enabled: true
+        - script:
+            content: |
+              kubectl rollout restart deploy/app -n chainsaw-texas-entraid
+              # Wait for the app deployment to be ready again after the restart
+              kubectl wait --for=condition=available --timeout=20s deploy/app -n chainsaw-texas-entraid
+        - error:
+            file: pod-with-texas-without-entraid.yaml
+        - error:
+            file: pod-without-texas.yaml
+        - assert:
+            file: pod-with-texas-with-entraid.yaml
+        - script:
+            content: |
+              # Verify TEXAS_URL is still set
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas-entraid deploy/app -c app -- printenv TEXAS_URL)
+              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set after enabling entraid"; exit 1; fi
+              echo "✅ TEXAS_URL=$TEXAS_URL"
+
+              # Call texas token and verify entraid is enabled
+              # We expect error pointing out that client authentication fails
+              RESPONSE=$(kubectl exec -n chainsaw-texas-entraid deploy/app -c app -- \
+                  curl -sX POST $TEXAS_URL/api/v1/token \
+                  -H "Content-Type: application/json" \
+                  -d "{\"identity_provider\":\"entra_id\",\"target\":\"other-client/.default\"}" \
+                  -w "\n%{http_code}")
+              echo "Response: $RESPONSE"
+              HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+              BODY=$(echo "$RESPONSE" | awk 'NR>1{print prev} {prev=$0}')
+              if [ "$HTTP_CODE" != "400" ]; then echo "❌ Expected HTTP 400, got: $HTTP_CODE. Body: $BODY"; exit 1; fi
+              ERROR_DESC=$(echo "$BODY" | jq -r '.error_description // empty')
+              case "$ERROR_DESC" in
+                "AADSTS70011: The provided request must include a 'scope' input parameter. The provided value for the input parameter 'scope' is not valid. The scope other-client/.default is not valid."*)
+                  echo "✅ Texas correctly attempted entraid token request (client auth failed as expected with dummy secrets)"
+                  exit 0
+                  ;;
+              esac
+              echo "❌ Unexpected error_description: $ERROR_DESC. Body: $BODY"
+              exit 1

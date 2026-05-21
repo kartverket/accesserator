@@ -46,8 +46,8 @@ var _ = Describe("SecurityConfig Resolver", func() {
 	})
 
 	Describe("ResolveSecurityConfig", func() {
-		Context("when both tokenx and maskinporten are disabled", func() {
-			It("should return scope with both configs disabled", func() {
+		Context("when tokenx, maskinporten and entraid are disabled", func() {
+			It("should return scope with all configs disabled", func() {
 				sc := accesseratorv1alpha.SecurityConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testSecurityConfig,
@@ -57,6 +57,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						ApplicationRef: testAppName,
 						Tokenx:         nil,
 						Maskinporten:   nil,
+						EntraID:        nil,
 					},
 				}
 
@@ -66,6 +67,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result).NotTo(BeNil())
 				Expect(result.TokenXConfig.Enabled).To(BeFalse())
 				Expect(result.MaskinportenConfig.Enabled).To(BeFalse())
+				Expect(result.EntraIdConfig.Enabled).To(BeFalse())
 				Expect(result.SecurityConfig.Name).To(Equal(testSecurityConfig))
 			})
 		})
@@ -83,6 +85,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 							Enabled: true,
 						},
 						Maskinporten: nil,
+						EntraID:      nil,
 					},
 				}
 
@@ -93,7 +96,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result).To(BeNil())
 			})
 
-			It("should return scope with tokenx enabled and maskinporten disabled", func() {
+			It("should return scope with tokenx enabled and maskinporten/entraid disabled", func() {
 				// Create application
 				app := &v1alpha1.Application{
 					ObjectMeta: metav1.ObjectMeta{
@@ -118,6 +121,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 							Enabled: true,
 						},
 						Maskinporten: nil,
+						EntraID:      nil,
 					},
 				}
 
@@ -128,6 +132,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result.TokenXConfig.Enabled).To(BeTrue())
 				Expect(result.TokenXConfig.ApplicationRef).To(Equal(testAppName))
 				Expect(result.MaskinportenConfig.Enabled).To(BeFalse())
+				Expect(result.EntraIdConfig.Enabled).To(BeFalse())
 			})
 		})
 
@@ -152,6 +157,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 								},
 							},
 						},
+						EntraID: nil,
 					},
 				}
 
@@ -160,14 +166,47 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
 				Expect(result.TokenXConfig.Enabled).To(BeFalse())
+				Expect(result.EntraIdConfig.Enabled).To(BeFalse())
 				Expect(result.MaskinportenConfig.Enabled).To(BeTrue())
 				Expect(result.MaskinportenConfig.Type).To(Equal(state.InlineClient))
 				Expect(result.MaskinportenConfig.ClientSpec.ClientName).To(Equal("test-client"))
 			})
 		})
 
-		Context("when both tokenx and maskinporten are enabled", func() {
-			It("should return scope with both configs enabled", func() {
+		Context("when only entraid is enabled", func() {
+			It("should return scope with entraid enabled using inline client", func() {
+				sc := accesseratorv1alpha.SecurityConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testSecurityConfig,
+						Namespace: testNamespace,
+					},
+					Spec: accesseratorv1alpha.SecurityConfigSpec{
+						ApplicationRef: testAppName,
+						Tokenx:         nil,
+						Maskinporten:   nil,
+						EntraID: &accesseratorv1alpha.EntraIDSpec{
+							Enabled: true,
+							Client: &accesseratorv1alpha.AzureAdApplicationSpec{
+								SecretName: "test-client-secret",
+							},
+						},
+					},
+				}
+
+				result, err := resolver.ResolveSecurityConfig(ctx, k8sClient, sc)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
+				Expect(result.TokenXConfig.Enabled).To(BeFalse())
+				Expect(result.MaskinportenConfig.Enabled).To(BeFalse())
+				Expect(result.EntraIdConfig.Enabled).To(BeTrue())
+				Expect(result.EntraIdConfig.Type).To(Equal(state.InlineClient))
+				Expect(result.EntraIdConfig.ClientSpec.SecretName).To(Equal("test-client-secret"))
+			})
+		})
+
+		Context("when tokenx, maskinporten and entraid are enabled", func() {
+			It("should return scope with all configs enabled", func() {
 				// Create application with access policy
 				otherAppName := "other-app"
 				accessPolicy := &podtypes.AccessPolicy{
@@ -214,6 +253,12 @@ var _ = Describe("SecurityConfig Resolver", func() {
 								ClientName: "test-client",
 							},
 						},
+						EntraID: &accesseratorv1alpha.EntraIDSpec{
+							Enabled: true,
+							Client: &accesseratorv1alpha.AzureAdApplicationSpec{
+								SecretName: testAppName + "-secret",
+							},
+						},
 					},
 				}
 
@@ -235,6 +280,11 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result.MaskinportenConfig.Type).To(Equal(state.InlineClient))
 				Expect(result.MaskinportenConfig.ClientSpec.ClientName).To(Equal("test-client"))
 				Expect(result.MaskinportenConfig.ClientSpec.SecretName).To(Equal(utilities.GetMaskinportenSecretName(testSecurityConfig)))
+
+				// Verify Entra ID config
+				Expect(result.EntraIdConfig.Enabled).To(BeTrue())
+				Expect(result.EntraIdConfig.Type).To(Equal(state.InlineClient))
+				Expect(result.EntraIdConfig.ClientSpec.SecretName).To(Equal("test-app-secret"))
 
 				// Verify SecurityConfig is preserved
 				Expect(result.SecurityConfig.Name).To(Equal(testSecurityConfig))

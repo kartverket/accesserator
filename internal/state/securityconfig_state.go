@@ -21,6 +21,7 @@ type Scope struct {
 	SecurityConfig         v1alpha.SecurityConfig
 	TokenXConfig           TokenXConfig
 	MaskinportenConfig     MaskinportenConfig
+	EntraIdConfig          EntraIdConfig
 	OpaConfig              OpaConfig
 	Descendants            []Descendant[client.Object]
 	InvalidConfig          bool
@@ -37,6 +38,14 @@ type MaskinportenConfig struct {
 	Enabled    bool
 	Type       ConfigType
 	ClientSpec *naisiov1.MaskinportenClientSpec
+	ClientRef  *v1alpha.ResourceRef
+	SecretData *map[string][]byte
+}
+
+type EntraIdConfig struct {
+	Enabled    bool
+	Type       ConfigType
+	ClientSpec *naisiov1.AzureAdApplicationSpec
 	ClientRef  *v1alpha.ResourceRef
 	SecretData *map[string][]byte
 }
