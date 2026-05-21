@@ -72,7 +72,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
 				},
 			}
 			c := pods.GetTexasContainer(securityConfig)
@@ -88,7 +88,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					corev1.EnvFromSource{
 						SecretRef: &corev1.SecretEnvSource{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: securityConfig.Status.MaskinportenSectretName,
+								Name: securityConfig.Status.MaskinportenSecretName,
 							},
 						},
 					},
@@ -146,7 +146,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					corev1.EnvFromSource{
 						SecretRef: &corev1.SecretEnvSource{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: securityConfig.Status.MaskinportenSectretName,
+								Name: securityConfig.Status.MaskinportenSecretName,
 							},
 						},
 					},
@@ -249,7 +249,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
 				},
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
@@ -258,7 +258,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				corev1.EnvFromSource{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: securityConfig.Status.MaskinportenSectretName,
+							Name: securityConfig.Status.MaskinportenSecretName,
 						},
 					},
 				},
@@ -345,7 +345,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				corev1.EnvFromSource{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: securityConfig.Status.MaskinportenSectretName,
+							Name: securityConfig.Status.MaskinportenSecretName,
 						},
 					},
 				},

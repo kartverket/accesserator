@@ -100,7 +100,7 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: securityConfig.Status.MaskinportenSectretName,
+					Name: securityConfig.Status.MaskinportenSecretName,
 				},
 			},
 		})

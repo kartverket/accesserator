@@ -139,7 +139,7 @@ func DetermineReconciliationState(
 		// If MaksinportenConfigType is secretRef, the integration secret is utilities.GetMaskinportenSecretFromSecretRefName(<SecurityConfig.Name>),
 		// otherwise we need to fetch if from the MaskinportenClient status
 		if scope.MaskinportenConfig.Type == state.SecretRef {
-			scope.SecurityConfig.Status.MaskinportenSectretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
+			scope.SecurityConfig.Status.MaskinportenSecretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
 		} else {
 			var maskinportenClientName string
 			switch scope.MaskinportenConfig.Type {
@@ -148,7 +148,7 @@ func DetermineReconciliationState(
 			case state.ClientRef:
 				maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
 			default:
-				return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
+				return nil, fmt.Errorf("encountered invalid ConfigType %d", scope.MaskinportenConfig.Type)
 			}
 
 			maskinportenClientObjectKey := client.ObjectKey{
@@ -166,7 +166,7 @@ func DetermineReconciliationState(
 			if maskinportenClient.Status.SynchronizationState != utilities.MaskinportenClientSynchronizationStateReady {
 				waitingForMaskinportenClient = true
 			}
-			scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
+			scope.SecurityConfig.Status.MaskinportenSecretName = maskinportenClient.Status.SynchronizationSecretName
 		}
 	}
 	switch {

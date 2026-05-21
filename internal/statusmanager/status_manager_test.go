@@ -244,7 +244,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(*result).To(Equal(statusmanager.StateReady))
-			Expect(scope.SecurityConfig.Status.MaskinportenSectretName).To(Equal(secretName),
+			Expect(scope.SecurityConfig.Status.MaskinportenSecretName).To(Equal(secretName),
 				"MaskinportenClientSecretName should be set from the MaskinportenClient synchronization secret name")
 		})
 
@@ -288,7 +288,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(*result).To(Equal(statusmanager.StateReady))
-		Expect(scope.SecurityConfig.Status.MaskinportenSectretName).To(Equal(utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)),
+		Expect(scope.SecurityConfig.Status.MaskinportenSecretName).To(Equal(utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)),
 			"MaskinportenClientSecretName should be set from utilities.GetMaskinportenSecretFromSecretRefName func")
 	})
 
