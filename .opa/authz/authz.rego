@@ -1,3 +1,5 @@
+# METADATA
+# entrypoint: true
 package authz
 
 import rego.v1
@@ -5,5 +7,5 @@ import rego.v1
 default allow := false
 
 allow if {
-    input.password == "after update"
+	input.password == "accesserator"
 }

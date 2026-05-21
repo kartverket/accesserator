@@ -14,6 +14,10 @@ permissions:
   id-token: write
   attestations: write
 
+env:
+  REGISTRY: ghcr.io
+  BUNDLE_NAME: ${{ github.repository }}/opa-bundle
+
 jobs:
   tags:
     runs-on: ubuntu-latest
@@ -36,9 +40,9 @@ jobs:
 
   build:
     needs: tags
-    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@2a48ed92e60552c1240b6969002e8b8ec0ab91f5
+    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@61c13e318179ef5c4b62de3d5241dfbd933dca08
     with:
-      artifactName: ${{ github.repository }}/opa-bundle
+      artifact-name: ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}
       rego-path: .opa
       test-path: .opa
       lint: true
