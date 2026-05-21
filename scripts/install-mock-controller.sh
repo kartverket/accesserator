@@ -5,6 +5,7 @@ KUBECTL_BIN="${KUBECTL_BIN:-./bin/kubectl}"
 
 MOCK_CONTROLLER_RESOURCES=(
   https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_maskinportenclients.yaml
+  https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_azureadapplications.yaml
 )
 
 echo "🤞  Creating namespace: $namespace_name"
@@ -40,12 +41,14 @@ rules:
   - nais.io
   resources:
   - maskinportenclients/finalizers
+  - azureadapplications/finalizers
   verbs:
   - update
 - apiGroups:
   - nais.io
   resources:
   - maskinportenclients/status
+  - azureadapplications/status
   verbs:
   - get
   - patch
@@ -61,6 +64,7 @@ rules:
   - nais.io
   resources:
   - maskinportenclients
+  - azureadapplications
   verbs:
   - create
   - delete
