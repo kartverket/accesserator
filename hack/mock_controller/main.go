@@ -83,7 +83,7 @@ func reconcileMaskinporten(
 		return reconcile.Result{}, err
 	}
 	logger.Info(fmt.Sprintf(
-		"Reconciling MaksinportenClient %s/%s",
+		"Reconciling MaskinportenClient %s/%s",
 		maskinportenClient.GetNamespace(),
 		maskinportenClient.GetName(),
 	))
@@ -124,7 +124,7 @@ func reconcileMaskinporten(
 		maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 		logger.Info(
 			fmt.Sprintf(
-				"Updating status for MaksinportenClient %s/%s.",
+				"Updating status for MaskinportenClient %s/%s.",
 				maskinportenClient.GetNamespace(),
 				maskinportenClient.GetName(),
 			),
@@ -134,7 +134,7 @@ func reconcileMaskinporten(
 			logger.Error(
 				statusErr,
 				fmt.Sprintf(
-					"Failed to update status for MaksinportenClient %s/%s.",
+					"Failed to update status for MaskinportenClient %s/%s.",
 					maskinportenClient.GetNamespace(),
 					maskinportenClient.GetName(),
 				),
@@ -143,7 +143,7 @@ func reconcileMaskinporten(
 		}
 		logger.Info(
 			fmt.Sprintf(
-				"Successfully updated status for MaksinportenClient %s/%s.",
+				"Successfully updated status for MaskinportenClient %s/%s.",
 				maskinportenClient.GetNamespace(),
 				maskinportenClient.GetName(),
 			),
@@ -192,7 +192,7 @@ func reconcileMaskinporten(
 	maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 	logger.Info(
 		fmt.Sprintf(
-			"Updating status for MaksinportenClient %s/%s.",
+			"Updating status for MaskinportenClient %s/%s.",
 			maskinportenClient.GetNamespace(),
 			maskinportenClient.GetName(),
 		),
@@ -202,7 +202,7 @@ func reconcileMaskinporten(
 		logger.Error(
 			statusErr,
 			fmt.Sprintf(
-				"Failed to update status for MaksinportenClient %s/%s.",
+				"Failed to update status for MaskinportenClient %s/%s.",
 				maskinportenClient.GetNamespace(),
 				maskinportenClient.GetName(),
 			),
@@ -211,7 +211,7 @@ func reconcileMaskinporten(
 	}
 	logger.Info(
 		fmt.Sprintf(
-			"Successfully updated status for MaksinportenClient %s/%s.",
+			"Successfully updated status for MaskinportenClient %s/%s.",
 			maskinportenClient.GetNamespace(),
 			maskinportenClient.GetName(),
 		),
@@ -281,7 +281,7 @@ func reconcileAzureAdApplication(
 		azureAdApplication.Status.SynchronizationSecretName = secretKey.Name
 		logger.Info(
 			fmt.Sprintf(
-				"Updating status for MaksinportenClient %s/%s.",
+				"Updating status for MaskinportenClient %s/%s.",
 				azureAdApplication.GetNamespace(),
 				azureAdApplication.GetName(),
 			),
@@ -349,7 +349,7 @@ func reconcileAzureAdApplication(
 	azureAdApplication.Status.SynchronizationSecretName = secretKey.Name
 	logger.Info(
 		fmt.Sprintf(
-			"Updating status for MaksinportenClient %s/%s.",
+			"Updating status for MaskinportenClient %s/%s.",
 			azureAdApplication.GetNamespace(),
 			azureAdApplication.GetName(),
 		),
