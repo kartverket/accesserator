@@ -37,349 +37,155 @@ func init() {
 	utilruntime.Must(naisiov1.AddToScheme(scheme))
 }
 
-type mockMaskinportenReconciler struct {
+// reconcileConfig captures the type-specific behaviour for a single mock reconciler instance.
+type reconcileConfig struct {
+	// resourceKind is the human-readable kind name used in log messages.
+	resourceKind string
+	// newObject returns a zero-value instance of the owned resource type.
+	newObject func() client.Object
+	// getSecretName extracts the desired secret name from the owned resource.
+	getSecretName func(client.Object) string
+	// getSecretData returns the desired secret key/value pairs.
+	getSecretData func() map[string][]byte
+	// setStatus persists the synchronization status back onto the owned resource.
+	setStatus func(ctx context.Context, k8sClient client.Client, obj client.Object, secretName string) error
+}
+
+type mockReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
+	config reconcileConfig
 }
 
-func (r *mockMaskinportenReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+func (r *mockReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := log.FromContext(ctx).WithValues("name", req.Name, "namespace", req.Namespace)
 
-	_, maskinportenErr := reconcileMaskinporten(r, ctx, req, logger)
-	if maskinportenErr != nil {
-		return reconcile.Result{}, maskinportenErr
-	}
-
-	return reconcile.Result{}, nil
-}
-
-type mockAzureAdReconciler struct {
-	client client.Client
-	scheme *runtime.Scheme
-}
-
-func (r *mockAzureAdReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	logger := log.FromContext(ctx).WithValues("name", req.Name, "namespace", req.Namespace)
-
-	_, azureAdErr := reconcileAzureAdApplication(r, ctx, req, logger)
-	if azureAdErr != nil {
-		return reconcile.Result{}, azureAdErr
-	}
-
-	return reconcile.Result{}, nil
-}
-
-func reconcileMaskinporten(
-	r *mockMaskinportenReconciler,
-	ctx context.Context,
-	req reconcile.Request,
-	logger logr.Logger,
-) (reconcile.Result, error) {
-	var maskinportenClient naisiov1.MaskinportenClient
-	if err := r.client.Get(ctx, req.NamespacedName, &maskinportenClient); err != nil {
+	obj := r.config.newObject()
+	if err := r.client.Get(ctx, req.NamespacedName, obj); err != nil {
 		if apierrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
 	}
 	logger.Info(fmt.Sprintf(
-		"Reconciling MaskinportenClient %s/%s",
-		maskinportenClient.GetNamespace(),
-		maskinportenClient.GetName(),
+		"Reconciling %s %s/%s",
+		r.config.resourceKind,
+		obj.GetNamespace(),
+		obj.GetName(),
 	))
+
+	return reconcileSecret(
+		ctx, r.client, r.scheme, logger,
+		obj,
+		r.config.resourceKind,
+		r.config.getSecretName(obj),
+		r.config.getSecretData(),
+		func(secretName string) error {
+			return r.config.setStatus(ctx, r.client, obj, secretName)
+		},
+	)
+}
+
+// reconcileSecret contains the shared logic for creating or updating a Secret owned by a
+// resource, followed by a status update. The caller provides the variable parts:
+//   - owner: the Kubernetes object that owns the secret
+//   - resourceKind: human-readable kind name used in log messages
+//   - secretName: name of the secret to manage
+//   - secretData: desired secret key/value pairs
+//   - setStatus: sets the owner's status fields and persists them; receives the secret name
+func reconcileSecret(
+	ctx context.Context,
+	k8sClient client.Client,
+	scheme *runtime.Scheme,
+	logger logr.Logger,
+	owner client.Object,
+	resourceKind string,
+	secretName string,
+	secretData map[string][]byte,
+	setStatus func(secretName string) error,
+) (reconcile.Result, error) {
 	secretKey := types.NamespacedName{
-		Namespace: maskinportenClient.GetNamespace(),
-		Name:      maskinportenClient.Spec.SecretName,
+		Namespace: owner.GetNamespace(),
+		Name:      secretName,
 	}
 
 	var existing corev1.Secret
-	if err := r.client.Get(ctx, secretKey, &existing); err != nil {
+	if err := k8sClient.Get(ctx, secretKey, &existing); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return reconcile.Result{}, err
 		}
-		logger.Info(
-			fmt.Sprintf("Secret %s/%s does not exist. Creating it...", secretKey.Namespace, secretKey.Name))
+
+		logger.Info(fmt.Sprintf("Secret %s/%s does not exist. Creating it...", secretKey.Namespace, secretKey.Name))
 		newSecret := corev1.Secret{
 			ObjectMeta: ctrl.ObjectMeta{
-				Name:      maskinportenClient.Spec.SecretName,
-				Namespace: maskinportenClient.GetNamespace(),
+				Name:      secretName,
+				Namespace: owner.GetNamespace(),
 			},
 			Type: corev1.SecretTypeOpaque,
-			Data: getMaskinportenSecretData(),
+			Data: secretData,
 		}
-
-		if setControllerRefErr := controllerutil.SetControllerReference(
-			&maskinportenClient,
-			&newSecret,
-			r.scheme,
-		); setControllerRefErr != nil {
-			return reconcile.Result{}, setControllerRefErr
+		if err := controllerutil.SetControllerReference(owner, &newSecret, scheme); err != nil {
+			return reconcile.Result{}, err
 		}
-
-		if createErr := r.client.Create(ctx, &newSecret); createErr != nil {
-			return reconcile.Result{}, createErr
+		if err := k8sClient.Create(ctx, &newSecret); err != nil {
+			return reconcile.Result{}, err
 		}
 		logger.Info(fmt.Sprintf("Successfully created Secret %s/%s.", secretKey.Namespace, secretKey.Name))
-		maskinportenClient.Status.SynchronizationState = MaskinportenClientSynchronizationStateReady
-		maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
-		logger.Info(
-			fmt.Sprintf(
-				"Updating status for MaskinportenClient %s/%s.",
-				maskinportenClient.GetNamespace(),
-				maskinportenClient.GetName(),
-			),
-		)
-		statusErr := setMaskinportenClientStatus(ctx, r.client, maskinportenClient)
-		if statusErr != nil {
-			logger.Error(
-				statusErr,
-				fmt.Sprintf(
-					"Failed to update status for MaskinportenClient %s/%s.",
-					maskinportenClient.GetNamespace(),
-					maskinportenClient.GetName(),
-				),
-			)
-			return reconcile.Result{}, statusErr
-		}
-		logger.Info(
-			fmt.Sprintf(
-				"Successfully updated status for MaskinportenClient %s/%s.",
-				maskinportenClient.GetNamespace(),
-				maskinportenClient.GetName(),
-			),
-		)
-		logger.Info(
-			fmt.Sprintf(
-				"Reconciliation complete for MaskinportenClient %s/%s.",
-				maskinportenClient.GetNamespace(),
-				maskinportenClient.GetName(),
-			),
-		)
-		return reconcile.Result{}, nil
-	}
-
-	logger.Info(
-		fmt.Sprintf(
+	} else {
+		logger.Info(fmt.Sprintf(
 			"Secret %s/%s already exists. Checking if it needs to be updated...",
 			secretKey.Namespace,
 			secretKey.Name,
-		),
-	)
+		))
 
-	if existing.Data == nil {
-		existing.Data = map[string][]byte{}
-	}
-
-	needsUpdate := false
-	for key, val := range getMaskinportenSecretData() {
-		if string(existing.Data[key]) != string(val) {
-			existing.Data[key] = val
-			needsUpdate = true
+		if existing.Data == nil {
+			existing.Data = map[string][]byte{}
+		}
+		needsUpdate := false
+		for key, val := range secretData {
+			if string(existing.Data[key]) != string(val) {
+				existing.Data[key] = val
+				needsUpdate = true
+			}
+		}
+		if needsUpdate {
+			logger.Info(fmt.Sprintf("Secret %s/%s needs update. Updating it...", secretKey.Namespace, secretKey.Name))
+			if err := k8sClient.Update(ctx, &existing); err != nil {
+				logger.Error(err, fmt.Sprintf("Failed to update Secret %s/%s", secretKey.Namespace, secretKey.Name))
+				return reconcile.Result{}, err
+			}
+		} else {
+			logger.Info(fmt.Sprintf("Secret %s/%s is up to date. No update needed.", secretKey.Namespace, secretKey.Name))
 		}
 	}
-	if needsUpdate {
-		logger.Info(
-			fmt.Sprintf("Secret %s/%s needs update. Updating it...", secretKey.Namespace, secretKey.Name))
-		if err := r.client.Update(ctx, &existing); err != nil {
-			logger.Error(err, fmt.Sprintf("Failed to update Secret %s/%s", secretKey.Namespace, secretKey.Name))
-			return reconcile.Result{}, err
-		}
-	} else {
-		logger.Info(
-			fmt.Sprintf("Secret %s/%s is up to date. No update needed.", secretKey.Namespace, secretKey.Name))
-	}
-	maskinportenClient.Status.SynchronizationState = MaskinportenClientSynchronizationStateReady
-	maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
-	logger.Info(
-		fmt.Sprintf(
-			"Updating status for MaskinportenClient %s/%s.",
-			maskinportenClient.GetNamespace(),
-			maskinportenClient.GetName(),
-		),
-	)
-	statusErr := setMaskinportenClientStatus(ctx, r.client, maskinportenClient)
-	if statusErr != nil {
-		logger.Error(
-			statusErr,
-			fmt.Sprintf(
-				"Failed to update status for MaskinportenClient %s/%s.",
-				maskinportenClient.GetNamespace(),
-				maskinportenClient.GetName(),
-			),
-		)
-		return reconcile.Result{}, statusErr
-	}
-	logger.Info(
-		fmt.Sprintf(
-			"Successfully updated status for MaskinportenClient %s/%s.",
-			maskinportenClient.GetNamespace(),
-			maskinportenClient.GetName(),
-		),
-	)
-	logger.Info(
-		fmt.Sprintf(
-			"Reconciliation complete for MaskinportenClient %s/%s.",
-			maskinportenClient.GetNamespace(),
-			maskinportenClient.GetName(),
-		),
-	)
-	return reconcile.Result{}, nil
-}
 
-func reconcileAzureAdApplication(
-	r *mockAzureAdReconciler,
-	ctx context.Context,
-	req reconcile.Request,
-	logger logr.Logger,
-) (reconcile.Result, error) {
-	var azureAdApplication naisiov1.AzureAdApplication
-	if err := r.client.Get(ctx, req.NamespacedName, &azureAdApplication); err != nil {
-		if apierrors.IsNotFound(err) {
-			return reconcile.Result{}, nil
-		}
+	logger.Info(fmt.Sprintf(
+		"Updating status for %s %s/%s.",
+		resourceKind,
+		owner.GetNamespace(),
+		owner.GetName(),
+	))
+	if err := setStatus(secretKey.Name); err != nil {
+		logger.Error(err, fmt.Sprintf(
+			"Failed to update status for %s %s/%s.",
+			resourceKind,
+			owner.GetNamespace(),
+			owner.GetName(),
+		))
 		return reconcile.Result{}, err
 	}
 	logger.Info(fmt.Sprintf(
-		"Reconciling AzureAdApplication %s/%s",
-		azureAdApplication.GetNamespace(),
-		azureAdApplication.GetName(),
+		"Successfully updated status for %s %s/%s.",
+		resourceKind,
+		owner.GetNamespace(),
+		owner.GetName(),
 	))
-	secretKey := types.NamespacedName{
-		Namespace: azureAdApplication.GetNamespace(),
-		Name:      azureAdApplication.Spec.SecretName,
-	}
-
-	var existing corev1.Secret
-	if err := r.client.Get(ctx, secretKey, &existing); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return reconcile.Result{}, err
-		}
-		logger.Info(
-			fmt.Sprintf("Secret %s/%s does not exist. Creating it...", secretKey.Namespace, secretKey.Name))
-		newSecret := corev1.Secret{
-			ObjectMeta: ctrl.ObjectMeta{
-				Name:      azureAdApplication.Spec.SecretName,
-				Namespace: azureAdApplication.GetNamespace(),
-			},
-			Type: corev1.SecretTypeOpaque,
-			Data: getEntraIdSecretData(),
-		}
-
-		if setControllerRefErr := controllerutil.SetControllerReference(
-			&azureAdApplication,
-			&newSecret,
-			r.scheme,
-		); setControllerRefErr != nil {
-			return reconcile.Result{}, setControllerRefErr
-		}
-
-		if createErr := r.client.Create(ctx, &newSecret); createErr != nil {
-			return reconcile.Result{}, createErr
-		}
-		logger.Info(fmt.Sprintf("Successfully created Secret %s/%s.", secretKey.Namespace, secretKey.Name))
-		azureAdApplication.Status.SynchronizationState = AzureAdApplicationSynchronizationStateReady
-		azureAdApplication.Status.SynchronizationSecretName = secretKey.Name
-		logger.Info(
-			fmt.Sprintf(
-				"Updating status for MaskinportenClient %s/%s.",
-				azureAdApplication.GetNamespace(),
-				azureAdApplication.GetName(),
-			),
-		)
-		statusErr := setAzureAdApplicationStatus(ctx, r.client, azureAdApplication)
-		if statusErr != nil {
-			logger.Error(
-				statusErr,
-				fmt.Sprintf(
-					"Failed to update status for AzureAdApplication %s/%s.",
-					azureAdApplication.GetNamespace(),
-					azureAdApplication.GetName(),
-				),
-			)
-			return reconcile.Result{}, statusErr
-		}
-		logger.Info(
-			fmt.Sprintf(
-				"Successfully updated status for AzureAdApplication %s/%s.",
-				azureAdApplication.GetNamespace(),
-				azureAdApplication.GetName(),
-			),
-		)
-		logger.Info(
-			fmt.Sprintf(
-				"Reconciliation complete for AzureAdApplication %s/%s.",
-				azureAdApplication.GetNamespace(),
-				azureAdApplication.GetName(),
-			),
-		)
-		return reconcile.Result{}, nil
-	}
-
-	logger.Info(
-		fmt.Sprintf(
-			"Secret %s/%s already exists. Checking if it needs to be updated...",
-			secretKey.Namespace,
-			secretKey.Name,
-		),
-	)
-
-	if existing.Data == nil {
-		existing.Data = map[string][]byte{}
-	}
-
-	needsUpdate := false
-	for key, val := range getEntraIdSecretData() {
-		if string(existing.Data[key]) != string(val) {
-			existing.Data[key] = val
-			needsUpdate = true
-		}
-	}
-	if needsUpdate {
-		logger.Info(
-			fmt.Sprintf("Secret %s/%s needs update. Updating it...", secretKey.Namespace, secretKey.Name))
-		if err := r.client.Update(ctx, &existing); err != nil {
-			logger.Error(err, fmt.Sprintf("Failed to update Secret %s/%s", secretKey.Namespace, secretKey.Name))
-			return reconcile.Result{}, err
-		}
-	} else {
-		logger.Info(
-			fmt.Sprintf("Secret %s/%s is up to date. No update needed.", secretKey.Namespace, secretKey.Name))
-	}
-	azureAdApplication.Status.SynchronizationState = AzureAdApplicationSynchronizationStateReady
-	azureAdApplication.Status.SynchronizationSecretName = secretKey.Name
-	logger.Info(
-		fmt.Sprintf(
-			"Updating status for MaskinportenClient %s/%s.",
-			azureAdApplication.GetNamespace(),
-			azureAdApplication.GetName(),
-		),
-	)
-	statusErr := setAzureAdApplicationStatus(ctx, r.client, azureAdApplication)
-	if statusErr != nil {
-		logger.Error(
-			statusErr,
-			fmt.Sprintf(
-				"Failed to update status for AzureAdApplication %s/%s.",
-				azureAdApplication.GetNamespace(),
-				azureAdApplication.GetName(),
-			),
-		)
-		return reconcile.Result{}, statusErr
-	}
-	logger.Info(
-		fmt.Sprintf(
-			"Successfully updated status for AzureAdApplication %s/%s.",
-			azureAdApplication.GetNamespace(),
-			azureAdApplication.GetName(),
-		),
-	)
-	logger.Info(
-		fmt.Sprintf(
-			"Reconciliation complete for AzureAdApplication %s/%s.",
-			azureAdApplication.GetNamespace(),
-			azureAdApplication.GetName(),
-		),
-	)
+	logger.Info(fmt.Sprintf(
+		"Reconciliation complete for %s %s/%s.",
+		resourceKind,
+		owner.GetNamespace(),
+		owner.GetName(),
+	))
 	return reconcile.Result{}, nil
 }
 
@@ -401,27 +207,55 @@ func main() {
 		os.Exit(1)
 	}
 
-	maskinportenReconciler := &mockMaskinportenReconciler{
+	maskinportenReconciler := &mockReconciler{
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
+		config: reconcileConfig{
+			resourceKind: "MaskinportenClient",
+			newObject:    func() client.Object { return &naisiov1.MaskinportenClient{} },
+			getSecretName: func(obj client.Object) string {
+				return obj.(*naisiov1.MaskinportenClient).Spec.SecretName
+			},
+			getSecretData: getMaskinportenSecretData,
+			setStatus: func(ctx context.Context, k8sClient client.Client, obj client.Object, secretName string) error {
+				mc := obj.(*naisiov1.MaskinportenClient)
+				mc.Status.SynchronizationState = MaskinportenClientSynchronizationStateReady
+				mc.Status.SynchronizationSecretName = secretName
+				return setMaskinportenClientStatus(ctx, k8sClient, *mc)
+			},
+		},
 	}
-	if createMaskinportenControllerErr := ctrl.NewControllerManagedBy(mgr).
+	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&naisiov1.MaskinportenClient{}).
 		Owns(&corev1.Secret{}).
-		Complete(maskinportenReconciler); createMaskinportenControllerErr != nil {
-		fmt.Fprintf(os.Stderr, "failed to set up controller: %v\n", createMaskinportenControllerErr)
+		Complete(maskinportenReconciler); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to set up controller: %v\n", err)
 		os.Exit(1)
 	}
 
-	azureAdReconciler := &mockAzureAdReconciler{
+	azureAdReconciler := &mockReconciler{
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
+		config: reconcileConfig{
+			resourceKind: "AzureAdApplication",
+			newObject:    func() client.Object { return &naisiov1.AzureAdApplication{} },
+			getSecretName: func(obj client.Object) string {
+				return obj.(*naisiov1.AzureAdApplication).Spec.SecretName
+			},
+			getSecretData: getEntraIdSecretData,
+			setStatus: func(ctx context.Context, k8sClient client.Client, obj client.Object, secretName string) error {
+				app := obj.(*naisiov1.AzureAdApplication)
+				app.Status.SynchronizationState = AzureAdApplicationSynchronizationStateReady
+				app.Status.SynchronizationSecretName = secretName
+				return setAzureAdApplicationStatus(ctx, k8sClient, *app)
+			},
+		},
 	}
-	if createEntraIdControllerErr := ctrl.NewControllerManagedBy(mgr).
+	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&naisiov1.AzureAdApplication{}).
 		Owns(&corev1.Secret{}).
-		Complete(azureAdReconciler); createEntraIdControllerErr != nil {
-		fmt.Fprintf(os.Stderr, "failed to set up controller: %v\n", createEntraIdControllerErr)
+		Complete(azureAdReconciler); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to set up controller: %v\n", err)
 		os.Exit(1)
 	}
 
