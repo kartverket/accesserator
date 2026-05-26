@@ -61,7 +61,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=accesserator.kartverket.no,resources=securityconfigs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch
-// +kubebuilder:rbac:groups=nais.io,resources=jwkers;maskinportenclients,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=nais.io,resources=jwkers;maskinportenclients;azureadapplications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch

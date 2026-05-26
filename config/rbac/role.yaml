@@ -61,6 +61,7 @@ rules:
 - apiGroups:
   - nais.io
   resources:
+  - azureadapplications
   - jwkers
   - maskinportenclients
   verbs:
