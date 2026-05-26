@@ -27,6 +27,11 @@ import (
 
 var scheme = runtime.NewScheme()
 
+const (
+	MaskinportenClientSynchronizationStateReady = "Synchronized"
+	AzureAdApplicationSynchronizationStateReady = "Synchronized"
+)
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(naisiov1.AddToScheme(scheme))
@@ -115,7 +120,7 @@ func reconcileMaskinporten(
 			return reconcile.Result{}, createErr
 		}
 		logger.Info(fmt.Sprintf("Successfully created Secret %s/%s.", secretKey.Namespace, secretKey.Name))
-		maskinportenClient.Status.SynchronizationState = "Synchronized"
+		maskinportenClient.Status.SynchronizationState = MaskinportenClientSynchronizationStateReady
 		maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 		logger.Info(
 			fmt.Sprintf(
@@ -183,7 +188,7 @@ func reconcileMaskinporten(
 		logger.Info(
 			fmt.Sprintf("Secret %s/%s is up to date. No update needed.", secretKey.Namespace, secretKey.Name))
 	}
-	maskinportenClient.Status.SynchronizationState = "Synchronized"
+	maskinportenClient.Status.SynchronizationState = MaskinportenClientSynchronizationStateReady
 	maskinportenClient.Status.SynchronizationSecretName = secretKey.Name
 	logger.Info(
 		fmt.Sprintf(
@@ -272,7 +277,7 @@ func reconcileAzureAdApplication(
 			return reconcile.Result{}, createErr
 		}
 		logger.Info(fmt.Sprintf("Successfully created Secret %s/%s.", secretKey.Namespace, secretKey.Name))
-		azureAdApplication.Status.SynchronizationState = "Synchronized"
+		azureAdApplication.Status.SynchronizationState = AzureAdApplicationSynchronizationStateReady
 		azureAdApplication.Status.SynchronizationSecretName = secretKey.Name
 		logger.Info(
 			fmt.Sprintf(
@@ -340,7 +345,7 @@ func reconcileAzureAdApplication(
 		logger.Info(
 			fmt.Sprintf("Secret %s/%s is up to date. No update needed.", secretKey.Namespace, secretKey.Name))
 	}
-	azureAdApplication.Status.SynchronizationState = "Synchronized"
+	azureAdApplication.Status.SynchronizationState = AzureAdApplicationSynchronizationStateReady
 	azureAdApplication.Status.SynchronizationSecretName = secretKey.Name
 	logger.Info(
 		fmt.Sprintf(
