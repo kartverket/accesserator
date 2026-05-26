@@ -140,7 +140,7 @@ var _ = Describe("Config Type Entra ID", func() {
 
 		Context("when no config source is specified", func() {
 			It("should return None as config type", func() {
-				spec := &accesseratorv1alpha.MaskinportenSpec{
+				spec := &accesseratorv1alpha.EntraIDSpec{
 					Enabled: true,
 				}
 
