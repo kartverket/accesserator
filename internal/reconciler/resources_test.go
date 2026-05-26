@@ -11,6 +11,8 @@ import (
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	istioapiv1 "istio.io/api/networking/v1"
+	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -532,5 +534,132 @@ var _ = Describe("SecretShouldUpdateFunc", func() {
 		}
 
 		Expect(reconciler.SecretShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+})
+
+var _ = Describe("ServiceEntryShouldUpdateFunc", func() {
+	It("returns false when current and desired are equal", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo:   []string{".", "istio-system"},
+				Hosts:      []string{"example.com"},
+				Ports:      []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+				Resolution: istioapiv1.ServiceEntry_DNS,
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo:   []string{".", "istio-system"},
+				Hosts:      []string{"example.com"},
+				Ports:      []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+				Resolution: istioapiv1.ServiceEntry_DNS,
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+
+	It("returns false when both are empty", func() {
+		current := &istionetworkingv1.ServiceEntry{}
+		desired := &istionetworkingv1.ServiceEntry{}
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+
+	It("returns true when ExportTo differs", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo: []string{"."},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo: []string{".", "istio-system"},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when Hosts differs", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Hosts: []string{"old.example.com"},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Hosts: []string{"new.example.com"},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a Port is added", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{
+					{Name: "https", Number: 443, Protocol: "HTTPS"},
+					{Name: "http", Number: 80, Protocol: "HTTP"},
+				},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a Port is removed", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{
+					{Name: "https", Number: 443, Protocol: "HTTPS"},
+					{Name: "http", Number: 80, Protocol: "HTTP"},
+				},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{
+					{Name: "https", Number: 443, Protocol: "HTTPS"},
+				},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a Port value changes", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{{Name: "https", Number: 8443, Protocol: "HTTPS"}},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when Resolution differs", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Resolution: istioapiv1.ServiceEntry_DNS,
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Resolution: istioapiv1.ServiceEntry_STATIC,
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
 	})
 })
