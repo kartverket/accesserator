@@ -33,14 +33,18 @@ func ResolveEntraIdConfig(ctx context.Context, k8sClient client.Client, security
 	}
 	switch *entraIdConfigType {
 	case state.InlineClient:
+		var claims *naisiov1.AzureAdClaims
+		if securityConfig.Spec.EntraID.Client.Groups != nil {
+			claims = &naisiov1.AzureAdClaims{
+				Groups: securityConfig.Spec.EntraID.Client.Groups,
+			}
+		}
 		return &state.EntraIdConfig{
 			Enabled: true,
 			Type:    *entraIdConfigType,
 			ClientSpec: &naisiov1.AzureAdApplicationSpec{
-				SecretName: secretNameOrDefault(securityConfig),
-				Claims: &naisiov1.AzureAdClaims{
-					Groups: securityConfig.Spec.EntraID.Client.Groups,
-				},
+				SecretName:                secretNameOrDefault(securityConfig),
+				Claims:                    claims,
 				LogoutUrl:                 securityConfig.Spec.EntraID.Client.LogoutUrl,
 				PreAuthorizedApplications: securityConfig.Spec.EntraID.Client.PreAuthorizedApplications,
 				ReplyUrls:                 securityConfig.Spec.EntraID.Client.ReplyUrls,
