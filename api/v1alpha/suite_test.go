@@ -44,31 +44,20 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	var err error
-	err = accesseratorv1alpha.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(accesseratorv1alpha.AddToScheme(scheme.Scheme)).To(Succeed())
 
 	// Load environment variables
-	err = os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "a-random-tag")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "a-random-uuid")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", AllowedOpaBundleSourcePrefix)
-	Expect(err).NotTo(HaveOccurred())
-	err = config.Load()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "a-random-tag")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "a-random-uuid")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", AllowedOpaBundleSourcePrefix)).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS", "kartverket")).To(Succeed())
+	Expect(config.Load()).To(Succeed())
 
 	// +kubebuilder:scaffold:scheme
 
@@ -85,6 +74,7 @@ var _ = BeforeSuite(func() {
 		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
 	}
 
+	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
