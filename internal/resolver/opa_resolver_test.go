@@ -3,6 +3,7 @@ package resolver_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
@@ -265,10 +266,18 @@ var _ = Describe("OPA Resolver", func() {
 					attestErr: errors.New("attestation-fetch-failed"),
 				}
 
-				_, err := resolver.ResolveOpaConfigWithFetcher(logger, fetcher, makeSecurityConfig(validSourceConfig()))
+				sc := makeSecurityConfig(validSourceConfig())
+				_, err := resolver.ResolveOpaConfigWithFetcher(logger, fetcher, sc)
 
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("attestation-fetch-failed"))
+				Expect(err.Error()).To(Equal(
+					fmt.Sprintf(
+						"failed to verify OCI bundle from %s: "+
+							"failed to fetch cosign bundle for %s",
+						sc.Spec.Opa.BundleURLs[0].URL,
+						sc.Spec.Opa.BundleURLs[0].URL,
+					),
+				))
 				Expect(fetcher.attestCalls).To(Equal(1))
 				Expect(fetcher.fetchCalls).To(BeZero())
 			})

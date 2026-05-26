@@ -315,11 +315,11 @@ var _ = Describe("SecurityConfig validating webhook", func() {
 
 		err := k8sClient.Create(ctx, sc)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring(
-			"signature validation failed for http://bundle-source/bundle:latest: " +
-				"resolve OCI bundle from http://bundle-source/bundle:latest: " +
-				"failed parsing OCI reference http://bundle-source/bundle:latest: " +
-				"invalid reference: invalid repository \"/bundle-source/bundle\"",
+		Expect(err.Error()).To(Equal(
+			fmt.Sprintf(
+				"admission webhook \"vsecurityconfig-v1alpha.kb.io\" denied the request: "+
+					"failed to resolve OCI bundle digest for %s", sc.Spec.Opa.BundleURLs[0].URL,
+			),
 		))
 	})
 

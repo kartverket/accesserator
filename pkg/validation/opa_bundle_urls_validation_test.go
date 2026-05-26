@@ -3,6 +3,7 @@ package validation_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -168,8 +169,9 @@ var _ = Describe("ValidateBundleSourceSignature", func() {
 		err := validation.ValidateBundleSourceSignature(context.Background(), fetcher, nil, withVerification)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("resolve-failed"))
-		Expect(err.Error()).To(ContainSubstring(bundleURL))
+		Expect(err.Error()).To(Equal(
+			fmt.Sprintf("failed to resolve OCI bundle digest for %s", bundleURL),
+		))
 		Expect(fetcher.attestCalls).To(BeZero())
 	})
 
@@ -179,7 +181,9 @@ var _ = Describe("ValidateBundleSourceSignature", func() {
 		err := validation.ValidateBundleSourceSignature(context.Background(), fetcher, nil, withVerification)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("attestation-failed"))
+		Expect(err.Error()).To(Equal(
+			fmt.Sprintf("failed to fetch cosign bundle for %s", bundleURL),
+		))
 		Expect(fetcher.resolveCalls).To(Equal(1))
 		Expect(fetcher.attestCalls).To(Equal(1))
 	})
@@ -205,7 +209,7 @@ var _ = Describe("ValidateBundleSignature", func() {
 		)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("src.repository is required"))
+		Expect(err.Error()).To(ContainSubstring("src.Repository is required"))
 	})
 })
 
