@@ -45,12 +45,14 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Owns(&naisiov1.Jwker{}).
 		Owns(&naisiov1.MaskinportenClient{}).
+		Owns(&naisiov1.AzureAdApplication{}).
 		Owns(&istionetworkingv1.ServiceEntry{}).
 		Owns(&networkv1.NetworkPolicy{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Watches(&v1alpha1.Application{}, eventhandler.HandleSkiperatorApplicationEvent(r.Client)).
 		Watches(&naisiov1.MaskinportenClient{}, eventhandler.HandleMaskinportenClientEvent(r.Client)).
+		Watches(&naisiov1.AzureAdApplication{}, eventhandler.HandleAzureAdApplicationEvent(r.Client)).
 		Watches(&corev1.Secret{}, eventhandler.HandleSecretEvent(r.Client)).
 		Named("securityconfig").
 		Complete(r)
