@@ -45,12 +45,14 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Owns(&naisiov1.Jwker{}).
 		Owns(&naisiov1.MaskinportenClient{}).
+		Owns(&naisiov1.AzureAdApplication{}).
 		Owns(&istionetworkingv1.ServiceEntry{}).
 		Owns(&networkv1.NetworkPolicy{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Watches(&v1alpha1.Application{}, eventhandler.HandleSkiperatorApplicationEvent(r.Client)).
 		Watches(&naisiov1.MaskinportenClient{}, eventhandler.HandleMaskinportenClientEvent(r.Client)).
+		Watches(&naisiov1.AzureAdApplication{}, eventhandler.HandleAzureAdApplicationEvent(r.Client)).
 		Watches(&corev1.Secret{}, eventhandler.HandleSecretEvent(r.Client)).
 		Named("securityconfig").
 		Complete(r)
@@ -61,7 +63,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=accesserator.kartverket.no,resources=securityconfigs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch
-// +kubebuilder:rbac:groups=nais.io,resources=jwkers;maskinportenclients,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=nais.io,resources=jwkers;maskinportenclients;azureadapplications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch

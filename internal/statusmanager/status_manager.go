@@ -24,6 +24,7 @@ const (
 	StatePending
 	StateWaitingForJwker
 	StateWaitingForMaskinportenClient
+	StateWaitingForAzureAdApplication
 	StateFailed
 	StateReady
 )
@@ -115,6 +116,7 @@ func DetermineReconciliationState(
 
 	waitingForJwker := false
 	waitingForMaskinportenClient := false
+	waitingForAzureAdApplication := false
 
 	if scope.TokenXConfig.Enabled {
 		jwkerObjectKey := client.ObjectKey{
@@ -139,7 +141,7 @@ func DetermineReconciliationState(
 		// If MaksinportenConfigType is secretRef, the integration secret is utilities.GetMaskinportenSecretFromSecretRefName(<SecurityConfig.Name>),
 		// otherwise we need to fetch if from the MaskinportenClient status
 		if scope.MaskinportenConfig.Type == state.SecretRef {
-			scope.SecurityConfig.Status.MaskinportenSectretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
+			scope.SecurityConfig.Status.MaskinportenSecretName = utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)
 		} else {
 			var maskinportenClientName string
 			switch scope.MaskinportenConfig.Type {
@@ -148,7 +150,7 @@ func DetermineReconciliationState(
 			case state.ClientRef:
 				maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
 			default:
-				return nil, fmt.Errorf("encountered invalid MaskinportenConfigType %d", scope.MaskinportenConfig.Type)
+				return nil, fmt.Errorf("encountered invalid ConfigType %d", scope.MaskinportenConfig.Type)
 			}
 
 			maskinportenClientObjectKey := client.ObjectKey{
@@ -166,14 +168,50 @@ func DetermineReconciliationState(
 			if maskinportenClient.Status.SynchronizationState != utilities.MaskinportenClientSynchronizationStateReady {
 				waitingForMaskinportenClient = true
 			}
-			scope.SecurityConfig.Status.MaskinportenSectretName = maskinportenClient.Status.SynchronizationSecretName
+			scope.SecurityConfig.Status.MaskinportenSecretName = maskinportenClient.Status.SynchronizationSecretName
 		}
 	}
+
+	if scope.EntraIdConfig.Enabled {
+		if scope.EntraIdConfig.Type == state.SecretRef {
+			scope.SecurityConfig.Status.EntraIdSecretName = utilities.GetAzureAdSecretFromSecretRefName(scope.SecurityConfig.Name)
+		} else {
+			var azureAdApplicationName string
+			switch scope.EntraIdConfig.Type {
+			case state.InlineClient, state.None:
+				azureAdApplicationName = utilities.GetAzureAdApplicationName(string(scope.SecurityConfig.Spec.ApplicationRef))
+			case state.ClientRef:
+				azureAdApplicationName = string(scope.SecurityConfig.Spec.EntraID.ClientRef.Name)
+			default:
+				return nil, fmt.Errorf("encountered invalid ConfigType %d", scope.EntraIdConfig.Type)
+			}
+
+			azureAdApplicationObjectKey := client.ObjectKey{
+				Namespace: scope.SecurityConfig.Namespace,
+				Name:      azureAdApplicationName,
+			}
+			azureAdApplication, getAzureAdApplicationErr := utilities.GetAzureAdApplication(ctx, k8sClient, azureAdApplicationObjectKey)
+			if getAzureAdApplicationErr != nil {
+				return nil, fmt.Errorf("failed to get AzureAdApplication resource %s/%s: %w",
+					azureAdApplicationObjectKey.Namespace,
+					azureAdApplicationObjectKey.Name,
+					getAzureAdApplicationErr,
+				)
+			}
+			if azureAdApplication.Status.SynchronizationState != utilities.AzureAdApplicationSynchronizationStateReady {
+				waitingForAzureAdApplication = true
+			}
+			scope.SecurityConfig.Status.EntraIdSecretName = azureAdApplication.Status.SynchronizationSecretName
+		}
+	}
+
 	switch {
 	case waitingForJwker:
 		return utilities.Ptr(StateWaitingForJwker), nil
 	case waitingForMaskinportenClient:
 		return utilities.Ptr(StateWaitingForMaskinportenClient), nil
+	case waitingForAzureAdApplication:
+		return utilities.Ptr(StateWaitingForAzureAdApplication), nil
 	default:
 		return utilities.Ptr(StateReady), nil
 	}
@@ -183,7 +221,7 @@ func determinePhase(reconciliationState ReconciliationState) v1alpha.Phase {
 	switch reconciliationState {
 	case StateInvalid:
 		return v1alpha.PhaseInvalid
-	case StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient:
+	case StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient, StateWaitingForAzureAdApplication:
 		return v1alpha.PhasePending
 	case StateFailed:
 		return v1alpha.PhaseFailed
@@ -195,7 +233,7 @@ func determinePhase(reconciliationState ReconciliationState) v1alpha.Phase {
 
 func determineReadiness(reconciliationState ReconciliationState) bool {
 	switch reconciliationState {
-	case StateInvalid, StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient, StateFailed:
+	case StateInvalid, StatePending, StateWaitingForJwker, StateWaitingForMaskinportenClient, StateWaitingForAzureAdApplication, StateFailed:
 		return false
 	case StateReady:
 		return true
@@ -213,6 +251,8 @@ func statusMessage(reconciliationState ReconciliationState, validationErrorMessa
 		return "SecurityConfig pending, waiting for Jwker to be ready."
 	case StateWaitingForMaskinportenClient:
 		return "SecurityConfig pending, waiting for MaskinportenClient to be ready."
+	case StateWaitingForAzureAdApplication:
+		return "SecurityConfig pending, waiting for AzureAdApplication to be ready."
 	case StateFailed:
 		return "SecurityConfig failed."
 	case StateReady:

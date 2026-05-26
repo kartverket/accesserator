@@ -15,5 +15,8 @@ package crd
 // MaskinportenClient CRD
 //go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/f638cfb830180dc1d175cab8e7a07a1606688667/config/crd/bases/nais.io_maskinportenclients.yaml
 
+// AzureAdApplication CRD
+//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/f638cfb830180dc1d175cab8e7a07a1606688667/config/crd/bases/nais.io_azureadapplications.yaml
+
 // Istio ServiceEntry CRD
 //go:generate urlcrd -outdir=./bases -kind=ServiceEntry -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.28.0/kubernetes/customresourcedefinitions.gen.yaml

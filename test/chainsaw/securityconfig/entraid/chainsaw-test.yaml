@@ -1,0 +1,59 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: entraid
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        - script:
+            content: |
+              ENV_FILE=../../../../hack/mock_controller/.env.example
+              if [ ! -f "$ENV_FILE" ]; then
+                echo "⚠️  hack/mock_controller/.env.example not found."
+                exit 1
+              fi
+              echo "⏳ Replacing mock-controller-env secret from $ENV_FILE"
+              kubectl create secret generic mock-controller-env \
+                --from-env-file="$ENV_FILE" \
+                -n mock-controller-system \
+                --dry-run=client -o yaml | kubectl apply -f -
+              kubectl rollout restart deployment/mock-controller -n mock-controller-system
+              kubectl rollout status deployment/mock-controller -n mock-controller-system --timeout=30s
+              echo "✅ mock-controller-env secret replaced and mock-controller restarted"
+        - create:
+            file: skiperator-application.yaml
+        - create:
+            file: securityconfig-entraid-disabled.yaml
+        - error:
+            file: azure-ad-application.yaml
+        - error:
+            file: entraid-secret.yaml
+        - error:
+            file: service-entry.yaml
+        - error:
+            file: securityconfig-with-updated-status.yaml
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                entraid:
+                  enabled: true
+                applicationRef: app
+        - assert:
+            file: securityconfig-with-updated-status.yaml
+        - assert:
+            file: azure-ad-application.yaml
+        - assert:
+            file: entraid-secret.yaml
+        - assert:
+            file: service-entry.yaml

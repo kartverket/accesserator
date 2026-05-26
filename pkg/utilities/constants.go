@@ -1,12 +1,17 @@
 package utilities
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 const (
 	EgressNameSuffix = "egress"
 
 	JwkerSecretNameSuffix                       = "jwker-secret"
 	MaskinportenClientSynchronizationStateReady = "Synchronized"
+	AzureAdApplicationSynchronizationStateReady = "Synchronized"
 	JwkerSynchronizationStateReady              = "RolloutComplete"
 
 	MaskinportenNameSuffix = "maskinporten"
@@ -21,11 +26,30 @@ const (
 	MaskinportenTestTokenEndpoint = "https://test.maskinporten.no/token"
 	MaskinportenTestJwksUri       = "https://test.maskinporten.no/jwk"
 
+	EntraIdNameSuffix = "entraid"
+
+	EntraIdHost                  = "login.microsoftonline.com"
+	EntraIdIssuerTemplate        = "https://login.microsoftonline.com/%s/v2.0"
+	EntraIdTokenEndpointTemplate = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
+	EntraIdJwksUriTemplate       = "https://login.microsoftonline.com/%s/discovery/v2.0/keys"
+
 	OpaConfigMapNameSuffix = "opa"
 
 	IstioReadinessProbeRewritePathPattern = "/app-health/%s/readyz"
 	IstioProbeRewritePort                 = 15020
 )
+
+func EntraIdIssuer(tenantId string) string {
+	return fmt.Sprintf(EntraIdIssuerTemplate, tenantId)
+}
+
+func EntraIdTokenEndpoint(tenantId string) string {
+	return fmt.Sprintf(EntraIdTokenEndpointTemplate, tenantId)
+}
+
+func EntraIdJwksUri(tenantId string) string {
+	return fmt.Sprintf(EntraIdJwksUriTemplate, tenantId)
+}
 
 var (
 	CommonInitContainer = corev1.Container{

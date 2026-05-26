@@ -72,7 +72,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
 				},
 			}
 			c := pods.GetTexasContainer(securityConfig)
@@ -88,7 +88,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					corev1.EnvFromSource{
 						SecretRef: &corev1.SecretEnvSource{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: securityConfig.Status.MaskinportenSectretName,
+								Name: securityConfig.Status.MaskinportenSecretName,
 							},
 						},
 					},
@@ -96,7 +96,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			)
 		})
 
-		It("builds a texas init container with both tokenx and maskinporten enabled when they are enabled in SecurityConfig", func() {
+		It("builds a texas init container with both tokenx and maskinporten and entraid enabled when they are enabled in SecurityConfig", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -115,10 +115,14 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 							},
 						},
 					},
+					EntraID: &v1alpha.EntraIDSpec{
+						Enabled: true,
+					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
-					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					JwkerSecretName:        utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					EntraIdSecretName:      utilities.GetAzureAdSecretName(securityConfigName),
 				},
 			}
 			c := pods.GetTexasContainer(securityConfig)
@@ -129,6 +133,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(c.Env).NotTo(BeEmpty())
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.TokenXEnabledEnvVarName, Value: "true"}))
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.MaskinportenEnabledEnvVarName, Value: "true"}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.AzureEnabledEnvVarName, Value: "true"}))
 			Expect(c.EnvFrom).NotTo(BeEmpty())
 			Expect(c.EnvFrom).To(
 				ContainElement(
@@ -146,7 +151,18 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					corev1.EnvFromSource{
 						SecretRef: &corev1.SecretEnvSource{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: securityConfig.Status.MaskinportenSectretName,
+								Name: securityConfig.Status.MaskinportenSecretName,
+							},
+						},
+					},
+				),
+			)
+			Expect(c.EnvFrom).To(
+				ContainElement(
+					corev1.EnvFromSource{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: securityConfig.Status.EntraIdSecretName,
 							},
 						},
 					},
@@ -249,7 +265,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
 				},
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
@@ -258,14 +274,64 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				corev1.EnvFromSource{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: securityConfig.Status.MaskinportenSectretName,
+							Name: securityConfig.Status.MaskinportenSecretName,
 						},
 					},
 				},
 			))
 		})
 
-		It("returns env vars with maskinporten and tokenx enabled and the expected integration secret refs when both are enabled in SecurityConfig", func() {
+		It("returns env vars with entraid disabled and no integration secrets when entraid is not configured in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+				},
+			}
+			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.AzureEnabled).To(Equal("false"))
+			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
+		})
+
+		It("returns env vars with entraid disabled and no integration secrets when entraid is disabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					EntraID: &v1alpha.EntraIDSpec{
+						Enabled: false,
+					},
+				},
+			}
+			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.AzureEnabled).To(Equal("false"))
+			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
+		})
+
+		It("returns env vars with entraid enabled and the expected integration secret ref when entraid is enabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					EntraID: &v1alpha.EntraIDSpec{
+						Enabled: true,
+					},
+				},
+				Status: v1alpha.SecurityConfigStatus{
+					EntraIdSecretName: utilities.GetAzureAdSecretName(securityConfigName),
+				},
+			}
+			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.AzureEnabled).To(Equal("true"))
+			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
+				corev1.EnvFromSource{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: securityConfig.Status.EntraIdSecretName,
+						},
+					},
+				},
+			))
+		})
+
+		It("returns env vars with maskinporten and entraid and tokenx enabled and the expected integration secret refs when both are enabled in SecurityConfig", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{
 					ApplicationRef: applicationRef,
@@ -284,20 +350,25 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 							},
 						},
 					},
+					EntraID: &v1alpha.EntraIDSpec{
+						Enabled: true,
+					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
-					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+					EntraIdSecretName:      utilities.GetAzureAdSecretName(securityConfigName),
+					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					JwkerSecretName:        utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
 				},
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.AzureEnabled).To(Equal("true"))
 			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
 			Expect(envVars.TokenXEnabled).To(Equal("true"))
 			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
 				corev1.EnvFromSource{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: securityConfig.Status.MaskinportenSectretName,
+							Name: securityConfig.Status.EntraIdSecretName,
 						},
 					},
 				},
@@ -306,51 +377,12 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 				corev1.EnvFromSource{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: securityConfig.Status.JwkerSecretName,
+							Name: securityConfig.Status.MaskinportenSecretName,
 						},
 					},
 				},
 			))
-		})
-
-		It("returns env vars with maskinporten enabled and tokenx disabled and the expected integration secret ref for only for maskinporten", func() {
-			securityConfig := v1alpha.SecurityConfig{
-				Spec: v1alpha.SecurityConfigSpec{
-					ApplicationRef: applicationRef,
-					Tokenx: &v1alpha.TokenXSpec{
-						Enabled: false,
-					},
-					Maskinporten: &v1alpha.MaskinportenSpec{
-						Enabled: true,
-						Client: &v1alpha.MaskinportenClientSpec{
-							ClientName: securityConfigName,
-							Scopes: &v1alpha.MaskinportenScope{
-								ConsumedScopes: []naisiov1.ConsumedScope{
-									{Name: "scope1"},
-									{Name: "scope2"},
-								},
-							},
-						},
-					},
-				},
-				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSectretName: utilities.GetMaskinportenSecretName(securityConfigName),
-					JwkerSecretName:         utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
-				},
-			}
-			envVars := pods.GetTexasEnvVars(securityConfig)
-			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
-			Expect(envVars.TokenXEnabled).To(Equal("false"))
 			Expect(envVars.IntegrationSecretsRefs).To(ContainElement(
-				corev1.EnvFromSource{
-					SecretRef: &corev1.SecretEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: securityConfig.Status.MaskinportenSectretName,
-						},
-					},
-				},
-			))
-			Expect(envVars.IntegrationSecretsRefs).ToNot(ContainElement(
 				corev1.EnvFromSource{
 					SecretRef: &corev1.SecretEnvSource{
 						LocalObjectReference: corev1.LocalObjectReference{

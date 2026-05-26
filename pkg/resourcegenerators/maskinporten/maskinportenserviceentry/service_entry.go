@@ -1,6 +1,7 @@
 package maskinportenserviceentry
 
 import (
+	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	istioapiv1 "istio.io/api/networking/v1"
@@ -13,8 +14,8 @@ const (
 	IstiodNamesapce       = "istio-system"
 )
 
-func GetDesired(objectMeta v1.ObjectMeta, maskinportenEnabled bool) *istionetworkingv1.ServiceEntry {
-	if !maskinportenEnabled {
+func GetDesired(objectMeta v1.ObjectMeta, maskinportenConfig state.MaskinportenConfig) *istionetworkingv1.ServiceEntry {
+	if !maskinportenConfig.Enabled {
 		return nil
 	}
 

@@ -3,6 +3,7 @@ package pods
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/pkg/config"
@@ -82,9 +83,9 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 // GetTexasEnvVars resolves the env var values for the Texas container from the SecurityConfig.
 func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 	var integrationSecrets []corev1.EnvFromSource
-	tokenxEnabled := "false"
+	tokenxEnabled := false
 	if securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled {
-		tokenxEnabled = "true"
+		tokenxEnabled = true
 		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
@@ -94,22 +95,35 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 		})
 	}
 
-	maskinportenEnabled := "false"
+	maskinportenEnabled := false
 	if securityConfig.Spec.Maskinporten != nil && securityConfig.Spec.Maskinporten.Enabled {
-		maskinportenEnabled = "true"
+		maskinportenEnabled = true
 		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: securityConfig.Status.MaskinportenSectretName,
+					Name: securityConfig.Status.MaskinportenSecretName,
 				},
 			},
 		})
 	}
+
+	entraIdEnabled := false
+	if securityConfig.Spec.EntraID != nil && securityConfig.Spec.EntraID.Enabled {
+		entraIdEnabled = true
+		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: securityConfig.Status.EntraIdSecretName,
+				},
+			},
+		})
+	}
+
 	return TexasEnvVars{
-		TokenXEnabled:          tokenxEnabled,
-		MaskinportenEnabled:    maskinportenEnabled,
-		AzureEnabled:           "false",
-		IdportenEnabled:        "false",
+		TokenXEnabled:          strconv.FormatBool(tokenxEnabled),
+		MaskinportenEnabled:    strconv.FormatBool(maskinportenEnabled),
+		AzureEnabled:           strconv.FormatBool(entraIdEnabled),
+		IdportenEnabled:        strconv.FormatBool(false),
 		IntegrationSecretsRefs: integrationSecrets,
 	}
 }

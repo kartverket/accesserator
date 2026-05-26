@@ -38,6 +38,14 @@ type SecurityConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Maskinporten *MaskinportenSpec `json:"maskinporten,omitempty"`
 
+	// EntraID specifies whether to configure the Entra ID API consumer capability for an application referred to by `applicationRef`.
+	// The configuration can either be provided inline via the `client` field,
+	// by referencing an existing AzureAdApplication resource via the `clientRef` field,
+	// or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.
+	//
+	// +kubebuilder:validation:Optional
+	EntraID *EntraIDSpec `json:"entraid,omitempty"`
+
 	// Opa specifies whether to configure the open policy agent capability for an application referred to by `applicationRef`.
 	// The configuration includes which bundles compiled from rego policies, and how often OPA should check for updates to these bundles.
 	//
@@ -122,17 +130,27 @@ type MaskinportenSpec struct {
 	Client *MaskinportenClientSpec `json:"client,omitempty"`
 
 	// ClientRef references an existing MaskinportenClient by name.
-	// Use this when a MaskinportenClient exists, and you want to reference it.
+	// Use this when a client registration resource exists, and you want to reference it.
 	//
 	// +kubebuilder:validation:Optional
-	ClientRef *MaskinportenClientRef `json:"clientRef,omitempty"`
+	ClientRef *ResourceRef `json:"clientRef,omitempty"`
 
-	// SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
+	// SecretRef sources the client registration client credentials from one or more existing Kubernetes secrets.
 	// Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
 	// and MaskinportenClient CRD (e.g. manually registered at DigDir).
 	//
 	// +kubebuilder:validation:Optional
 	SecretRef *SecretRef `json:"secretRef,omitempty"`
+}
+
+func (spec MaskinportenSpec) GetClient() *MaskinportenClientSpec {
+	return spec.Client
+}
+func (spec MaskinportenSpec) GetClientRef() *ResourceRef {
+	return spec.ClientRef
+}
+func (spec MaskinportenSpec) GetSecretRef() *SecretRef {
+	return spec.SecretRef
 }
 
 // MaskinportenClientSpec defines the inline configuration for a [MaskinportenClient](https://github.com/nais/digdirator?tab=readme-ov-file#digdirator).
@@ -165,11 +183,95 @@ type MaskinportenScope struct {
 	ConsumedScopes []naisiov1.ConsumedScope `json:"consumes"`
 }
 
-// MaskinportenClientRef defines a reference to an existing MaskinportenClient by name.
+// EntraIDSpec defines the configuration for Entra ID.
+//
+// At most one of `client`, `clientRef`, or `secretRef` may be specified.
+// Exactly one must be specified when `enabled` is true.
 //
 // +kubebuilder:object:generate=true
-type MaskinportenClientRef struct {
-	// Name of the referenced MaskinportenClient.
+// +kubebuilder:validation:XValidation:rule="[has(self.client), has(self.clientRef), has(self.secretRef)].filter(x, x).size() <= 1",message="At most one of client, clientRef, or secretRef may be specified."
+type EntraIDSpec struct {
+	// Enabled indicates whether Entra ID should be configured for the application.
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// Client defines the Entra ID client configuration inline.
+	// Use this when you want to configure the client directly.
+	//
+	// +kubebuilder:validation:Optional
+	Client *AzureAdApplicationSpec `json:"client,omitempty"`
+
+	// ClientRef references an existing AzureAdApplication by name.
+	// Use this when a AzureAdApplication exists, and you want to reference it.
+	//
+	// +kubebuilder:validation:Optional
+	ClientRef *ResourceRef `json:"clientRef,omitempty"`
+
+	// SecretRef sources the client registration credentials from one or more existing Kubernetes secrets.
+	// Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
+	// and AzureAdApplication CRD (e.g. manually registered at Entra).
+	//
+	// +kubebuilder:validation:Optional
+	SecretRef *SecretRef `json:"secretRef,omitempty"`
+}
+
+func (spec EntraIDSpec) GetClient() *AzureAdApplicationSpec {
+	return spec.Client
+}
+func (spec EntraIDSpec) GetClientRef() *ResourceRef {
+	return spec.ClientRef
+}
+func (spec EntraIDSpec) GetSecretRef() *SecretRef {
+	return spec.SecretRef
+}
+
+// AzureAdApplicationSpec defines the inline configuration for a [AzureAdApplication](https://github.com/nais/azurerator?tab=readme-ov-file#azurerator).
+//
+// +kubebuilder:object:generate=true
+type AzureAdApplicationSpec struct {
+	// SecretName is the name of the resulting Secret resource to be created. If not set, the secret will be given a
+	// a name based on the name of the SecurityConfig resource.
+	//
+	// +kubebuilder:validation:Optional
+	SecretName string `json:"secretName,omitempty"`
+
+	// Groups is a list of Entra ID group IDs to be emitted in the `groups` claim in tokens issued by Entra ID. This
+	// also assigns groups to the application for access control. Only direct members of the groups are granted access.
+	//
+	// +kubebuilder:validation:Optional
+	Groups []naisiov1.AzureAdGroup `json:"groups,omitempty"`
+
+	// LogoutUrl is the URL where Entra ID sends a request to have the application clear the user's session data. This
+	// is required if single sign-out should work correctly. Must start with 'https'
+	//
+	// +kubebuilder:validation:Optional
+	LogoutUrl string `json:"logoutUrl,omitempty"`
+
+	// PreAuthorizedApplications is a list of Entra ID Applications that are authorized to perform client credential
+	// flow with this application as scope, or the on-behalf-of (OBO) flow.
+	//
+	// +kubebuilder:validation:Optional
+	PreAuthorizedApplications []naisiov1.AccessPolicyInboundRule `json:"preAuthorizedApplications,omitempty"`
+
+	// ReplyUrls is a list of authorized redirect URIs Entra ID may use when performing authorization code flow. All
+	// production URLs must use the 'https' scheme.
+	//
+	// +kubebuilder:validation:Optional
+	ReplyUrls []naisiov1.AzureAdReplyUrl `json:"replyUrls,omitempty"`
+
+	// SinglePageApplication denotes whether this Entra ID application should be registered as a single-page-application
+	// for usage in client-side applications without access to secrets.
+	//
+	// +kubebuilder:validation:Optional
+	SinglePageApplication *bool `json:"singlePageApplication,omitempty"`
+}
+
+// ResourceRef defines a reference to an existing resource by name.
+//
+// +kubebuilder:object:generate=true
+type ResourceRef struct {
+	// Name of the referenced resource.
 	//
 	// +kubebuilder:validation:Required
 	Name ResourceName `json:"name"`
@@ -259,14 +361,15 @@ type SecretKeySelector struct {
 
 // SecurityConfigStatus defines the observed state of SecurityConfig.
 type SecurityConfigStatus struct {
-	ObservedGeneration      int64              `json:"observedGeneration,omitempty"`
-	Conditions              []metav1.Condition `json:"conditions,omitempty"`
-	Phase                   Phase              `json:"phase,omitempty"`
-	Message                 string             `json:"message,omitempty"`
-	JwkerSecretName         string             `json:"jwkerSecretName,omitempty"`
-	MaskinportenSectretName string             `json:"maskinportenSecretName,omitempty"`
-	OpaBundleSource         *OpaBundleSource   `json:"opaBundleSource,omitempty"`
-	Ready                   bool               `json:"ready"`
+	ObservedGeneration     int64              `json:"observedGeneration,omitempty"`
+	Conditions             []metav1.Condition `json:"conditions,omitempty"`
+	Phase                  Phase              `json:"phase,omitempty"`
+	Message                string             `json:"message,omitempty"`
+	JwkerSecretName        string             `json:"jwkerSecretName,omitempty"`
+	MaskinportenSecretName string             `json:"maskinportenSecretName,omitempty"`
+	EntraIdSecretName      string             `json:"entraIdSecretName,omitempty"`
+	OpaBundleSource        *OpaBundleSource   `json:"opaBundleSource,omitempty"`
+	Ready                  bool               `json:"ready"`
 }
 
 // OpaBundleSource defines the source of OPA bundles used for policy evaluation.

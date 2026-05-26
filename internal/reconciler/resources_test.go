@@ -11,6 +11,8 @@ import (
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	istioapiv1 "istio.io/api/networking/v1"
+	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,6 +88,9 @@ var _ = Describe("ControllerResources", func() {
 					"MaskinportenClient",
 					"Secret",
 					"ServiceEntry",
+					"AzureAdApplication",
+					"Secret",
+					"ServiceEntry",
 					"ConfigMap",
 				),
 			)
@@ -93,26 +98,25 @@ var _ = Describe("ControllerResources", func() {
 
 		It("returns resources with correct names", func() {
 			resources := reconciler.ControllerResources(scope)
-			namesByKind := make(map[string]string, len(resources))
-			for _, r := range resources {
-				namesByKind[r.GetResourceKind()] = r.GetResourceName()
+
+			resourceKindsAndNames := make([]string, len(resources))
+			for i, r := range resources {
+				resourceKindsAndNames[i] = fmt.Sprintf("%s/%s", r.GetResourceKind(), r.GetResourceName())
 			}
 
-			Expect(namesByKind["Jwker"]).To(Equal(
-				utilities.GetJwkerName(string(securityConfig.Spec.ApplicationRef)),
-			))
-			Expect(namesByKind["NetworkPolicy"]).To(Equal(
-				utilities.GetTokenxEgressName(scope.SecurityConfig.Name, config.Get().TokenxName),
-			))
-			Expect(namesByKind["MaskinportenClient"]).To(Equal(
-				utilities.GetMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
-			))
-			Expect(namesByKind["Secret"]).To(Equal(
-				utilities.GetMaskinportenSecretFromSecretRefName(securityConfig.Name),
-			))
-			Expect(namesByKind["ServiceEntry"]).To(Equal(
-				utilities.GetMaskinportenServiceEntryName(securityConfig.Name),
-			))
+			Expect(resourceKindsAndNames).To(
+				ConsistOf(
+					fmt.Sprintf("%s/%s", "Jwker", utilities.GetJwkerName(string(securityConfig.Spec.ApplicationRef))),
+					fmt.Sprintf("%s/%s", "NetworkPolicy", utilities.GetTokenxEgressName(scope.SecurityConfig.Name, config.Get().TokenxName)),
+					fmt.Sprintf("%s/%s", "MaskinportenClient", utilities.GetMaskinportenClientName(string(securityConfig.Spec.ApplicationRef))),
+					fmt.Sprintf("%s/%s", "Secret", utilities.GetMaskinportenSecretFromSecretRefName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.GetMaskinportenServiceEntryName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "AzureAdApplication", utilities.GetAzureAdApplicationName(string(securityConfig.Spec.ApplicationRef))),
+					fmt.Sprintf("%s/%s", "Secret", utilities.GetAzureAdSecretFromSecretRefName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.GetAzureAdServiceEntryName(securityConfig.Name)),
+					fmt.Sprintf("%s/%s", "ConfigMap", utilities.GetOpaConfigMapName(securityConfig.Name)),
+				),
+			)
 		})
 	})
 })
@@ -530,5 +534,132 @@ var _ = Describe("SecretShouldUpdateFunc", func() {
 		}
 
 		Expect(reconciler.SecretShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+})
+
+var _ = Describe("ServiceEntryShouldUpdateFunc", func() {
+	It("returns false when current and desired are equal", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo:   []string{".", "istio-system"},
+				Hosts:      []string{"example.com"},
+				Ports:      []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+				Resolution: istioapiv1.ServiceEntry_DNS,
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo:   []string{".", "istio-system"},
+				Hosts:      []string{"example.com"},
+				Ports:      []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+				Resolution: istioapiv1.ServiceEntry_DNS,
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+
+	It("returns false when both are empty", func() {
+		current := &istionetworkingv1.ServiceEntry{}
+		desired := &istionetworkingv1.ServiceEntry{}
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+
+	It("returns true when ExportTo differs", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo: []string{"."},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				ExportTo: []string{".", "istio-system"},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when Hosts differs", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Hosts: []string{"old.example.com"},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Hosts: []string{"new.example.com"},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a Port is added", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{
+					{Name: "https", Number: 443, Protocol: "HTTPS"},
+					{Name: "http", Number: 80, Protocol: "HTTP"},
+				},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a Port is removed", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{
+					{Name: "https", Number: 443, Protocol: "HTTPS"},
+					{Name: "http", Number: 80, Protocol: "HTTP"},
+				},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{
+					{Name: "https", Number: 443, Protocol: "HTTPS"},
+				},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a Port value changes", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{{Name: "https", Number: 443, Protocol: "HTTPS"}},
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Ports: []*istioapiv1.ServicePort{{Name: "https", Number: 8443, Protocol: "HTTPS"}},
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when Resolution differs", func() {
+		current := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Resolution: istioapiv1.ServiceEntry_DNS,
+			},
+		}
+		desired := &istionetworkingv1.ServiceEntry{
+			Spec: istioapiv1.ServiceEntry{
+				Resolution: istioapiv1.ServiceEntry_STATIC,
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
 	})
 })

@@ -82,16 +82,37 @@ func GetMaskinportenSecretFromSecretRefName(securityConfigName string) string {
 	)
 }
 
+func GetMaskinportenServiceEntryName(securityConfigName string) string {
+	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
+}
+
+func GetAzureAdApplicationName(applicationRef string) string {
+	return fmt.Sprintf("%s-%s", applicationRef, EntraIdNameSuffix)
+}
+
+func GetAzureAdSecretName(securityConfigName string) string {
+	return fmt.Sprintf("%s-%s", securityConfigName, EntraIdNameSuffix)
+}
+
+func GetAzureAdSecretFromSecretRefName(securityConfigName string) string {
+	return fmt.Sprintf(
+		"%s-%s-%s",
+		securityConfigName,
+		EntraIdNameSuffix,
+		ShortHash(securityConfigName),
+	)
+}
+
+func GetAzureAdServiceEntryName(securityConfigName string) string {
+	return fmt.Sprintf("%s-%s", securityConfigName, EntraIdNameSuffix)
+}
+
 // ShortHash returns the first 8 hex characters of an FNV-32a hash of s.
 // Useful for producing short, stable, Kubernetes-safe name suffixes.
 func ShortHash(s string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(s))
 	return fmt.Sprintf("%08x", h.Sum32())
-}
-
-func GetMaskinportenServiceEntryName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
 }
 
 func GetSecret(ctx context.Context, k8sClient client.Client, key client.ObjectKey) (*corev1.Secret, error) {
@@ -148,6 +169,23 @@ func GetMaskinportenClient(
 		)
 	}
 	return &maskinportenClient, nil
+}
+
+func GetAzureAdApplication(
+	ctx context.Context,
+	k8sClient client.Client,
+	key client.ObjectKey,
+) (*naisiov1.AzureAdApplication, error) {
+	var azureadapplication naisiov1.AzureAdApplication
+	if err := k8sClient.Get(ctx, key, &azureadapplication); err != nil {
+		return nil, fmt.Errorf(
+			"failed to get AzureAdApplication %s/%s: %w",
+			key.Name,
+			key.Namespace,
+			err,
+		)
+	}
+	return &azureadapplication, nil
 }
 
 func GetOpaConfigMapName(securityConfigName string) string {

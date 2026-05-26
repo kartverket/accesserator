@@ -323,7 +323,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			sc.Spec = accesseratorv1alpha.SecurityConfigSpec{
 				Maskinporten: &accesseratorv1alpha.MaskinportenSpec{
 					Enabled: true,
-					ClientRef: &accesseratorv1alpha.MaskinportenClientRef{
+					ClientRef: &accesseratorv1alpha.ResourceRef{
 						Name: externalClientName,
 					},
 				},

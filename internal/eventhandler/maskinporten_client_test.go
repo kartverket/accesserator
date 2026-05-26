@@ -19,7 +19,7 @@ var _ = Describe("HandleMaskinportenClientEvent", func() {
 			Spec: v1alpha.SecurityConfigSpec{
 				ApplicationRef: "app-a",
 				Maskinporten: &v1alpha.MaskinportenSpec{
-					ClientRef: &v1alpha.MaskinportenClientRef{Name: "mp-client"},
+					ClientRef: &v1alpha.ResourceRef{Name: "mp-client"},
 				},
 			},
 		}
@@ -28,7 +28,7 @@ var _ = Describe("HandleMaskinportenClientEvent", func() {
 			Spec: v1alpha.SecurityConfigSpec{
 				ApplicationRef: "app-a",
 				Maskinporten: &v1alpha.MaskinportenSpec{
-					ClientRef: &v1alpha.MaskinportenClientRef{Name: "mp-client"},
+					ClientRef: &v1alpha.ResourceRef{Name: "mp-client"},
 				},
 			},
 		}
@@ -37,7 +37,7 @@ var _ = Describe("HandleMaskinportenClientEvent", func() {
 			Spec: v1alpha.SecurityConfigSpec{
 				ApplicationRef: "app-a",
 				Maskinporten: &v1alpha.MaskinportenSpec{
-					ClientRef: &v1alpha.MaskinportenClientRef{Name: "other-client"},
+					ClientRef: &v1alpha.ResourceRef{Name: "other-client"},
 				},
 			},
 		}
@@ -46,7 +46,7 @@ var _ = Describe("HandleMaskinportenClientEvent", func() {
 			Spec: v1alpha.SecurityConfigSpec{
 				ApplicationRef: "app-a",
 				Maskinporten: &v1alpha.MaskinportenSpec{
-					ClientRef: &v1alpha.MaskinportenClientRef{Name: "mp-client"},
+					ClientRef: &v1alpha.ResourceRef{Name: "mp-client"},
 				},
 			},
 		}

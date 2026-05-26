@@ -1,0 +1,13 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+spec:
+  applicationRef: app
+  entraid:
+    enabled: true
+status:
+  entraIdSecretName: security-config-entraid
+  message: SecurityConfig ready.
+  phase: Ready
+  ready: true
