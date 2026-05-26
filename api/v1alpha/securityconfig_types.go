@@ -130,12 +130,12 @@ type MaskinportenSpec struct {
 	Client *MaskinportenClientSpec `json:"client,omitempty"`
 
 	// ClientRef references an existing MaskinportenClient by name.
-	// Use this when a MaskinportenClient exists, and you want to reference it.
+	// Use this when a client registration resource exists, and you want to reference it.
 	//
 	// +kubebuilder:validation:Optional
 	ClientRef *ResourceRef `json:"clientRef,omitempty"`
 
-	// SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
+	// SecretRef sources the client registration client credentials from one or more existing Kubernetes secrets.
 	// Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
 	// and MaskinportenClient CRD (e.g. manually registered at DigDir).
 	//
@@ -208,7 +208,7 @@ type EntraIDSpec struct {
 	// +kubebuilder:validation:Optional
 	ClientRef *ResourceRef `json:"clientRef,omitempty"`
 
-	// SecretRef sources the Entra ID client credentials from one or more existing Kubernetes secrets.
+	// SecretRef sources the client registration credentials from one or more existing Kubernetes secrets.
 	// Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
 	// and AzureAdApplication CRD (e.g. manually registered at Entra).
 	//
