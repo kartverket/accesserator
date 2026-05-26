@@ -30,5 +30,10 @@ spec:
     enabled: true
     bundleUrls:
       - name: test-bundle
-        url: ghcr.io/kartverket/accesserator/opa-bundle@sha256:4aa8fc74fb5265b33174cca45c4fa0728a0d4c6738ff7197997c159257e204f0
+        url: ghcr.io/kartverket/accesserator/opa-bundle:setup-cosign-verification
+        verification:
+          source:
+            repository: kartverket/accesserator
+            workflow: .github/workflows/build-and-push-opa-bundle.yml
+            ref: refs/pull/73/merge
   applicationRef: app

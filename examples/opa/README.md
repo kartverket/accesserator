@@ -5,7 +5,12 @@ This allows you to define and maintain a custom authorization scheme independent
 
 ## Configuring OPA with `SecurityConfig`
 The OPA capability is configured with `SecurityConfig` through the `opa` field, where you can specify the URL to one or more
-OPA bundles used for authorization and the port that the OPA server should listen on.
+OPA bundles used for authorization and the port that the OPA server should listen on. 
+
+To verify the provenance of an OPA bundle, configure spec.opa.bundleUrls[*].verification. This assumes the bundle was built 
+and signed using GitHub Actions with keyless Cosign signing, and that the signature is stored as an OCI 1.1 referrer. 
+When configured, the verification checks that the bundle was built in the expected GitHub repository, by the expected workflow, 
+and from the expected Git reference.
 
 > [!TIP]
 > An OPA bundle is a collection of OPA policies and data that are compiled together into a single `tar.gz` file.
@@ -26,7 +31,12 @@ spec:
     enabled: true
     bundleUrls:
       - name: authz-bundle
-        url: ghcr.io/kartverket/accesserator/opa-bundle:sha-2694ecfda47ac082b141d73199853f410a92d3c3
+        url: ghcr.io/kartverket/accesserator/opa-bundle:setup-cosign-verification
+        verification:
+          source:
+            repository: kartverket/accesserator
+            workflow: .github/workflows/build-and-push-opa-bundle.yml
+            ref: refs/pull/73
   applicationRef: app
 ```
 
