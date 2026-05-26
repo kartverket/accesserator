@@ -78,6 +78,8 @@ spec:
             - name: docker-config
               mountPath: /tmp/github-auth
               readOnly: true
+            - name: sigstore-tuf
+              mountPath: /tmp/tuf
       imagePullSecrets:
         - name: github-auth
       priorityClassName: skip-critical
@@ -97,3 +99,5 @@ spec:
             items:
               - key: .dockerconfigjson
                 path: config.json
+        - name: sigstore-tuf
+          emptyDir: {}
