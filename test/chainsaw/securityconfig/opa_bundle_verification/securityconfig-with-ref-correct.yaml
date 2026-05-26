@@ -1,0 +1,15 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+spec:
+  opa:
+    enabled: true
+    bundleUrls:
+      - name: test-bundle
+        url: ghcr.io/kartverket/accesserator/opa-bundle:setup-cosign-verification
+        verification:
+          source:
+            repository: kartverket/accesserator
+            workflow: .github/workflows/build-and-push-opa-bundle.yml
+            ref: refs/pull/73/merge
