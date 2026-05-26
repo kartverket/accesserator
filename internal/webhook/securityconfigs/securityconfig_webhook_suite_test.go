@@ -286,4 +286,65 @@ var _ = Describe("SecurityConfig validating webhook", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set"))
 	})
+
+	It("rejects a SecurityConfig with verification when the registry is unreachable", func() {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "securityconfig-verification-unreachable-"},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		sc := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "security-config", Namespace: ns.Name},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "myapp",
+				Opa: &v1alpha.OpenPolicyAgentSpec{
+					Enabled: true,
+					BundleURLs: []v1alpha.BundleSource{{
+						Name: "authz-bundle",
+						URL:  allowedBundleURLPrefixes + "/bundle:latest",
+						Verification: &v1alpha.BundleSourceVerification{
+							Source: v1alpha.GitHubRepositorySource{
+								Repository: "kartverket/accesserator",
+							},
+						},
+					}},
+				},
+			},
+		}
+
+		err := k8sClient.Create(ctx, sc)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring(
+			"signature validation failed for http://bundle-source/bundle:latest: " +
+				"resolve OCI bundle from http://bundle-source/bundle:latest: " +
+				"failed parsing OCI reference http://bundle-source/bundle:latest: " +
+				"invalid reference: invalid repository \"/bundle-source/bundle\"",
+		))
+	})
+
+	It("accepts a SecurityConfig when no bundle has verification set", func() {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "securityconfig-no-verification-"},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		sc := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "security-config", Namespace: ns.Name},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "myapp",
+				Opa: &v1alpha.OpenPolicyAgentSpec{
+					Enabled: true,
+					BundleURLs: []v1alpha.BundleSource{{
+						Name: "authz-bundle",
+						URL:  allowedBundleURLPrefixes + "/bundle:latest",
+						// Verification intentionally omitted
+					}},
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+	})
 })
