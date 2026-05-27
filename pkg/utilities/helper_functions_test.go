@@ -102,11 +102,10 @@ var _ = Describe("Helper Functions", func() {
 	})
 
 	Describe("GetMaskinportenClientName", func() {
-		It("should return application ref with maskinporten suffix", func() {
+		It("should return the application ref as the maskinportenclient name", func() {
 			appRef := "my-app"
-			expected := fmt.Sprintf("%s-%s", appRef, utilities.MaskinportenNameSuffix)
 			result := utilities.GetMaskinportenClientName(appRef)
-			Expect(result).To(Equal(expected))
+			Expect(result).To(Equal(appRef))
 		})
 	})
 

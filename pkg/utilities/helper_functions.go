@@ -62,10 +62,6 @@ func GetTokenxEgressName(securityConfigName string, tokenxConfigName string) str
 }
 
 func GetMaskinportenClientName(applicationRef string) string {
-	return fmt.Sprintf("%s-%s", applicationRef, MaskinportenNameSuffix)
-}
-
-func GetDefaultMaskinportenClientName(applicationRef string) string {
 	return applicationRef
 }
 
@@ -87,7 +83,7 @@ func GetMaskinportenServiceEntryName(securityConfigName string) string {
 }
 
 func GetAzureAdApplicationName(applicationRef string) string {
-	return fmt.Sprintf("%s-%s", applicationRef, EntraIdNameSuffix)
+	return applicationRef
 }
 
 func GetAzureAdSecretName(securityConfigName string) string {

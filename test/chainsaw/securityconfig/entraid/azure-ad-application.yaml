@@ -1,7 +1,7 @@
 apiVersion: nais.io/v1
 kind: AzureAdApplication
 metadata:
-  name: app-entraid
+  name: app
 spec:
   secretName: security-config-entraid
 status:

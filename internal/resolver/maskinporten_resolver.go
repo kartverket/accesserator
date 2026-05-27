@@ -74,7 +74,7 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 			Enabled: true,
 			Type:    *maskinportenConfigType,
 			ClientSpec: &naisiov1.MaskinportenClientSpec{
-				ClientName: utilities.GetDefaultMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
+				ClientName: utilities.GetMaskinportenClientName(string(securityConfig.Spec.ApplicationRef)),
 				Scopes:     naisiov1.MaskinportenScope{},
 				SecretName: utilities.GetMaskinportenSecretName(securityConfig.Name),
 			},
