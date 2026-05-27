@@ -49,58 +49,60 @@ func GetJwker(ctx context.Context, k8sClient client.Client, objectKey client.Obj
 	return &jwker, nil
 }
 
-func GetJwkerName(applicationRef string) string {
-	return applicationRef
+type JwkerNamer struct{ Base string }
+
+func (n JwkerNamer) Name() string {
+	return n.Base
 }
 
-func GetJwkerSecretName(jwkerName string) string {
-	return fmt.Sprintf("%s-%s", jwkerName, JwkerSecretNameSuffix)
+func (n JwkerNamer) SecretName() string {
+	return fmt.Sprintf("%s-%s", n.Base, JwkerSecretNameSuffix)
 }
 
-func GetTokenxEgressName(securityConfigName string, tokenxConfigName string) string {
-	return fmt.Sprintf("%s-%s-%s", securityConfigName, tokenxConfigName, EgressNameSuffix)
+func (n JwkerNamer) EgressName(tokenxName string) string {
+	return fmt.Sprintf("%s-%s-%s", n.Base, tokenxName, EgressNameSuffix)
 }
 
-func GetMaskinportenClientName(applicationRef string) string {
-	return applicationRef
+type MaskinportenNamer struct{ Base string }
+
+func (n MaskinportenNamer) Name() string {
+	return n.Base
 }
 
-func GetMaskinportenSecretName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
+func (n MaskinportenNamer) SecretName() string {
+	return fmt.Sprintf("%s-%s", n.Base, MaskinportenNameSuffix)
 }
 
-func GetMaskinportenSecretFromSecretRefName(securityConfigName string) string {
-	return fmt.Sprintf(
-		"%s-%s-%s",
-		securityConfigName,
-		MaskinportenNameSuffix,
-		ShortHash(securityConfigName),
-	)
+func (n MaskinportenNamer) SecretFromRefName() string {
+	return fmt.Sprintf("%s-%s-%s", n.Base, MaskinportenNameSuffix, ShortHash(n.Base))
 }
 
-func GetMaskinportenServiceEntryName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
+func (n MaskinportenNamer) ServiceEntryName() string {
+	return fmt.Sprintf("%s-%s", n.Base, MaskinportenNameSuffix)
 }
 
-func GetAzureAdApplicationName(applicationRef string) string {
-	return applicationRef
+type EntraIdNamer struct{ Base string }
+
+func (n EntraIdNamer) Name() string {
+	return n.Base
 }
 
-func GetAzureAdSecretName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, EntraIdNameSuffix)
+func (n EntraIdNamer) SecretName() string {
+	return fmt.Sprintf("%s-%s", n.Base, EntraIdNameSuffix)
 }
 
-func GetAzureAdSecretFromSecretRefName(securityConfigName string) string {
-	return fmt.Sprintf(
-		"%s-%s-%s",
-		securityConfigName,
-		EntraIdNameSuffix,
-		ShortHash(securityConfigName),
-	)
+func (n EntraIdNamer) SecretFromRefName() string {
+	return fmt.Sprintf("%s-%s-%s", n.Base, EntraIdNameSuffix, ShortHash(n.Base))
 }
 
-func GetAzureAdServiceEntryName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, EntraIdNameSuffix)
+func (n EntraIdNamer) ServiceEntryName() string {
+	return fmt.Sprintf("%s-%s", n.Base, EntraIdNameSuffix)
+}
+
+type OpaNamer struct{ Base string }
+
+func (n OpaNamer) ConfigMapName() string {
+	return fmt.Sprintf("%s-%s", n.Base, OpaConfigMapNameSuffix)
 }
 
 // ShortHash returns the first 8 hex characters of an FNV-32a hash of s.
@@ -182,10 +184,6 @@ func GetAzureAdApplication(
 		)
 	}
 	return &azureadapplication, nil
-}
-
-func GetOpaConfigMapName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, OpaConfigMapNameSuffix)
 }
 
 // GetMockKubernetesClient returns a fake Kubernetes client with the provided scheme and objects. Only used in testing.

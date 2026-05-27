@@ -114,7 +114,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 				Expect(result.ClientSpec).NotTo(BeNil())
 				Expect(result.ClientSpec.ClientName).To(Equal("test-client"))
 				Expect(result.ClientSpec.Scopes.ConsumedScopes).To(HaveLen(2))
-				Expect(result.ClientSpec.SecretName).To(Equal(utilities.GetMaskinportenSecretName(testSecurityConfig)))
+				Expect(result.ClientSpec.SecretName).To(Equal(utilities.MaskinportenNamer{Base: testAppName}.SecretName()))
 			})
 
 			It("should handle nil scopes", func() {

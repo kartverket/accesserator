@@ -36,7 +36,7 @@ var _ = Describe("opa.go unit tests", func() {
 			},
 			Status: v1alpha.SecurityConfigStatus{
 				OpaBundleSource: &v1alpha.OpaBundleSource{
-					ConfigMapName: utilities.GetOpaConfigMapName(securityConfigName),
+					ConfigMapName: utilities.OpaNamer{Base: applicationRef}.ConfigMapName(),
 					BundleNames:   []string{"bundle-a", "bundle-b"},
 				},
 			},
@@ -77,7 +77,7 @@ var _ = Describe("opa.go unit tests", func() {
 				},
 				Status: v1alpha.SecurityConfigStatus{
 					OpaBundleSource: &v1alpha.OpaBundleSource{
-						ConfigMapName: utilities.GetOpaConfigMapName(securityConfigName),
+						ConfigMapName: utilities.OpaNamer{Base: applicationRef}.ConfigMapName(),
 						BundleNames:   []string{"bundle-a", "bundle-b"},
 					},
 				},

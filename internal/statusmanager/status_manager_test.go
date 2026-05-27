@@ -227,7 +227,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 						Maskinporten: &v1alpha.MaskinportenSpec{
 							Enabled: true,
 							ClientRef: &v1alpha.ResourceRef{
-								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
+								Name: v1alpha.ResourceName(utilities.MaskinportenNamer{Base: "my-app"}.Name()),
 							},
 						},
 					},
@@ -288,8 +288,8 @@ var _ = Describe("DetermineReconciliationState", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(*result).To(Equal(statusmanager.StateReady))
-		Expect(scope.SecurityConfig.Status.MaskinportenSecretName).To(Equal(utilities.GetMaskinportenSecretFromSecretRefName(scope.SecurityConfig.Name)),
-			"MaskinportenClientSecretName should be set from utilities.GetMaskinportenSecretFromSecretRefName func")
+		Expect(scope.SecurityConfig.Status.MaskinportenSecretName).To(Equal(utilities.MaskinportenNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.SecretFromRefName()),
+			"MaskinportenSecretName should be set from MaskinportenNamer.SecretFromRefName")
 	})
 
 	Context("when both TokenX and Maskinporten are enabled", func() {
@@ -306,7 +306,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 						Maskinporten: &v1alpha.MaskinportenSpec{
 							Enabled: true,
 							ClientRef: &v1alpha.ResourceRef{
-								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
+								Name: v1alpha.ResourceName(utilities.MaskinportenNamer{Base: "my-app"}.Name()),
 							},
 						},
 					},
@@ -339,7 +339,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 						Maskinporten: &v1alpha.MaskinportenSpec{
 							Enabled: true,
 							ClientRef: &v1alpha.ResourceRef{
-								Name: v1alpha.ResourceName(utilities.GetMaskinportenClientName("my-app")),
+								Name: v1alpha.ResourceName(utilities.MaskinportenNamer{Base: "my-app"}.Name()),
 							},
 						},
 					},
@@ -440,7 +440,7 @@ var _ = Describe("UpdateSecurityConfigStatus", func() {
 
 			updated := &v1alpha.SecurityConfig{}
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(sc), updated)).To(Succeed())
-			Expect(updated.Status.OpaBundleSource.ConfigMapName).To(Equal(utilities.GetOpaConfigMapName(scope.SecurityConfig.Name)))
+			Expect(updated.Status.OpaBundleSource.ConfigMapName).To(Equal(utilities.OpaNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.ConfigMapName()))
 			Expect(updated.Status.OpaBundleSource.BundleNames).To(Equal([]string{"bundle-a", "bundle-b"}))
 		})
 	})

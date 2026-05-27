@@ -91,14 +91,14 @@ var _ = Describe("SecurityConfig Controller", func() {
 
 			By("Cleanup any created Jwker resource")
 			jwker := &naisiov1.Jwker{}
-			jwkerKey := types.NamespacedName{Name: utilities.GetJwkerName(skiperatorAppName), Namespace: namespaceName}
+			jwkerKey := types.NamespacedName{Name: utilities.JwkerNamer{Base: skiperatorAppName}.Name(), Namespace: namespaceName}
 			if err := k8sClient.Get(ctx, jwkerKey, jwker); err == nil {
 				Expect(k8sClient.Delete(ctx, jwker)).To(Succeed())
 			}
 
 			By("Cleanup any created Netpol resource")
 			netpol := &v1.NetworkPolicy{}
-			netpolKey := types.NamespacedName{Name: utilities.GetTokenxEgressName(securityConfigName, config.Get().TokenxName), Namespace: namespaceName}
+			netpolKey := types.NamespacedName{Name: utilities.JwkerNamer{Base: skiperatorAppName}.EgressName(config.Get().TokenxName), Namespace: namespaceName}
 			if err := k8sClient.Get(ctx, netpolKey, netpol); err == nil {
 				Expect(k8sClient.Delete(ctx, netpol)).To(Succeed())
 			}
@@ -106,7 +106,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Cleanup any created MaskinportenClient resource")
 			maskinportenClientCleanup := &naisiov1.MaskinportenClient{}
 			maskinportenClientCleanupKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenClientName(skiperatorAppName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.Name(),
 				Namespace: namespaceName,
 			}
 			if err := k8sClient.Get(ctx, maskinportenClientCleanupKey, maskinportenClientCleanup); err == nil {
@@ -116,7 +116,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Cleanup any created maskinporten ServiceEntry resource")
 			maskinportenServiceEntryCleanup := &istionetworkingv1.ServiceEntry{}
 			maskinportenServiceEntryCleanupKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenServiceEntryName(securityConfigName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			if err := k8sClient.Get(ctx, maskinportenServiceEntryCleanupKey, maskinportenServiceEntryCleanup); err == nil {
@@ -126,7 +126,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Cleanup any created maskinporten integration Secret resource")
 			maskinportenSecretCleanup := &corev1.Secret{}
 			maskinportenSecretCleanupKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenSecretFromSecretRefName(securityConfigName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.SecretFromRefName(),
 				Namespace: namespaceName,
 			}
 			if err := k8sClient.Get(ctx, maskinportenSecretCleanupKey, maskinportenSecretCleanup); err == nil {
@@ -136,7 +136,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Cleanup any created AzureAdApplication resource")
 			azureAdApplicationCleanup := &naisiov1.AzureAdApplication{}
 			azureAdApplicationCleanupKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.Name(),
 				Namespace: namespaceName,
 			}
 			if err := k8sClient.Get(ctx, azureAdApplicationCleanupKey, azureAdApplicationCleanup); err == nil {
@@ -146,7 +146,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Cleanup any created AzureAd ServiceEntry resource")
 			azureAdServiceEntryCleanup := &istionetworkingv1.ServiceEntry{}
 			azureAdServiceEntryCleanupKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			if err := k8sClient.Get(ctx, azureAdServiceEntryCleanupKey, azureAdServiceEntryCleanup); err == nil {
@@ -156,7 +156,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Cleanup any created azuread integration Secret resource")
 			azureAdSecretCleanup := &corev1.Secret{}
 			azureAdSecretCleanupKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.SecretFromRefName(),
 				Namespace: namespaceName,
 			}
 			if err := k8sClient.Get(ctx, azureAdSecretCleanupKey, azureAdSecretCleanup); err == nil {
@@ -186,7 +186,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a NetworkPolicy resource was created")
 			netpol := &v1.NetworkPolicy{}
 			netpolKey := types.NamespacedName{
-				Name:      utilities.GetTokenxEgressName(securityConfigName, config.Get().TokenxName),
+				Name:      utilities.JwkerNamer{Base: skiperatorAppName}.EgressName(config.Get().TokenxName),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -196,7 +196,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a Jwker resource was created")
 			jwker := &naisiov1.Jwker{}
 			jwkerKey := types.NamespacedName{
-				Name:      utilities.GetJwkerName(skiperatorAppName),
+				Name:      utilities.JwkerNamer{Base: skiperatorAppName}.Name(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -272,7 +272,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a MaskinportenClient resource was created")
 			maskinportenClient := &naisiov1.MaskinportenClient{}
 			maskinportenClientKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenClientName(skiperatorAppName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.Name(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -282,7 +282,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a ServiceEntry resource was created")
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			serviceEntryKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenServiceEntryName(securityConfigName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -292,7 +292,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a Secret was NOT created")
 			secret := &corev1.Secret{}
 			secretKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenSecretFromSecretRefName(securityConfigName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.SecretFromRefName(),
 				Namespace: namespaceName,
 			}
 			Consistently(func() bool {
@@ -310,7 +310,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 
 			By("Marking the MaskinportenClient resource as ready")
 			maskinportenClient.Status.SynchronizationState = utilities.MaskinportenClientSynchronizationStateReady
-			maskinportenClient.Status.SynchronizationSecretName = utilities.GetMaskinportenSecretName(securityConfigName)
+			maskinportenClient.Status.SynchronizationSecretName = utilities.MaskinportenNamer{Base: skiperatorAppName}.SecretName()
 			Expect(k8sClient.Status().Update(ctx, maskinportenClient)).To(Succeed())
 
 			By("Reconciling again to let SecurityConfig transition to PhaseReady")
@@ -370,7 +370,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a ServiceEntry resource was created")
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			serviceEntryKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenServiceEntryName(securityConfigName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -381,7 +381,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			controllerCreatedClient := &naisiov1.MaskinportenClient{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetMaskinportenClientName(skiperatorAppName),
+					Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.Name(),
 					Namespace: namespaceName,
 				}, controllerCreatedClient))
 			}).Should(BeTrue())
@@ -390,7 +390,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			secret := &corev1.Secret{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetMaskinportenSecretFromSecretRefName(securityConfigName),
+					Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.SecretFromRefName(),
 					Namespace: namespaceName,
 				}, secret))
 			}).Should(BeTrue())
@@ -480,7 +480,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a ServiceEntry resource was created")
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			serviceEntryKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenServiceEntryName(securityConfigName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -490,7 +490,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that an integration Secret was created")
 			integrationSecret := &corev1.Secret{}
 			integrationSecretKey := types.NamespacedName{
-				Name:      utilities.GetMaskinportenSecretFromSecretRefName(securityConfigName),
+				Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.SecretFromRefName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -501,7 +501,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			maskinportenClient := &naisiov1.MaskinportenClient{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetMaskinportenClientName(skiperatorAppName),
+					Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.Name(),
 					Namespace: namespaceName,
 				}, maskinportenClient))
 			}).Should(BeTrue())
@@ -540,7 +540,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a AzureAdApplication resource was created")
 			azureAdApplication := &naisiov1.AzureAdApplication{}
 			azureAdApplicationKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.Name(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -550,7 +550,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a ServiceEntry resource was created")
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			serviceEntryKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -560,7 +560,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a Secret was NOT created")
 			secret := &corev1.Secret{}
 			secretKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.SecretFromRefName(),
 				Namespace: namespaceName,
 			}
 			Consistently(func() bool {
@@ -578,7 +578,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 
 			By("Marking the AzureAdApplication resource as ready")
 			azureAdApplication.Status.SynchronizationState = utilities.AzureAdApplicationSynchronizationStateReady
-			azureAdApplication.Status.SynchronizationSecretName = utilities.GetAzureAdSecretName(securityConfigName)
+			azureAdApplication.Status.SynchronizationSecretName = utilities.EntraIdNamer{Base: skiperatorAppName}.SecretName()
 			Expect(k8sClient.Status().Update(ctx, azureAdApplication)).To(Succeed())
 
 			By("Reconciling again to let SecurityConfig transition to PhaseReady")
@@ -638,7 +638,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a ServiceEntry resource was created")
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			serviceEntryKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -649,7 +649,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			controllerCreatedClient := &naisiov1.AzureAdApplication{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+					Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.Name(),
 					Namespace: namespaceName,
 				}, controllerCreatedClient))
 			}).Should(BeTrue())
@@ -658,7 +658,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			secret := &corev1.Secret{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+					Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.SecretFromRefName(),
 					Namespace: namespaceName,
 				}, secret))
 			}).Should(BeTrue())
@@ -748,7 +748,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that a ServiceEntry resource was created")
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			serviceEntryKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.ServiceEntryName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -758,7 +758,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying that an integration Secret was created")
 			integrationSecret := &corev1.Secret{}
 			integrationSecretKey := types.NamespacedName{
-				Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+				Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.SecretFromRefName(),
 				Namespace: namespaceName,
 			}
 			Eventually(func() error {
@@ -769,7 +769,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			azureAdApplication := &naisiov1.AzureAdApplication{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+					Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.Name(),
 					Namespace: namespaceName,
 				}, azureAdApplication))
 			}).Should(BeTrue())
@@ -801,7 +801,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			maskinportenClient := &naisiov1.MaskinportenClient{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetMaskinportenClientName(skiperatorAppName),
+					Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.Name(),
 					Namespace: namespaceName,
 				}, maskinportenClient))
 			}).Should(BeTrue())
@@ -810,7 +810,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetMaskinportenServiceEntryName(securityConfigName),
+					Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.ServiceEntryName(),
 					Namespace: namespaceName,
 				}, serviceEntry))
 			}).Should(BeTrue())
@@ -819,7 +819,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			secret := &corev1.Secret{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetMaskinportenSecretFromSecretRefName(securityConfigName),
+					Name:      utilities.MaskinportenNamer{Base: skiperatorAppName}.SecretFromRefName(),
 					Namespace: namespaceName,
 				}, secret))
 			}).Should(BeTrue())
@@ -842,7 +842,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			azureAdApplication := &naisiov1.AzureAdApplication{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+					Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.Name(),
 					Namespace: namespaceName,
 				}, azureAdApplication))
 			}).Should(BeTrue())
@@ -851,7 +851,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			serviceEntry := &istionetworkingv1.ServiceEntry{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+					Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.ServiceEntryName(),
 					Namespace: namespaceName,
 				}, serviceEntry))
 			}).Should(BeTrue())
@@ -860,7 +860,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			secret := &corev1.Secret{}
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+					Name:      utilities.EntraIdNamer{Base: skiperatorAppName}.SecretFromRefName(),
 					Namespace: namespaceName,
 				}, secret))
 			}).Should(BeTrue())
@@ -888,7 +888,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			jwker := &naisiov1.Jwker{}
 			Consistently(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetJwkerName(skiperatorAppName),
+					Name:      utilities.JwkerNamer{Base: skiperatorAppName}.Name(),
 					Namespace: namespaceName,
 				}, jwker)
 				return errors.IsNotFound(err)
@@ -898,7 +898,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			netpol := &v1.NetworkPolicy{}
 			Consistently(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      utilities.GetTokenxEgressName(securityConfigName, config.Get().TokenxName),
+					Name:      utilities.JwkerNamer{Base: skiperatorAppName}.EgressName(config.Get().TokenxName),
 					Namespace: namespaceName,
 				}, netpol)
 				return errors.IsNotFound(err)
@@ -928,7 +928,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Deleting the owned NetworkPolicy resource")
 			netpol := &v1.NetworkPolicy{}
 			netpolKey := types.NamespacedName{
-				Name:      utilities.GetTokenxEgressName(securityConfigName, config.Get().TokenxName),
+				Name:      utilities.JwkerNamer{Base: skiperatorAppName}.EgressName(config.Get().TokenxName),
 				Namespace: namespaceName,
 			}
 			Expect(k8sClient.Get(ctx, netpolKey, netpol)).To(Succeed())
@@ -948,7 +948,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Deleting the owned Jwker resource")
 			jwker := &naisiov1.Jwker{}
 			jwkerKey := types.NamespacedName{
-				Name:      utilities.GetJwkerName(skiperatorAppName),
+				Name:      utilities.JwkerNamer{Base: skiperatorAppName}.Name(),
 				Namespace: namespaceName,
 			}
 			Expect(k8sClient.Get(ctx, jwkerKey, jwker)).To(Succeed())
