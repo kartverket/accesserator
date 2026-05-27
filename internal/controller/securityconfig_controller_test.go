@@ -113,14 +113,14 @@ var _ = Describe("SecurityConfig Controller", func() {
 				Expect(k8sClient.Delete(ctx, maskinportenClientCleanup)).To(Succeed())
 			}
 
-			By("Cleanup any created ServiceEntry resource")
-			serviceEntryCleanup := &istionetworkingv1.ServiceEntry{}
-			serviceEntryCleanupKey := types.NamespacedName{
+			By("Cleanup any created maskinporten ServiceEntry resource")
+			maskinportenServiceEntryCleanup := &istionetworkingv1.ServiceEntry{}
+			maskinportenServiceEntryCleanupKey := types.NamespacedName{
 				Name:      utilities.GetMaskinportenServiceEntryName(securityConfigName),
 				Namespace: namespaceName,
 			}
-			if err := k8sClient.Get(ctx, serviceEntryCleanupKey, serviceEntryCleanup); err == nil {
-				Expect(k8sClient.Delete(ctx, serviceEntryCleanup)).To(Succeed())
+			if err := k8sClient.Get(ctx, maskinportenServiceEntryCleanupKey, maskinportenServiceEntryCleanup); err == nil {
+				Expect(k8sClient.Delete(ctx, maskinportenServiceEntryCleanup)).To(Succeed())
 			}
 
 			By("Cleanup any created maskinporten integration Secret resource")
@@ -131,6 +131,36 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}
 			if err := k8sClient.Get(ctx, maskinportenSecretCleanupKey, maskinportenSecretCleanup); err == nil {
 				Expect(k8sClient.Delete(ctx, maskinportenSecretCleanup)).To(Succeed())
+			}
+
+			By("Cleanup any created AzureAdApplication resource")
+			azureAdApplicationCleanup := &naisiov1.AzureAdApplication{}
+			azureAdApplicationCleanupKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+				Namespace: namespaceName,
+			}
+			if err := k8sClient.Get(ctx, azureAdApplicationCleanupKey, azureAdApplicationCleanup); err == nil {
+				Expect(k8sClient.Delete(ctx, azureAdApplicationCleanup)).To(Succeed())
+			}
+
+			By("Cleanup any created AzureAd ServiceEntry resource")
+			azureAdServiceEntryCleanup := &istionetworkingv1.ServiceEntry{}
+			azureAdServiceEntryCleanupKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Namespace: namespaceName,
+			}
+			if err := k8sClient.Get(ctx, azureAdServiceEntryCleanupKey, azureAdServiceEntryCleanup); err == nil {
+				Expect(k8sClient.Delete(ctx, azureAdServiceEntryCleanup)).To(Succeed())
+			}
+
+			By("Cleanup any created azuread integration Secret resource")
+			azureAdSecretCleanup := &corev1.Secret{}
+			azureAdSecretCleanupKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+				Namespace: namespaceName,
+			}
+			if err := k8sClient.Get(ctx, azureAdSecretCleanupKey, azureAdSecretCleanup); err == nil {
+				Expect(k8sClient.Delete(ctx, azureAdSecretCleanup)).To(Succeed())
 			}
 
 			skiperatorApp := &v1alpha1.Application{}
@@ -486,6 +516,274 @@ var _ = Describe("SecurityConfig Controller", func() {
 			}).Should(Equal(accesseratorv1alpha.PhaseReady))
 		})
 
+		It("should create AzureAdApplication and ServiceEntry (NOT Secret) when Entraid is enabled via inline client, and SecurityConfig should have correct status", func() {
+			By("Updating SecurityConfig with EntraID inline client configuration")
+			sc := &accesseratorv1alpha.SecurityConfig{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+			sc.Spec = accesseratorv1alpha.SecurityConfigSpec{
+				EntraID: &accesseratorv1alpha.EntraIDSpec{
+					Enabled: true,
+					Client: &accesseratorv1alpha.AzureAdApplicationSpec{
+						SecretName: "test-client",
+					},
+				},
+				ApplicationRef: skiperatorAppName,
+			}
+			Expect(k8sClient.Update(ctx, sc)).To(Succeed())
+
+			By("Reconciling the SecurityConfig with EntraID inline client enabled")
+			fakeRecorder := events.NewFakeRecorder(100)
+			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying that a AzureAdApplication resource was created")
+			azureAdApplication := &naisiov1.AzureAdApplication{}
+			azureAdApplicationKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+				Namespace: namespaceName,
+			}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, azureAdApplicationKey, azureAdApplication)
+			}).Should(Succeed())
+
+			By("Verifying that a ServiceEntry resource was created")
+			serviceEntry := &istionetworkingv1.ServiceEntry{}
+			serviceEntryKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Namespace: namespaceName,
+			}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, serviceEntryKey, serviceEntry)
+			}).Should(Succeed())
+
+			By("Verifying that a Secret was NOT created")
+			secret := &corev1.Secret{}
+			secretKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+				Namespace: namespaceName,
+			}
+			Consistently(func() bool {
+				return errors.IsNotFound(k8sClient.Get(ctx, secretKey, secret))
+			}).Should(BeTrue())
+
+			By("Verifying that SecurityConfig is PhasePending while waiting for AzureAdApplication")
+			Eventually(func() (accesseratorv1alpha.Phase, error) {
+				s := &accesseratorv1alpha.SecurityConfig{}
+				if err := k8sClient.Get(ctx, typeNamespacedName, s); err != nil {
+					return "", err
+				}
+				return s.Status.Phase, nil
+			}).Should(Equal(accesseratorv1alpha.PhasePending))
+
+			By("Marking the AzureAdApplication resource as ready")
+			azureAdApplication.Status.SynchronizationState = utilities.AzureAdApplicationSynchronizationStateReady
+			azureAdApplication.Status.SynchronizationSecretName = utilities.GetAzureAdSecretName(securityConfigName)
+			Expect(k8sClient.Status().Update(ctx, azureAdApplication)).To(Succeed())
+
+			By("Reconciling again to let SecurityConfig transition to PhaseReady")
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying that SecurityConfig transitioned to PhaseReady")
+			Eventually(func() (accesseratorv1alpha.Phase, error) {
+				s := &accesseratorv1alpha.SecurityConfig{}
+				if err := k8sClient.Get(ctx, typeNamespacedName, s); err != nil {
+					return "", err
+				}
+				return s.Status.Phase, nil
+			}).Should(Equal(accesseratorv1alpha.PhaseReady))
+		})
+
+		It("should ONLY create ServiceEntry (NOT Secret or AzureAdApplication) when Entraid is enabled via clientRef, and SecurityConfig should have correct status", func() {
+			const externalClientName = "external-azure-ad-application"
+
+			By("Pre-creating a AzureAdApplication to be referenced via clientRef")
+			externalClient := &naisiov1.AzureAdApplication{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      externalClientName,
+					Namespace: namespaceName,
+				},
+				Spec: naisiov1.AzureAdApplicationSpec{
+					SecretName: "external-azure-ad-secret",
+				},
+			}
+			Expect(k8sClient.Create(ctx, externalClient)).To(Succeed())
+			DeferCleanup(func() {
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: externalClientName, Namespace: namespaceName}, externalClient); err == nil {
+					Expect(k8sClient.Delete(ctx, externalClient)).To(Succeed())
+				}
+			})
+
+			By("Updating SecurityConfig with EntraID clientRef configuration")
+			sc := &accesseratorv1alpha.SecurityConfig{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+			sc.Spec = accesseratorv1alpha.SecurityConfigSpec{
+				EntraID: &accesseratorv1alpha.EntraIDSpec{
+					Enabled: true,
+					ClientRef: &accesseratorv1alpha.ResourceRef{
+						Name: externalClientName,
+					},
+				},
+				ApplicationRef: skiperatorAppName,
+			}
+			Expect(k8sClient.Update(ctx, sc)).To(Succeed())
+
+			By("Reconciling the SecurityConfig with EntraID clientRef")
+			fakeRecorder := events.NewFakeRecorder(100)
+			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying that a ServiceEntry resource was created")
+			serviceEntry := &istionetworkingv1.ServiceEntry{}
+			serviceEntryKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Namespace: namespaceName,
+			}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, serviceEntryKey, serviceEntry)
+			}).Should(Succeed())
+
+			By("Verifying that no new AzureAdApplication was created by the controller")
+			controllerCreatedClient := &naisiov1.AzureAdApplication{}
+			Consistently(func() bool {
+				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+					Namespace: namespaceName,
+				}, controllerCreatedClient))
+			}).Should(BeTrue())
+
+			By("Verifying that no Secret was created")
+			secret := &corev1.Secret{}
+			Consistently(func() bool {
+				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+					Namespace: namespaceName,
+				}, secret))
+			}).Should(BeTrue())
+
+			By("Verifying that SecurityConfig is PhasePending while waiting for the referenced AzureAdApplication")
+			Eventually(func() (accesseratorv1alpha.Phase, error) {
+				s := &accesseratorv1alpha.SecurityConfig{}
+				if err := k8sClient.Get(ctx, typeNamespacedName, s); err != nil {
+					return "", err
+				}
+				return s.Status.Phase, nil
+			}).Should(Equal(accesseratorv1alpha.PhasePending))
+
+			By("Marking the referenced AzureAdApplication as ready")
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: externalClientName, Namespace: namespaceName}, externalClient)).To(Succeed())
+			externalClient.Status.SynchronizationState = utilities.AzureAdApplicationSynchronizationStateReady
+			externalClient.Status.SynchronizationSecretName = "external-azure-ad-application-secret"
+			Expect(k8sClient.Status().Update(ctx, externalClient)).To(Succeed())
+
+			By("Reconciling again to let SecurityConfig transition to PhaseReady")
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying that SecurityConfig transitioned to PhaseReady")
+			Eventually(func() (accesseratorv1alpha.Phase, error) {
+				s := &accesseratorv1alpha.SecurityConfig{}
+				if err := k8sClient.Get(ctx, typeNamespacedName, s); err != nil {
+					return "", err
+				}
+				return s.Status.Phase, nil
+			}).Should(Equal(accesseratorv1alpha.PhaseReady))
+		})
+
+		It("should ONLY create a ServiceEntry and Secret (NOT AzureAdApplication) when Entraid is enabled via secretRef, and SecurityConfig should have correct status", func() {
+			const (
+				sourceSecretName = "entra-id-credentials"
+				clientIDKey      = "clientId"
+				clientJWKKey     = "clientJwk"
+			)
+
+			By("Pre-creating a Kubernetes Secret containing Entra ID credentials")
+			sourceSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      sourceSecretName,
+					Namespace: namespaceName,
+				},
+				Type: corev1.SecretTypeOpaque,
+				Data: map[string][]byte{
+					clientIDKey:  []byte("test-client-id"),
+					clientJWKKey: []byte(`{"kty":"RSA","use":"sig","alg":"RS256","kid":"test"}`),
+				},
+			}
+			Expect(k8sClient.Create(ctx, sourceSecret)).To(Succeed())
+			DeferCleanup(func() {
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: sourceSecretName, Namespace: namespaceName}, sourceSecret); err == nil {
+					Expect(k8sClient.Delete(ctx, sourceSecret)).To(Succeed())
+				}
+			})
+
+			By("Updating SecurityConfig with EntraID secretRef configuration")
+			sc := &accesseratorv1alpha.SecurityConfig{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+			sc.Spec = accesseratorv1alpha.SecurityConfigSpec{
+				EntraID: &accesseratorv1alpha.EntraIDSpec{
+					Enabled: true,
+					SecretRef: &accesseratorv1alpha.SecretRef{
+						ClientID: accesseratorv1alpha.SecretKeySelector{
+							Name: sourceSecretName,
+							Key:  clientIDKey,
+						},
+						ClientJWK: accesseratorv1alpha.SecretKeySelector{
+							Name: sourceSecretName,
+							Key:  clientJWKKey,
+						},
+					},
+				},
+				ApplicationRef: skiperatorAppName,
+			}
+			Expect(k8sClient.Update(ctx, sc)).To(Succeed())
+
+			By("Reconciling the SecurityConfig with Entra ID secretRef")
+			fakeRecorder := events.NewFakeRecorder(100)
+			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying that a ServiceEntry resource was created")
+			serviceEntry := &istionetworkingv1.ServiceEntry{}
+			serviceEntryKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+				Namespace: namespaceName,
+			}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, serviceEntryKey, serviceEntry)
+			}).Should(Succeed())
+
+			By("Verifying that an integration Secret was created")
+			integrationSecret := &corev1.Secret{}
+			integrationSecretKey := types.NamespacedName{
+				Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
+				Namespace: namespaceName,
+			}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, integrationSecretKey, integrationSecret)
+			}).Should(Succeed())
+
+			By("Verifying that no AzureAdApplication was created")
+			azureAdApplication := &naisiov1.AzureAdApplication{}
+			Consistently(func() bool {
+				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+					Namespace: namespaceName,
+				}, azureAdApplication))
+			}).Should(BeTrue())
+
+			By("Verifying that SecurityConfig is PhaseReady (secretRef does not require waiting)")
+			Eventually(func() (accesseratorv1alpha.Phase, error) {
+				s := &accesseratorv1alpha.SecurityConfig{}
+				if err := k8sClient.Get(ctx, typeNamespacedName, s); err != nil {
+					return "", err
+				}
+				return s.Status.Phase, nil
+			}).Should(Equal(accesseratorv1alpha.PhaseReady))
+		})
+
 		It("should NOT create MaskinportenClient, ServiceEntry or Secret when Maskinporten is disabled", func() {
 			By("Setting Maskinporten to explicitly disabled on the SecurityConfig")
 			sc := &accesseratorv1alpha.SecurityConfig{}
@@ -522,6 +820,47 @@ var _ = Describe("SecurityConfig Controller", func() {
 			Consistently(func() bool {
 				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
 					Name:      utilities.GetMaskinportenSecretFromSecretRefName(securityConfigName),
+					Namespace: namespaceName,
+				}, secret))
+			}).Should(BeTrue())
+		})
+
+		It("should NOT create AzureAdApplication, ServiceEntry or Secret when EntraID is disabled", func() {
+			By("Setting EntraID to explicitly disabled on the SecurityConfig")
+			sc := &accesseratorv1alpha.SecurityConfig{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+			sc.Spec.EntraID = &accesseratorv1alpha.EntraIDSpec{Enabled: false}
+			Expect(k8sClient.Update(ctx, sc)).To(Succeed())
+
+			By("Reconciling the SecurityConfig with EntraID disabled")
+			fakeRecorder := events.NewFakeRecorder(100)
+			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying that no AzureAdApplication resource exists")
+			azureAdApplication := &naisiov1.AzureAdApplication{}
+			Consistently(func() bool {
+				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      utilities.GetAzureAdApplicationName(skiperatorAppName),
+					Namespace: namespaceName,
+				}, azureAdApplication))
+			}).Should(BeTrue())
+
+			By("Verifying that no ServiceEntry resource exists")
+			serviceEntry := &istionetworkingv1.ServiceEntry{}
+			Consistently(func() bool {
+				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      utilities.GetAzureAdServiceEntryName(securityConfigName),
+					Namespace: namespaceName,
+				}, serviceEntry))
+			}).Should(BeTrue())
+
+			By("Verifying that no entraid Secret resource exists")
+			secret := &corev1.Secret{}
+			Consistently(func() bool {
+				return errors.IsNotFound(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      utilities.GetAzureAdSecretFromSecretRefName(securityConfigName),
 					Namespace: namespaceName,
 				}, secret))
 			}).Should(BeTrue())
