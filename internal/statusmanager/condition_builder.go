@@ -70,6 +70,11 @@ func BuildSecurityConfigCondition(
 		condition.Reason = ReconciliationPending
 		condition.Message = "MaskinportenClient has not finished reconciliation."
 
+	case StateWaitingForAzureAdApplication:
+		condition.Status = metav1.ConditionUnknown
+		condition.Reason = ReconciliationPending
+		condition.Message = "AzureAdApplication has not finished reconciliation."
+
 	case StateFailed:
 		condition.Status = metav1.ConditionFalse
 		condition.Reason = "ReconciliationFailed"
