@@ -33,7 +33,7 @@ spec:
           value: "false"
       envFrom:
         - secretRef:
-            name: security-config-maskinporten
+            name: app-maskinporten-16d91ff8
       imagePullPolicy: IfNotPresent
       name: texas
       ports:

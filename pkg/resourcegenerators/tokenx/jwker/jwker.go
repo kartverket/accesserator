@@ -20,7 +20,7 @@ func GetDesired(objectMeta v1.ObjectMeta, tokenxConfig state.TokenXConfig) *nais
 	return &naisiov1.Jwker{
 		ObjectMeta: objectMeta,
 		Spec: naisiov1.JwkerSpec{
-			SecretName: utilities.JwkerNamer{Base: objectMeta.Name}.SecretName(),
+			SecretName: utilities.TokenxNamer{ApplicationRef: objectMeta.Name}.SecretName(),
 			AccessPolicy: &naisiov1.AccessPolicy{
 				Inbound: &naisiov1.AccessPolicyInbound{
 					Rules: naisIoV1AccessPolicyInboundRules,

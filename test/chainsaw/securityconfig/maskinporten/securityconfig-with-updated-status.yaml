@@ -13,7 +13,7 @@ spec:
           - name: demo311834282:write
           - name: demo311834282:read
 status:
-  maskinportenSecretName: security-config-maskinporten
+  maskinportenSecretName: app-maskinporten-16d91ff8
   message: SecurityConfig ready.
   phase: Ready
   ready: true

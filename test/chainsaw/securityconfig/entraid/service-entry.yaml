@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1
 kind: ServiceEntry
 metadata:
-  name: security-config-entraid
+  name: security-config-entraid-83b98f20
 spec:
   exportTo:
     - .

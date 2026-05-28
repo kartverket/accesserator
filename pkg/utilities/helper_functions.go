@@ -49,60 +49,76 @@ func GetJwker(ctx context.Context, k8sClient client.Client, objectKey client.Obj
 	return &jwker, nil
 }
 
-type JwkerNamer struct{ Base string }
-
-func (n JwkerNamer) Name() string {
-	return n.Base
+type TokenxNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
 }
 
-func (n JwkerNamer) SecretName() string {
-	return fmt.Sprintf("%s-%s", n.Base, JwkerSecretNameSuffix)
+func (n TokenxNamer) JwkerName() string {
+	return n.ApplicationRef
 }
 
-func (n JwkerNamer) EgressName(tokenxName string) string {
-	return fmt.Sprintf("%s-%s-%s", n.Base, tokenxName, EgressNameSuffix)
+func (n TokenxNamer) SecretName() string {
+	return fmt.Sprintf("%s-%s", n.ApplicationRef, JwkerSecretNameSuffix)
 }
 
-type MaskinportenNamer struct{ Base string }
+func (n TokenxNamer) EgressName(tokenxName string) string {
+	return fmt.Sprintf("%s-%s-%s", n.SecurityConfigName, tokenxName, EgressNameSuffix)
+}
 
-func (n MaskinportenNamer) Name() string {
-	return n.Base
+type MaskinportenNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
+}
+
+func (n MaskinportenNamer) MaskinportenClientName() string {
+	return n.ApplicationRef
 }
 
 func (n MaskinportenNamer) SecretName() string {
-	return fmt.Sprintf("%s-%s", n.Base, MaskinportenNameSuffix)
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.ApplicationRef, MaskinportenNameSuffix))
 }
 
 func (n MaskinportenNamer) SecretFromRefName() string {
-	return fmt.Sprintf("%s-%s-%s", n.Base, MaskinportenNameSuffix, ShortHash(n.Base))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, MaskinportenNameSuffix))
 }
 
 func (n MaskinportenNamer) ServiceEntryName() string {
-	return fmt.Sprintf("%s-%s", n.Base, MaskinportenNameSuffix)
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, MaskinportenNameSuffix))
 }
 
-type EntraIdNamer struct{ Base string }
+type EntraIdNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
+}
 
-func (n EntraIdNamer) Name() string {
-	return n.Base
+func (n EntraIdNamer) AzureAdApplicationName() string {
+	return n.ApplicationRef
 }
 
 func (n EntraIdNamer) SecretName() string {
-	return fmt.Sprintf("%s-%s", n.Base, EntraIdNameSuffix)
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.ApplicationRef, EntraIdNameSuffix))
 }
 
 func (n EntraIdNamer) SecretFromRefName() string {
-	return fmt.Sprintf("%s-%s-%s", n.Base, EntraIdNameSuffix, ShortHash(n.Base))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, EntraIdNameSuffix))
 }
 
 func (n EntraIdNamer) ServiceEntryName() string {
-	return fmt.Sprintf("%s-%s", n.Base, EntraIdNameSuffix)
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, EntraIdNameSuffix))
 }
 
-type OpaNamer struct{ Base string }
+type OpaNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
+}
 
 func (n OpaNamer) ConfigMapName() string {
-	return fmt.Sprintf("%s-%s", n.Base, OpaConfigMapNameSuffix)
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, OpaConfigMapNameSuffix))
+}
+
+func WithShortHashSuffix(s string) string {
+	return fmt.Sprintf("%s-%s", s, ShortHash(s))
 }
 
 // ShortHash returns the first 8 hex characters of an FNV-32a hash of s.

@@ -105,17 +105,18 @@ var _ = Describe("ControllerResources", func() {
 			}
 
 			appRef := string(securityConfig.Spec.ApplicationRef)
+			secConfName := securityConfig.Name
 			Expect(resourceKindsAndNames).To(
 				ConsistOf(
-					fmt.Sprintf("%s/%s", "Jwker", utilities.JwkerNamer{Base: appRef}.Name()),
-					fmt.Sprintf("%s/%s", "NetworkPolicy", utilities.JwkerNamer{Base: appRef}.EgressName(config.Get().TokenxName)),
-					fmt.Sprintf("%s/%s", "MaskinportenClient", utilities.MaskinportenNamer{Base: appRef}.Name()),
-					fmt.Sprintf("%s/%s", "Secret", utilities.MaskinportenNamer{Base: appRef}.SecretFromRefName()),
-					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.MaskinportenNamer{Base: appRef}.ServiceEntryName()),
-					fmt.Sprintf("%s/%s", "AzureAdApplication", utilities.EntraIdNamer{Base: appRef}.Name()),
-					fmt.Sprintf("%s/%s", "Secret", utilities.EntraIdNamer{Base: appRef}.SecretFromRefName()),
-					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.EntraIdNamer{Base: appRef}.ServiceEntryName()),
-					fmt.Sprintf("%s/%s", "ConfigMap", utilities.OpaNamer{Base: appRef}.ConfigMapName()),
+					fmt.Sprintf("%s/%s", "Jwker", utilities.TokenxNamer{ApplicationRef: appRef}.JwkerName()),
+					fmt.Sprintf("%s/%s", "NetworkPolicy", utilities.TokenxNamer{SecurityConfigName: secConfName}.EgressName(config.Get().TokenxName)),
+					fmt.Sprintf("%s/%s", "MaskinportenClient", utilities.MaskinportenNamer{ApplicationRef: appRef}.MaskinportenClientName()),
+					fmt.Sprintf("%s/%s", "Secret", utilities.MaskinportenNamer{SecurityConfigName: secConfName}.SecretFromRefName()),
+					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.MaskinportenNamer{SecurityConfigName: secConfName}.ServiceEntryName()),
+					fmt.Sprintf("%s/%s", "AzureAdApplication", utilities.EntraIdNamer{ApplicationRef: appRef}.AzureAdApplicationName()),
+					fmt.Sprintf("%s/%s", "Secret", utilities.EntraIdNamer{SecurityConfigName: secConfName}.SecretFromRefName()),
+					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.EntraIdNamer{SecurityConfigName: secConfName}.ServiceEntryName()),
+					fmt.Sprintf("%s/%s", "ConfigMap", utilities.OpaNamer{SecurityConfigName: secConfName}.ConfigMapName()),
 				),
 			)
 		})
@@ -201,7 +202,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 	})
 
 	It("updates a Secret when data changes", func() {
-		secretName := utilities.MaskinportenNamer{Base: string(securityConfig.Spec.ApplicationRef)}.SecretFromRefName()
+		secretName := utilities.MaskinportenNamer{SecurityConfigName: securityConfig.Name}.SecretFromRefName()
 
 		existing := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -233,7 +234,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 	})
 
 	It("does not update a Secret when data is unchanged", func() {
-		secretName := utilities.MaskinportenNamer{Base: string(securityConfig.Spec.ApplicationRef)}.SecretFromRefName()
+		secretName := utilities.MaskinportenNamer{SecurityConfigName: securityConfig.Name}.SecretFromRefName()
 
 		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
 		Expect(err).NotTo(HaveOccurred())
@@ -257,7 +258,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 	})
 
 	It("updates a Secret when a new data key is added", func() {
-		secretName := utilities.MaskinportenNamer{Base: string(securityConfig.Spec.ApplicationRef)}.SecretFromRefName()
+		secretName := utilities.MaskinportenNamer{SecurityConfigName: securityConfig.Name}.SecretFromRefName()
 
 		existing := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -290,7 +291,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 	})
 
 	It("updates a Secret when a data key is removed", func() {
-		secretName := utilities.MaskinportenNamer{Base: string(securityConfig.Spec.ApplicationRef)}.SecretFromRefName()
+		secretName := utilities.MaskinportenNamer{SecurityConfigName: securityConfig.Name}.SecretFromRefName()
 
 		existing := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{

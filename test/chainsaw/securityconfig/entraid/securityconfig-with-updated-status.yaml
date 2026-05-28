@@ -7,7 +7,7 @@ spec:
   entraid:
     enabled: true
 status:
-  entraIdSecretName: security-config-entraid
+  entraIdSecretName: app-entraid-11a69e00
   message: SecurityConfig ready.
   phase: Ready
   ready: true

@@ -33,7 +33,7 @@ spec:
           value: "false"
       envFrom:
         - secretRef:
-            name: security-config-entraid
+            name: app-entraid-11a69e00
       imagePullPolicy: IfNotPresent
       name: texas
       ports:

@@ -1,6 +1,7 @@
 package utilities_test
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
@@ -70,59 +71,80 @@ var _ = Describe("Helper Functions", func() {
 		})
 	})
 
-	Describe("JwkerNamer", func() {
-		It("Name returns the base", func() {
-			Expect(utilities.JwkerNamer{Base: "my-app"}.Name()).To(Equal("my-app"))
+	Describe("TokenxNamer", func() {
+		It("JwkerName returns the base", func() {
+			Expect(utilities.TokenxNamer{ApplicationRef: "my-app"}.JwkerName()).
+				To(Equal("my-app"))
 		})
 
 		It("SecretName returns base with jwker-secret suffix", func() {
-			Expect(utilities.JwkerNamer{Base: "my-app"}.SecretName()).To(Equal("my-app-jwker-secret"))
+			Expect(utilities.TokenxNamer{ApplicationRef: "my-app"}.SecretName()).
+				To(Equal("my-app-jwker-secret"))
 		})
 
 		It("EgressName returns base with tokenx name and egress suffix", func() {
-			Expect(utilities.JwkerNamer{Base: "my-app"}.EgressName("tokenx")).To(Equal("my-app-tokenx-egress"))
+			Expect(utilities.TokenxNamer{SecurityConfigName: "my-app"}.EgressName("tokenx")).
+				To(Equal("my-app-tokenx-egress"))
 		})
 	})
 
 	Describe("MaskinportenNamer", func() {
-		It("Name returns the base", func() {
-			Expect(utilities.MaskinportenNamer{Base: "my-app"}.Name()).To(Equal("my-app"))
+		It("MaskinportenClientName returns the base", func() {
+			Expect(utilities.MaskinportenNamer{ApplicationRef: "my-app"}.MaskinportenClientName()).
+				To(Equal("my-app"))
 		})
 
 		It("SecretName returns base with maskinporten suffix", func() {
-			Expect(utilities.MaskinportenNamer{Base: "my-app"}.SecretName()).To(Equal("my-app-maskinporten"))
+			Expect(utilities.MaskinportenNamer{ApplicationRef: "my-app"}.SecretName()).
+				To(Equal("my-app-maskinporten-86fb879f"))
 		})
 
 		It("SecretFromRefName returns base with maskinporten suffix and hash", func() {
-			Expect(utilities.MaskinportenNamer{Base: "my-app"}.SecretFromRefName()).To(Equal("my-app-maskinporten-ef484009"))
+			Expect(utilities.MaskinportenNamer{SecurityConfigName: "my-app"}.SecretFromRefName()).
+				To(Equal("my-app-maskinporten-86fb879f"))
 		})
 
 		It("ServiceEntryName returns base with maskinporten suffix", func() {
-			Expect(utilities.MaskinportenNamer{Base: "my-app"}.ServiceEntryName()).To(Equal("my-app-maskinporten"))
+			Expect(utilities.MaskinportenNamer{SecurityConfigName: "my-app"}.ServiceEntryName()).
+				To(Equal("my-app-maskinporten-86fb879f"))
 		})
 	})
 
 	Describe("EntraIdNamer", func() {
-		It("Name returns the base", func() {
-			Expect(utilities.EntraIdNamer{Base: "my-app"}.Name()).To(Equal("my-app"))
+		It("AzureAdApplicationName returns the base", func() {
+			Expect(utilities.EntraIdNamer{ApplicationRef: "my-app"}.AzureAdApplicationName()).
+				To(Equal("my-app"))
 		})
 
 		It("SecretName returns base with entraid suffix", func() {
-			Expect(utilities.EntraIdNamer{Base: "my-app"}.SecretName()).To(Equal("my-app-entraid"))
+			Expect(utilities.EntraIdNamer{ApplicationRef: "my-app"}.SecretName()).
+				To(Equal("my-app-entraid-ba831135"))
 		})
 
 		It("SecretFromRefName returns base with entraid suffix and hash", func() {
-			Expect(utilities.EntraIdNamer{Base: "my-app"}.SecretFromRefName()).To(Equal("my-app-entraid-ef484009"))
+			Expect(utilities.EntraIdNamer{SecurityConfigName: "my-app"}.SecretFromRefName()).
+				To(Equal("my-app-entraid-ba831135"))
 		})
 
 		It("ServiceEntryName returns base with entraid suffix", func() {
-			Expect(utilities.EntraIdNamer{Base: "my-app"}.ServiceEntryName()).To(Equal("my-app-entraid"))
+			Expect(utilities.EntraIdNamer{SecurityConfigName: "my-app"}.ServiceEntryName()).
+				To(Equal("my-app-entraid-ba831135"))
 		})
 	})
 
 	Describe("OpaNamer", func() {
 		It("ConfigMapName returns base with opa suffix", func() {
-			Expect(utilities.OpaNamer{Base: "my-app"}.ConfigMapName()).To(Equal("my-app-opa"))
+			Expect(utilities.OpaNamer{SecurityConfigName: "my-app"}.ConfigMapName()).
+				To(Equal("my-app-opa-1669dcfe"))
+		})
+	})
+
+	Describe("WithShortHashSuffix", func() {
+		It("should append the short hash as suffix", func() {
+			prefix := "my-prefix"
+			suffix := utilities.ShortHash(prefix)
+			expected := fmt.Sprintf("%s-%s", prefix, suffix)
+			Expect(utilities.WithShortHashSuffix(prefix)).To(Equal(expected))
 		})
 	})
 

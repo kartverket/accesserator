@@ -279,7 +279,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result.MaskinportenConfig.Enabled).To(BeTrue())
 				Expect(result.MaskinportenConfig.Type).To(Equal(state.InlineClient))
 				Expect(result.MaskinportenConfig.ClientSpec.ClientName).To(Equal("test-client"))
-				Expect(result.MaskinportenConfig.ClientSpec.SecretName).To(Equal(utilities.MaskinportenNamer{Base: testAppName}.SecretName()))
+				Expect(result.MaskinportenConfig.ClientSpec.SecretName).To(Equal(utilities.MaskinportenNamer{ApplicationRef: testAppName}.SecretName()))
 
 				// Verify Entra ID config
 				Expect(result.EntraIdConfig.Enabled).To(BeTrue())

@@ -80,7 +80,7 @@ func UpdateSecurityConfigStatus(
 		bundleNames := slices.Collect(maps.Keys(scope.OpaConfig.BundleBinaryData))
 		slices.Sort(bundleNames)
 		sc.Status.OpaBundleSource = &v1alpha.OpaBundleSource{
-			ConfigMapName: utilities.OpaNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.ConfigMapName(),
+			ConfigMapName: utilities.OpaNamer{SecurityConfigName: scope.SecurityConfig.Name}.ConfigMapName(),
 			BundleNames:   bundleNames,
 		}
 	}
@@ -121,7 +121,7 @@ func DetermineReconciliationState(
 	if scope.TokenXConfig.Enabled {
 		jwkerObjectKey := client.ObjectKey{
 			Namespace: scope.SecurityConfig.Namespace,
-			Name:      utilities.JwkerNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.Name(),
+			Name:      utilities.TokenxNamer{ApplicationRef: string(scope.SecurityConfig.Spec.ApplicationRef)}.JwkerName(),
 		}
 		jwkerResource, getJwkerErr := utilities.GetJwker(ctx, k8sClient, jwkerObjectKey)
 		if getJwkerErr != nil {
@@ -141,12 +141,12 @@ func DetermineReconciliationState(
 		// If MaskinportenConfigType is secretRef, the integration secret is derived from the applicationRef.
 		// Otherwise we need to fetch it from the MaskinportenClient status.
 		if scope.MaskinportenConfig.Type == state.SecretRef {
-			scope.SecurityConfig.Status.MaskinportenSecretName = utilities.MaskinportenNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.SecretFromRefName()
+			scope.SecurityConfig.Status.MaskinportenSecretName = utilities.MaskinportenNamer{SecurityConfigName: scope.SecurityConfig.Name}.SecretFromRefName()
 		} else {
 			var maskinportenClientName string
 			switch scope.MaskinportenConfig.Type {
 			case state.InlineClient, state.None:
-				maskinportenClientName = utilities.MaskinportenNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.Name()
+				maskinportenClientName = utilities.MaskinportenNamer{ApplicationRef: string(scope.SecurityConfig.Spec.ApplicationRef)}.MaskinportenClientName()
 			case state.ClientRef:
 				maskinportenClientName = string(scope.SecurityConfig.Spec.Maskinporten.ClientRef.Name)
 			default:
@@ -174,12 +174,12 @@ func DetermineReconciliationState(
 
 	if scope.EntraIdConfig.Enabled {
 		if scope.EntraIdConfig.Type == state.SecretRef {
-			scope.SecurityConfig.Status.EntraIdSecretName = utilities.EntraIdNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.SecretFromRefName()
+			scope.SecurityConfig.Status.EntraIdSecretName = utilities.EntraIdNamer{SecurityConfigName: scope.SecurityConfig.Name}.SecretFromRefName()
 		} else {
 			var azureAdApplicationName string
 			switch scope.EntraIdConfig.Type {
 			case state.InlineClient, state.None:
-				azureAdApplicationName = utilities.EntraIdNamer{Base: string(scope.SecurityConfig.Spec.ApplicationRef)}.Name()
+				azureAdApplicationName = utilities.EntraIdNamer{ApplicationRef: string(scope.SecurityConfig.Spec.ApplicationRef)}.AzureAdApplicationName()
 			case state.ClientRef:
 				azureAdApplicationName = string(scope.SecurityConfig.Spec.EntraID.ClientRef.Name)
 			default:
