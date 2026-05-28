@@ -1,10 +1,9 @@
 name: Build OPA bundle
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
     branches:
       - main
 
@@ -40,10 +39,10 @@ jobs:
 
   build:
     needs: tags
-    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@61c13e318179ef5c4b62de3d5241dfbd933dca08
+    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@d6024371c4629337d408a8fdea00d0ea2acc449d
     with:
       artifact-name: ${{ env.REGISTRY }}/${{ env.BUNDLE_NAME }}
-      rego-path: .opa
-      test-path: .opa
+      path: .opa
+      test: true
       lint: true
       additional-tags: ${{ needs.tags.outputs.branch }}
