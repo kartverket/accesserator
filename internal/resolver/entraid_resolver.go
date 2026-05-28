@@ -77,7 +77,7 @@ func ResolveEntraIdConfig(ctx context.Context, k8sClient client.Client, security
 			Enabled: true,
 			Type:    *entraIdConfigType,
 			ClientSpec: &naisiov1.AzureAdApplicationSpec{
-				SecretName: utilities.GetAzureAdSecretName(securityConfig.Name),
+				SecretName: utilities.EntraIdNamer{ApplicationRef: string(securityConfig.Spec.ApplicationRef)}.SecretName(),
 			},
 		}, nil
 	default:
@@ -87,7 +87,7 @@ func ResolveEntraIdConfig(ctx context.Context, k8sClient client.Client, security
 
 func secretNameOrDefault(securityConfig v1alpha.SecurityConfig) string {
 	if securityConfig.Spec.EntraID.Client.SecretName == "" {
-		return utilities.GetAzureAdSecretName(securityConfig.Name)
+		return utilities.EntraIdNamer{ApplicationRef: string(securityConfig.Spec.ApplicationRef)}.SecretName()
 	}
 	return securityConfig.Spec.EntraID.Client.SecretName
 }

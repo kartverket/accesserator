@@ -1,14 +1,14 @@
 apiVersion: nais.io/v1
 kind: MaskinportenClient
 metadata:
-  name: app-maskinporten
+  name: app
 spec:
   clientName: app
   scopes:
     consumes:
       - name: demo311834282:write
       - name: demo311834282:read
-  secretName: security-config-maskinporten
+  secretName: app-maskinporten-16d91ff8
 status:
-  synchronizationSecretName: security-config-maskinporten
+  synchronizationSecretName: app-maskinporten-16d91ff8
   synchronizationState: Synchronized

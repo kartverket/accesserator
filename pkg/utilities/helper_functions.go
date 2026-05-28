@@ -49,62 +49,76 @@ func GetJwker(ctx context.Context, k8sClient client.Client, objectKey client.Obj
 	return &jwker, nil
 }
 
-func GetJwkerName(applicationRef string) string {
-	return applicationRef
+type TokenxNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
 }
 
-func GetJwkerSecretName(jwkerName string) string {
-	return fmt.Sprintf("%s-%s", jwkerName, JwkerSecretNameSuffix)
+func (n TokenxNamer) JwkerName() string {
+	return n.ApplicationRef
 }
 
-func GetTokenxEgressName(securityConfigName string, tokenxConfigName string) string {
-	return fmt.Sprintf("%s-%s-%s", securityConfigName, tokenxConfigName, EgressNameSuffix)
+func (n TokenxNamer) SecretName() string {
+	return fmt.Sprintf("%s-%s", n.ApplicationRef, JwkerSecretNameSuffix)
 }
 
-func GetMaskinportenClientName(applicationRef string) string {
-	return fmt.Sprintf("%s-%s", applicationRef, MaskinportenNameSuffix)
+func (n TokenxNamer) EgressName(tokenxName string) string {
+	return fmt.Sprintf("%s-%s-%s", n.SecurityConfigName, tokenxName, EgressNameSuffix)
 }
 
-func GetDefaultMaskinportenClientName(applicationRef string) string {
-	return applicationRef
+type MaskinportenNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
 }
 
-func GetMaskinportenSecretName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
+func (n MaskinportenNamer) MaskinportenClientName() string {
+	return n.ApplicationRef
 }
 
-func GetMaskinportenSecretFromSecretRefName(securityConfigName string) string {
-	return fmt.Sprintf(
-		"%s-%s-%s",
-		securityConfigName,
-		MaskinportenNameSuffix,
-		ShortHash(securityConfigName),
-	)
+func (n MaskinportenNamer) SecretName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.ApplicationRef, MaskinportenNameSuffix))
 }
 
-func GetMaskinportenServiceEntryName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, MaskinportenNameSuffix)
+func (n MaskinportenNamer) SecretFromRefName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, MaskinportenNameSuffix))
 }
 
-func GetAzureAdApplicationName(applicationRef string) string {
-	return fmt.Sprintf("%s-%s", applicationRef, EntraIdNameSuffix)
+func (n MaskinportenNamer) ServiceEntryName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, MaskinportenNameSuffix))
 }
 
-func GetAzureAdSecretName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, EntraIdNameSuffix)
+type EntraIdNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
 }
 
-func GetAzureAdSecretFromSecretRefName(securityConfigName string) string {
-	return fmt.Sprintf(
-		"%s-%s-%s",
-		securityConfigName,
-		EntraIdNameSuffix,
-		ShortHash(securityConfigName),
-	)
+func (n EntraIdNamer) AzureAdApplicationName() string {
+	return n.ApplicationRef
 }
 
-func GetAzureAdServiceEntryName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, EntraIdNameSuffix)
+func (n EntraIdNamer) SecretName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.ApplicationRef, EntraIdNameSuffix))
+}
+
+func (n EntraIdNamer) SecretFromRefName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, EntraIdNameSuffix))
+}
+
+func (n EntraIdNamer) ServiceEntryName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, EntraIdNameSuffix))
+}
+
+type OpaNamer struct {
+	SecurityConfigName string
+	ApplicationRef     string
+}
+
+func (n OpaNamer) ConfigMapName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, OpaConfigMapNameSuffix))
+}
+
+func WithShortHashSuffix(s string) string {
+	return fmt.Sprintf("%s-%s", s, ShortHash(s))
 }
 
 // ShortHash returns the first 8 hex characters of an FNV-32a hash of s.
@@ -186,10 +200,6 @@ func GetAzureAdApplication(
 		)
 	}
 	return &azureadapplication, nil
-}
-
-func GetOpaConfigMapName(securityConfigName string) string {
-	return fmt.Sprintf("%s-%s", securityConfigName, OpaConfigMapNameSuffix)
 }
 
 // GetMockKubernetesClient returns a fake Kubernetes client with the provided scheme and objects. Only used in testing.

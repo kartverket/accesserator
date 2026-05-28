@@ -14,9 +14,6 @@ import (
 )
 
 var _ = Describe("Helper Functions", func() {
-	const (
-		secConfigName = "my-security-config"
-	)
 
 	Describe("Ptr", func() {
 		It("should return a pointer to the value", func() {
@@ -74,56 +71,80 @@ var _ = Describe("Helper Functions", func() {
 		})
 	})
 
-	Describe("GetJwkerName", func() {
-		It("should return the application ref as the jwker name", func() {
-			appRef := "my-app"
-			result := utilities.GetJwkerName(appRef)
-			Expect(result).To(Equal(appRef))
+	Describe("TokenxNamer", func() {
+		It("JwkerName returns the base", func() {
+			Expect(utilities.TokenxNamer{ApplicationRef: "my-app"}.JwkerName()).
+				To(Equal("my-app"))
+		})
+
+		It("SecretName returns base with jwker-secret suffix", func() {
+			Expect(utilities.TokenxNamer{ApplicationRef: "my-app"}.SecretName()).
+				To(Equal("my-app-jwker-secret"))
+		})
+
+		It("EgressName returns base with tokenx name and egress suffix", func() {
+			Expect(utilities.TokenxNamer{SecurityConfigName: "my-app"}.EgressName("tokenx")).
+				To(Equal("my-app-tokenx-egress"))
 		})
 	})
 
-	Describe("GetJwkerSecretName", func() {
-		It("should return jwker name with secret suffix", func() {
-			jwkerName := "foo"
-			expected := fmt.Sprintf("%s-%s", jwkerName, utilities.JwkerSecretNameSuffix)
-			result := utilities.GetJwkerSecretName(jwkerName)
-			Expect(result).To(Equal(expected))
+	Describe("MaskinportenNamer", func() {
+		It("MaskinportenClientName returns the base", func() {
+			Expect(utilities.MaskinportenNamer{ApplicationRef: "my-app"}.MaskinportenClientName()).
+				To(Equal("my-app"))
+		})
+
+		It("SecretName returns base with maskinporten suffix", func() {
+			Expect(utilities.MaskinportenNamer{ApplicationRef: "my-app"}.SecretName()).
+				To(Equal("my-app-maskinporten-86fb879f"))
+		})
+
+		It("SecretFromRefName returns base with maskinporten suffix and hash", func() {
+			Expect(utilities.MaskinportenNamer{SecurityConfigName: "my-app"}.SecretFromRefName()).
+				To(Equal("my-app-maskinporten-86fb879f"))
+		})
+
+		It("ServiceEntryName returns base with maskinporten suffix", func() {
+			Expect(utilities.MaskinportenNamer{SecurityConfigName: "my-app"}.ServiceEntryName()).
+				To(Equal("my-app-maskinporten-86fb879f"))
 		})
 	})
 
-	Describe("GetTokenxEgressName", func() {
-		It("should return combined name with egress suffix", func() {
-			secName := "sec"
-			tokenx := "tok"
-			expected := fmt.Sprintf("%s-%s-%s", secName, tokenx, utilities.EgressNameSuffix)
-			result := utilities.GetTokenxEgressName(secName, tokenx)
-			Expect(result).To(Equal(expected))
+	Describe("EntraIdNamer", func() {
+		It("AzureAdApplicationName returns the base", func() {
+			Expect(utilities.EntraIdNamer{ApplicationRef: "my-app"}.AzureAdApplicationName()).
+				To(Equal("my-app"))
+		})
+
+		It("SecretName returns base with entraid suffix", func() {
+			Expect(utilities.EntraIdNamer{ApplicationRef: "my-app"}.SecretName()).
+				To(Equal("my-app-entraid-ba831135"))
+		})
+
+		It("SecretFromRefName returns base with entraid suffix and hash", func() {
+			Expect(utilities.EntraIdNamer{SecurityConfigName: "my-app"}.SecretFromRefName()).
+				To(Equal("my-app-entraid-ba831135"))
+		})
+
+		It("ServiceEntryName returns base with entraid suffix", func() {
+			Expect(utilities.EntraIdNamer{SecurityConfigName: "my-app"}.ServiceEntryName()).
+				To(Equal("my-app-entraid-ba831135"))
 		})
 	})
 
-	Describe("GetMaskinportenClientName", func() {
-		It("should return application ref with maskinporten suffix", func() {
-			appRef := "my-app"
-			expected := fmt.Sprintf("%s-%s", appRef, utilities.MaskinportenNameSuffix)
-			result := utilities.GetMaskinportenClientName(appRef)
-			Expect(result).To(Equal(expected))
+	Describe("OpaNamer", func() {
+		It("ConfigMapName returns base with opa suffix", func() {
+			Expect(utilities.OpaNamer{SecurityConfigName: "my-app"}.ConfigMapName()).
+				To(Equal("my-app-opa-1669dcfe"))
 		})
 	})
 
-	Describe("GetMaskinportenSecretName", func() {
-		It("should return security config name with maskinporten suffix", func() {
-			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.MaskinportenNameSuffix)
-			result := utilities.GetMaskinportenSecretName(secConfigName)
-			Expect(result).To(Equal(expected))
-		})
-	})
-
-	Describe("GetMaskinportenSecretFromSecretRefName", func() {
-		It("should return security config name with maskinporten suffix and hash", func() {
-			expectedHash := utilities.ShortHash(secConfigName)
-			expected := fmt.Sprintf("%s-%s-%s", secConfigName, utilities.MaskinportenNameSuffix, expectedHash)
-			result := utilities.GetMaskinportenSecretFromSecretRefName(secConfigName)
-			Expect(result).To(Equal(expected))
+	Describe("WithShortHashSuffix", func() {
+		It("should append the short hash as suffix", func() {
+			prefix := "my-prefix"
+			suffix := utilities.ShortHash(prefix)
+			expected := fmt.Sprintf("%s-%s", prefix, suffix)
+			Expect(utilities.WithShortHashSuffix(prefix)).To(Equal(expected))
 		})
 	})
 
@@ -145,22 +166,6 @@ var _ = Describe("Helper Functions", func() {
 			result1 := utilities.ShortHash("input1")
 			result2 := utilities.ShortHash("input2")
 			Expect(result1).NotTo(Equal(result2))
-		})
-	})
-
-	Describe("GetMaskinportenServiceEntryName", func() {
-		It("should return security config name with maskinporten suffix", func() {
-			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.MaskinportenNameSuffix)
-			result := utilities.GetMaskinportenServiceEntryName(secConfigName)
-			Expect(result).To(Equal(expected))
-		})
-	})
-
-	Describe("GetOpaConfigMapName", func() {
-		It("should return security config name with OPA config map suffix", func() {
-			expected := fmt.Sprintf("%s-%s", secConfigName, utilities.OpaConfigMapNameSuffix)
-			result := utilities.GetOpaConfigMapName(secConfigName)
-			Expect(result).To(Equal(expected))
 		})
 	})
 

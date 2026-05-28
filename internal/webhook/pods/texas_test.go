@@ -31,7 +31,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					JwkerSecretName: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+					JwkerSecretName: utilities.TokenxNamer{ApplicationRef: applicationRef}.SecretName(),
 				},
 			}
 			c := pods.GetTexasContainer(securityConfig)
@@ -72,7 +72,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					MaskinportenSecretName: utilities.MaskinportenNamer{SecurityConfigName: securityConfigName}.SecretName(),
 				},
 			}
 			c := pods.GetTexasContainer(securityConfig)
@@ -120,9 +120,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					JwkerSecretName:        utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
-					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
-					EntraIdSecretName:      utilities.GetAzureAdSecretName(securityConfigName),
+					JwkerSecretName:        utilities.TokenxNamer{SecurityConfigName: securityConfigName}.SecretName(),
+					MaskinportenSecretName: utilities.MaskinportenNamer{SecurityConfigName: securityConfigName}.SecretName(),
+					EntraIdSecretName:      utilities.EntraIdNamer{SecurityConfigName: securityConfigName}.SecretName(),
 				},
 			}
 			c := pods.GetTexasContainer(securityConfig)
@@ -206,7 +206,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					JwkerSecretName: utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+					JwkerSecretName: utilities.TokenxNamer{SecurityConfigName: securityConfigName}.SecretName(),
 				},
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
@@ -265,7 +265,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
+					MaskinportenSecretName: utilities.MaskinportenNamer{SecurityConfigName: securityConfigName}.SecretName(),
 				},
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
@@ -315,7 +315,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					EntraIdSecretName: utilities.GetAzureAdSecretName(securityConfigName),
+					EntraIdSecretName: utilities.EntraIdNamer{SecurityConfigName: securityConfigName}.SecretName(),
 				},
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
@@ -355,9 +355,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					},
 				},
 				Status: v1alpha.SecurityConfigStatus{
-					EntraIdSecretName:      utilities.GetAzureAdSecretName(securityConfigName),
-					MaskinportenSecretName: utilities.GetMaskinportenSecretName(securityConfigName),
-					JwkerSecretName:        utilities.GetJwkerSecretName(utilities.GetJwkerName(applicationRef)),
+					EntraIdSecretName:      utilities.EntraIdNamer{ApplicationRef: applicationRef}.SecretName(),
+					MaskinportenSecretName: utilities.MaskinportenNamer{ApplicationRef: applicationRef}.SecretName(),
+					JwkerSecretName:        utilities.TokenxNamer{ApplicationRef: applicationRef}.SecretName(),
 				},
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
