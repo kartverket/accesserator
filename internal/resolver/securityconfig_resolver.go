@@ -23,7 +23,7 @@ func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securit
 		return nil, fmt.Errorf("failed to resolve Maskinporten config: %w", maskinportenConfigResolveErr)
 	}
 
-	entraIdConfig, entraIdConfigResolveErr := ResolveEntraIdConfig(ctx, k8sClient, securityConfig)
+	entraIdConfig, entraIdConfigResolveErr := ResolveEntraIdConfig(logger, ctx, k8sClient, securityConfig)
 	if entraIdConfigResolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve Entra ID config: %w", entraIdConfigResolveErr)
 	}

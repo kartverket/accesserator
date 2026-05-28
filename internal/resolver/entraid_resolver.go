@@ -7,6 +7,7 @@ import (
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,14 +21,17 @@ const (
 	AzureAppClientJwkEnvVar              = "AZURE_APP_JWK"
 )
 
-func ResolveEntraIdConfig(ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.EntraIdConfig, error) {
+func ResolveEntraIdConfig(logger log.Logger, ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.EntraIdConfig, error) {
 	if securityConfig.Spec.EntraID == nil || !securityConfig.Spec.EntraID.Enabled {
 		return &state.EntraIdConfig{
 			Enabled: false,
 		}, nil
 	}
+	logger.Info("Entra ID enabled, resolving Entra ID config", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
 	entraIdConfigType, err := utilities.DetermineConfigType(securityConfig.Spec.EntraID)
+	logger.Info("Determined Entra ID config type", "name", securityConfig.Name, "namespace", securityConfig.Namespace, "configType", entraIdConfigType)
+
 	if err != nil {
 		return nil, err
 	}
@@ -39,6 +43,12 @@ func ResolveEntraIdConfig(ctx context.Context, k8sClient client.Client, security
 				Groups: securityConfig.Spec.EntraID.Client.Groups,
 			}
 		}
+		logger.Info(
+			"Entra ID config resolved",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", entraIdConfigType,
+		)
 		return &state.EntraIdConfig{
 			Enabled: true,
 			Type:    *entraIdConfigType,
@@ -52,6 +62,12 @@ func ResolveEntraIdConfig(ctx context.Context, k8sClient client.Client, security
 			},
 		}, nil
 	case state.ClientRef:
+		logger.Info(
+			"Entra ID config resolved",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", entraIdConfigType,
+		)
 		return &state.EntraIdConfig{
 			Enabled:   true,
 			Type:      *entraIdConfigType,
@@ -67,12 +83,24 @@ func ResolveEntraIdConfig(ctx context.Context, k8sClient client.Client, security
 		if entraIdSecretDataErr != nil {
 			return nil, fmt.Errorf("failed to get Entra ID secret data: %w", entraIdSecretDataErr)
 		}
+		logger.Info(
+			"Entra ID config resolved",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", entraIdConfigType,
+		)
 		return &state.EntraIdConfig{
 			Enabled:    true,
 			Type:       *entraIdConfigType,
 			SecretData: entraIdSecretData,
 		}, nil
 	case state.None:
+		logger.Info(
+			"Entra ID config resolved",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", entraIdConfigType,
+		)
 		return &state.EntraIdConfig{
 			Enabled: true,
 			Type:    *entraIdConfigType,
