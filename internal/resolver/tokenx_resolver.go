@@ -44,10 +44,24 @@ func ResolveTokenXConfig(ctx context.Context, k8sClient client.Client, securityC
 		return nil, err
 	}
 
+	naisIoV1AccessPolicyInboundRules := naisiov1.AccessPolicyInboundRules{}
+	if jwkerInboundRules != nil {
+		naisIoV1AccessPolicyInboundRules = jwkerInboundRules
+	}
+
 	return &state.TokenXConfig{
 		Enabled:        tokenXEnabled,
 		ApplicationRef: string(securityConfig.Spec.ApplicationRef),
-		InboundRules:   jwkerInboundRules,
+		JwkerSpec: naisiov1.JwkerSpec{
+			SecretName: utilities.TokenxNamer{ApplicationRef: string(securityConfig.Spec.ApplicationRef)}.SecretName(),
+			AccessPolicy: &naisiov1.AccessPolicy{
+				Inbound: &naisiov1.AccessPolicyInbound{
+					Rules: naisIoV1AccessPolicyInboundRules,
+				},
+				// Jwker outbound access policy is required, but not relevant for token exchange.
+				Outbound: &naisiov1.AccessPolicyOutbound{},
+			},
+		},
 	}, nil
 }
 
