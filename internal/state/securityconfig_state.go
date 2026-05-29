@@ -31,7 +31,7 @@ type Scope struct {
 type TokenXConfig struct {
 	Enabled        bool
 	ApplicationRef string
-	InboundRules   naisiov1.AccessPolicyInboundRules
+	JwkerSpec      naisiov1.JwkerSpec
 }
 
 type MaskinportenConfig struct {

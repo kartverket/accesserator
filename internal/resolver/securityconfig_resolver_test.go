@@ -270,10 +270,10 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				// Verify TokenX config
 				Expect(result.TokenXConfig.Enabled).To(BeTrue())
 				Expect(result.TokenXConfig.ApplicationRef).To(Equal(testAppName))
-				Expect(result.TokenXConfig.InboundRules).NotTo(BeNil())
-				Expect(result.TokenXConfig.InboundRules.GetRules()).To(HaveLen(1))
-				Expect(result.TokenXConfig.InboundRules.GetRules()[0].Application).To(Equal(otherAppName))
-				Expect(result.TokenXConfig.InboundRules.GetRules()[0].Namespace).To(Equal(testNamespace))
+				Expect(result.TokenXConfig.JwkerSpec.AccessPolicy.Inbound.Rules).NotTo(BeNil())
+				Expect(result.TokenXConfig.JwkerSpec.AccessPolicy.Inbound.Rules.GetRules()).To(HaveLen(1))
+				Expect(result.TokenXConfig.JwkerSpec.AccessPolicy.Inbound.Rules.GetRules()[0].Application).To(Equal(otherAppName))
+				Expect(result.TokenXConfig.JwkerSpec.AccessPolicy.Inbound.Rules.GetRules()[0].Namespace).To(Equal(testNamespace))
 
 				// Verify Maskinporten config
 				Expect(result.MaskinportenConfig.Enabled).To(BeTrue())
