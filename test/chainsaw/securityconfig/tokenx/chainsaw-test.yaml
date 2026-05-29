@@ -13,18 +13,44 @@ spec:
         skip.kartverket.no/skip-managed: "true"
   steps:
     - try:
+        # setup
         - create:
             file: namespaces.yaml
         - create:
             file: skiperator-application.yaml
+
+        # tokenx disabled gives no resources
         - create:
             file: securityconfig-tokenx-disabled.yaml
         - error:
-            file: jwker.yaml
+            file: jwker-with-rules.yaml
+        - error:
+            file: jwker-without-rules.yaml
         - error:
             file: netpol.yaml
         - error:
             file: securityconfig-with-updated-status.yaml
+
+        # tokenx enabled without access policies gives jwker without rules
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                tokenx:
+                  enabled: true
+        - assert:
+            file: securityconfig-with-updated-status.yaml
+        - assert:
+            file: jwker-without-rules.yaml
+        - error:
+            file: jwker-with-rules.yaml
+        - assert:
+            file: netpol.yaml
+
+        # tokenx enabled with access policies gives jwker with rules
         - patch:
             resource:
               apiVersion: accesserator.kartverket.no/v1alpha
@@ -44,6 +70,6 @@ spec:
         - assert:
             file: securityconfig-with-updated-status.yaml
         - assert:
-            file: jwker.yaml
+            file: jwker-with-rules.yaml
         - assert:
             file: netpol.yaml
