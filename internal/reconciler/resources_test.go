@@ -455,6 +455,17 @@ var _ = Describe("ConfigMapShouldUpdateFunc", func() {
 
 		Expect(reconciler.ConfigMapShouldUpdateFunc(current, desired)).To(BeTrue())
 	})
+
+	It("returns true when a desired label is missing on current", func() {
+		current := &corev1.ConfigMap{}
+		desired := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app.kubernetes.io/managed-by": "accesserator"},
+			},
+		}
+
+		Expect(reconciler.ConfigMapShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
 })
 
 var _ = Describe("SecretShouldUpdateFunc", func() {
@@ -564,6 +575,52 @@ var _ = Describe("SecretShouldUpdateFunc", func() {
 		}
 		desired := &corev1.Secret{
 			Type: corev1.SecretTypeBasicAuth,
+		}
+
+		Expect(reconciler.SecretShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+
+	It("returns true when a desired label is missing on current", func() {
+		current := &corev1.Secret{}
+		desired := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app.kubernetes.io/managed-by": "accesserator"},
+			},
+		}
+
+		Expect(reconciler.SecretShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a desired label has a different value on current", func() {
+		current := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app.kubernetes.io/managed-by": "someone-else"},
+			},
+		}
+		desired := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app.kubernetes.io/managed-by": "accesserator"},
+			},
+		}
+
+		Expect(reconciler.SecretShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	// The "returns true" tests for each resource type already ensured the label clause is included in the ShouldUpdate
+	// func. We still have to test the "returns false" case, but only for one (randomly chosen) resource type.
+	It("returns false when desired labels are a subset of current labels", func() {
+		current := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"app.kubernetes.io/managed-by": "accesserator",
+					"custom.example.com/team":      "platform",
+				},
+			},
+		}
+		desired := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app.kubernetes.io/managed-by": "accesserator"},
+			},
 		}
 
 		Expect(reconciler.SecretShouldUpdateFunc(current, desired)).To(BeFalse())
@@ -690,6 +747,17 @@ var _ = Describe("ServiceEntryShouldUpdateFunc", func() {
 		desired := &istionetworkingv1.ServiceEntry{
 			Spec: istioapiv1.ServiceEntry{
 				Resolution: istioapiv1.ServiceEntry_STATIC,
+			},
+		}
+
+		Expect(reconciler.ServiceEntryShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a desired label is missing on current", func() {
+		current := &istionetworkingv1.ServiceEntry{}
+		desired := &istionetworkingv1.ServiceEntry{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app.kubernetes.io/managed-by": "accesserator"},
 			},
 		}
 
