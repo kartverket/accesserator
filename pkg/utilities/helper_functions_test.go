@@ -42,6 +42,15 @@ var _ = Describe("Helper Functions", func() {
 		})
 	})
 
+	Describe("SecurityConfigStandardLabels", func() {
+		It("returns the standard Accesserator labels with the resource name", func() {
+			Expect(utilities.SecurityConfigStandardLabels()).To(Equal(map[string]string{
+				"app.kubernetes.io/managed-by":          "accesserator",
+				"accesserator.kartverket.no/controller": "securityconfig",
+			}))
+		})
+	})
+
 	Describe("LowestNonZeroResult", func() {
 		var (
 			zero ctrl.Result

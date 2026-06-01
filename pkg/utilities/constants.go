@@ -37,6 +37,12 @@ const (
 
 	IstioReadinessProbeRewritePathPattern = "/app-health/%s/readyz"
 	IstioProbeRewritePort                 = 15020
+
+	ManagedByLabelKey  = "app.kubernetes.io/managed-by"
+	ControllerLabelKey = "accesserator.kartverket.no/controller"
+
+	ManagedByLabelValue                = "accesserator"
+	SecurityConfigControllerLabelValue = "securityconfig"
 )
 
 func EntraIdIssuer(tenantId string) string {

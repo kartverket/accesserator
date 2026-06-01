@@ -197,6 +197,10 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 		}, createdSecret)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(createdSecret.Data).To(HaveKey("token"))
+		Expect(createdSecret.Labels).To(SatisfyAll(
+			HaveKeyWithValue("app.kubernetes.io/managed-by", "accesserator"),
+			HaveKeyWithValue("accesserator.kartverket.no/controller", "securityconfig"),
+		))
 	})
 
 	It("updates a Secret when data changes", func() {
@@ -229,6 +233,35 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 			Namespace: testNamespace,
 		}, updated)).To(Succeed())
 		Expect(updated.Data["token"]).To(Equal([]byte("new-token")))
+	})
+
+	It("adds standard labels to an existing Secret that is missing them", func() {
+		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
+
+		existing := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: testNamespace,
+			},
+			Data: map[string][]byte{
+				"token": []byte("initial-token"),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		Expect(k8sClient.Create(ctx, existing)).To(Succeed())
+
+		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
+		Expect(err).NotTo(HaveOccurred())
+
+		updated := &corev1.Secret{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: testNamespace,
+		}, updated)).To(Succeed())
+		Expect(updated.Labels).To(SatisfyAll(
+			HaveKeyWithValue("app.kubernetes.io/managed-by", "accesserator"),
+			HaveKeyWithValue("accesserator.kartverket.no/controller", "securityconfig"),
+		))
 	})
 
 	It("does not update a Secret when data is unchanged", func() {

@@ -2,6 +2,9 @@ apiVersion: nais.io/v1
 kind: MaskinportenClient
 metadata:
   name: app
+  labels:
+    accesserator.kartverket.no/controller: securityconfig
+    app.kubernetes.io/managed-by: accesserator
 spec:
   clientName: app
   scopes:

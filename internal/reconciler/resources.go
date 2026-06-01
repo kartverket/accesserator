@@ -52,6 +52,7 @@ func jwkerControllerResource(scope *state.Scope) ControllerResourceAdapter[*nais
 	jwkerObjectMeta := metav1.ObjectMeta{
 		Name:      jwkerName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := jwker.GetDesired(jwkerObjectMeta, scope.TokenXConfig)
 
@@ -63,10 +64,12 @@ func jwkerControllerResource(scope *state.Scope) ControllerResourceAdapter[*nais
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
 				ShouldUpdate: func(current, desired *naisiov1.Jwker) bool {
-					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
+					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec) ||
+						labelsNeedUpdate(current, desired)
 				},
 				UpdateFields: func(current, desired *naisiov1.Jwker) {
 					current.Spec = desired.Spec
+					current.Labels = desired.Labels
 				},
 			},
 		},
@@ -82,6 +85,7 @@ func tokenxEgressControllerResource(scope *state.Scope) ControllerResourceAdapte
 	tokenxEgressObjectMeta := metav1.ObjectMeta{
 		Name:      tokenxEgressName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := egress.GetDesired(tokenxEgressObjectMeta, scope.TokenXConfig)
 
@@ -93,10 +97,12 @@ func tokenxEgressControllerResource(scope *state.Scope) ControllerResourceAdapte
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
 				ShouldUpdate: func(current, desired *networkv1.NetworkPolicy) bool {
-					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
+					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec) ||
+						labelsNeedUpdate(current, desired)
 				},
 				UpdateFields: func(current, desired *networkv1.NetworkPolicy) {
 					current.Spec = desired.Spec
+					current.Labels = desired.Labels
 				},
 			},
 		},
@@ -112,6 +118,7 @@ func maskinportenClientControllerResource(scope *state.Scope) ControllerResource
 	maskinportenClientObjectMeta := metav1.ObjectMeta{
 		Name:      maskinportenClientName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := maskinportenclient.GetDesired(maskinportenClientObjectMeta, scope.MaskinportenConfig)
 
@@ -123,10 +130,12 @@ func maskinportenClientControllerResource(scope *state.Scope) ControllerResource
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
 				ShouldUpdate: func(current, desired *naisiov1.MaskinportenClient) bool {
-					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
+					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec) ||
+						labelsNeedUpdate(current, desired)
 				},
 				UpdateFields: func(current, desired *naisiov1.MaskinportenClient) {
 					current.Spec = desired.Spec
+					current.Labels = desired.Labels
 				},
 			},
 		},
@@ -141,6 +150,7 @@ func maskinportenSecretControllerResource(scope *state.Scope) ControllerResource
 	maskinportenSecretObjectMeta := metav1.ObjectMeta{
 		Name:      maskinportenSecretName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := maskinportensecret.GetDesired(maskinportenSecretObjectMeta, scope.MaskinportenConfig)
 
@@ -167,6 +177,7 @@ func maskinportenServiceEntryControllerResource(scope *state.Scope) ControllerRe
 	maskinportenServiceEntryObjectMeta := metav1.ObjectMeta{
 		Name:      maskinportenServiceEntryName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := maskinportenserviceentry.GetDesired(maskinportenServiceEntryObjectMeta, scope.MaskinportenConfig)
 
@@ -193,6 +204,7 @@ func azureAdApplicationControllerResource(scope *state.Scope) ControllerResource
 	azureAdApplicationObjectMeta := metav1.ObjectMeta{
 		Name:      azureAdApplicationName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := azureadapplication.GetDesired(azureAdApplicationObjectMeta, scope.EntraIdConfig)
 
@@ -204,7 +216,8 @@ func azureAdApplicationControllerResource(scope *state.Scope) ControllerResource
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
 				ShouldUpdate: func(current, desired *naisiov1.AzureAdApplication) bool {
-					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec)
+					return !equality.Semantic.DeepEqual(current.Spec, desired.Spec) ||
+						labelsNeedUpdate(current, desired)
 				},
 				UpdateFields: func(current, desired *naisiov1.AzureAdApplication) {
 					current.Spec = desired.Spec
@@ -222,6 +235,7 @@ func azureAdSecretControllerResource(scope *state.Scope) ControllerResourceAdapt
 	azureAdSecretObjectMeta := metav1.ObjectMeta{
 		Name:      azureAdSecretName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := azureadsecret.GetDesired(azureAdSecretObjectMeta, scope.EntraIdConfig)
 
@@ -247,6 +261,7 @@ func azureAdServiceEntryControllerResource(scope *state.Scope) ControllerResourc
 	azureAdServiceEntryObjectMeta := metav1.ObjectMeta{
 		Name:      azureAdServiceEntryName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := azureadserviceentry.GetDesired(azureAdServiceEntryObjectMeta, scope.EntraIdConfig)
 
@@ -272,6 +287,7 @@ func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapte
 	opaConfigMapObjectMeta := metav1.ObjectMeta{
 		Name:      opaConfigMapName,
 		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    utilities.SecurityConfigStandardLabels(),
 	}
 	desiredResource := opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)
 
@@ -292,19 +308,22 @@ func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapte
 func ConfigMapShouldUpdateFunc(current, desired *corev1.ConfigMap) bool {
 	return !equality.Semantic.DeepEqual(current.BinaryData, desired.BinaryData) ||
 		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
-		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable)
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable) ||
+		labelsNeedUpdate(current, desired)
 }
 
 func configMapUpdateFieldsFunc(current, desired *corev1.ConfigMap) {
 	current.BinaryData = desired.BinaryData
 	current.Data = desired.Data
 	current.Immutable = desired.Immutable
+	current.Labels = desired.Labels
 }
 
 func SecretShouldUpdateFunc(current, desired *corev1.Secret) bool {
 	return !equality.Semantic.DeepEqual(current.StringData, desired.StringData) ||
 		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
-		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable)
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable) ||
+		labelsNeedUpdate(current, desired)
 }
 
 func secretUpdateFieldsFunc(current, desired *corev1.Secret) {
@@ -312,13 +331,15 @@ func secretUpdateFieldsFunc(current, desired *corev1.Secret) {
 	current.Data = desired.Data
 	current.Immutable = desired.Immutable
 	current.Type = desired.Type
+	current.Labels = desired.Labels
 }
 
 func ServiceEntryShouldUpdateFunc(current, desired *istionetworkingv1.ServiceEntry) bool {
 	return !reflect.DeepEqual(current.Spec.GetExportTo(), desired.Spec.GetExportTo()) ||
 		!reflect.DeepEqual(current.Spec.GetHosts(), desired.Spec.GetHosts()) ||
 		!reflect.DeepEqual(current.Spec.GetPorts(), desired.Spec.GetPorts()) ||
-		!reflect.DeepEqual(current.Spec.GetResolution(), desired.Spec.GetResolution())
+		!reflect.DeepEqual(current.Spec.GetResolution(), desired.Spec.GetResolution()) ||
+		labelsNeedUpdate(current, desired)
 }
 
 func serviceEntryUpdateFieldsFunc(current, desired *istionetworkingv1.ServiceEntry) {
@@ -326,4 +347,22 @@ func serviceEntryUpdateFieldsFunc(current, desired *istionetworkingv1.ServiceEnt
 	current.Spec.Hosts = desired.Spec.Hosts
 	current.Spec.Ports = desired.Spec.Ports
 	current.Spec.Resolution = desired.Spec.Resolution
+	current.Labels = desired.Labels
+}
+
+type LabeledObject interface {
+	GetLabels() map[string]string
+}
+
+// labelsNeedUpdate reports whether any of the desired labels are missing from current or have a
+// different value. Labels on current that are not part of the desired set are ignored.
+func labelsNeedUpdate(current, desired LabeledObject) bool {
+	desiredLabels := desired.GetLabels()
+	currentLabels := current.GetLabels()
+	for key, value := range desiredLabels {
+		if currentValue, ok := currentLabels[key]; !ok || currentValue != value {
+			return true
+		}
+	}
+	return false
 }
