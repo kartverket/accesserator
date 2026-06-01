@@ -53,7 +53,7 @@ func ResolveTokenXConfig(ctx context.Context, k8sClient client.Client, securityC
 		Enabled:        tokenXEnabled,
 		ApplicationRef: string(securityConfig.Spec.ApplicationRef),
 		JwkerSpec: naisiov1.JwkerSpec{
-			SecretName: utilities.TokenxNamer{ApplicationRef: string(securityConfig.Spec.ApplicationRef)}.SecretName(),
+			SecretName: utilities.NewTokenxNamer(securityConfig).SecretName(),
 			AccessPolicy: &naisiov1.AccessPolicy{
 				Inbound: &naisiov1.AccessPolicyInbound{
 					Rules: naisIoV1AccessPolicyInboundRules,
