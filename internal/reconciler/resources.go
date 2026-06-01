@@ -48,8 +48,9 @@ jwkerControllerResource reconciles a Jwker resource which creates a client regis
 a corresponding secret which may be used to authenticate the Texas sidecar client.
 */
 func jwkerControllerResource(scope *state.Scope) ControllerResourceAdapter[*naisiov1.Jwker] {
+	jwkerName := utilities.NewTokenxNamer(scope.SecurityConfig).JwkerName()
 	jwkerObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.TokenxNamer{ApplicationRef: string(scope.SecurityConfig.Spec.ApplicationRef)}.JwkerName(),
+		Name:      jwkerName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := jwker.GetDesired(jwkerObjectMeta, scope.TokenXConfig)
@@ -77,8 +78,9 @@ tokenxEgressControllerResource reconciles a NetworkPolicy resource which allows 
 server, if token exchange is enabled.
 */
 func tokenxEgressControllerResource(scope *state.Scope) ControllerResourceAdapter[*networkv1.NetworkPolicy] {
+	tokenxEgressName := utilities.NewTokenxNamer(scope.SecurityConfig).EgressName(config.Get().TokenxName)
 	tokenxEgressObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.TokenxNamer{SecurityConfigName: scope.SecurityConfig.Name}.EgressName(config.Get().TokenxName),
+		Name:      tokenxEgressName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := egress.GetDesired(tokenxEgressObjectMeta, scope.TokenXConfig)
@@ -106,8 +108,9 @@ maskinportenClientControllerResource reconciles a MaskinportenClient resources, 
 Digdir's API with corresponding secret that may be used to fetch Maskinporten tokens.
 */
 func maskinportenClientControllerResource(scope *state.Scope) ControllerResourceAdapter[*naisiov1.MaskinportenClient] {
+	maskinportenClientName := utilities.NewMaskinportenNamer(scope.SecurityConfig).MaskinportenClientName()
 	maskinportenClientObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.MaskinportenNamer{ApplicationRef: string(scope.SecurityConfig.Spec.ApplicationRef)}.MaskinportenClientName(),
+		Name:      maskinportenClientName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := maskinportenclient.GetDesired(maskinportenClientObjectMeta, scope.MaskinportenConfig)
@@ -134,8 +137,9 @@ func maskinportenClientControllerResource(scope *state.Scope) ControllerResource
 maskinportenSecretControllerResource reconciles a Secret resource based on an existing Maskinporten client registration.
 */
 func maskinportenSecretControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.Secret] {
+	maskinportenSecretName := utilities.NewMaskinportenNamer(scope.SecurityConfig).SecretFromRefName()
 	maskinportenSecretObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.MaskinportenNamer{SecurityConfigName: scope.SecurityConfig.Name}.SecretFromRefName(),
+		Name:      maskinportenSecretName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := maskinportensecret.GetDesired(maskinportenSecretObjectMeta, scope.MaskinportenConfig)
@@ -159,8 +163,9 @@ maskinportenServiceEntryControllerResource reconciles a ServiceEntry resource wh
 API.
 */
 func maskinportenServiceEntryControllerResource(scope *state.Scope) ControllerResourceAdapter[*istionetworkingv1.ServiceEntry] {
+	maskinportenServiceEntryName := utilities.NewMaskinportenNamer(scope.SecurityConfig).ServiceEntryName()
 	maskinportenServiceEntryObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.MaskinportenNamer{SecurityConfigName: scope.SecurityConfig.Name}.ServiceEntryName(),
+		Name:      maskinportenServiceEntryName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := maskinportenserviceentry.GetDesired(maskinportenServiceEntryObjectMeta, scope.MaskinportenConfig)
@@ -184,8 +189,9 @@ azureAdApplicationControllerResource reconciles a AzureAdApplication resources, 
 Azure's API with corresponding secret that may be used to fetch Entra ID tokens.
 */
 func azureAdApplicationControllerResource(scope *state.Scope) ControllerResourceAdapter[*naisiov1.AzureAdApplication] {
+	azureAdApplicationName := utilities.NewEntraIdNamer(scope.SecurityConfig).AzureAdApplicationName()
 	azureAdApplicationObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.EntraIdNamer{ApplicationRef: string(scope.SecurityConfig.Spec.ApplicationRef)}.AzureAdApplicationName(),
+		Name:      azureAdApplicationName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := azureadapplication.GetDesired(azureAdApplicationObjectMeta, scope.EntraIdConfig)
@@ -212,8 +218,9 @@ func azureAdApplicationControllerResource(scope *state.Scope) ControllerResource
 azureAdSecretControllerResource reconciles a Secret resource based on an existing Entra ID client registration.
 */
 func azureAdSecretControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.Secret] {
+	azureAdSecretName := utilities.NewEntraIdNamer(scope.SecurityConfig).SecretFromRefName()
 	azureAdSecretObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.EntraIdNamer{SecurityConfigName: scope.SecurityConfig.Name}.SecretFromRefName(),
+		Name:      azureAdSecretName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := azureadsecret.GetDesired(azureAdSecretObjectMeta, scope.EntraIdConfig)
@@ -236,8 +243,9 @@ func azureAdSecretControllerResource(scope *state.Scope) ControllerResourceAdapt
 azureAdServiceEntryControllerResource reconciles a ServiceEntry resource which allows access to the Entra ID API.
 */
 func azureAdServiceEntryControllerResource(scope *state.Scope) ControllerResourceAdapter[*istionetworkingv1.ServiceEntry] {
+	azureAdServiceEntryName := utilities.NewEntraIdNamer(scope.SecurityConfig).ServiceEntryName()
 	azureAdServiceEntryObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.EntraIdNamer{SecurityConfigName: scope.SecurityConfig.Name}.ServiceEntryName(),
+		Name:      azureAdServiceEntryName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := azureadserviceentry.GetDesired(azureAdServiceEntryObjectMeta, scope.EntraIdConfig)
@@ -260,8 +268,9 @@ func azureAdServiceEntryControllerResource(scope *state.Scope) ControllerResourc
 opaConfigMapControllerResource reconciles a ConfigMap resource with all configured bundles as binary data.
 */
 func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.ConfigMap] {
+	opaConfigMapName := utilities.NewOpaNamer(scope.SecurityConfig).ConfigMapName()
 	opaConfigMapObjectMeta := metav1.ObjectMeta{
-		Name:      utilities.OpaNamer{SecurityConfigName: scope.SecurityConfig.Name}.ConfigMapName(),
+		Name:      opaConfigMapName,
 		Namespace: scope.SecurityConfig.Namespace,
 	}
 	desiredResource := opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)

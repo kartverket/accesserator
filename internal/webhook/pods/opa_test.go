@@ -20,7 +20,7 @@ var _ = Describe("opa.go unit tests", func() {
 	)
 
 	newSecurityConfig := func(opaEnabled bool) v1alpha.SecurityConfig {
-		return v1alpha.SecurityConfig{
+		securityConfig := v1alpha.SecurityConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: securityConfigName,
 			},
@@ -34,13 +34,14 @@ var _ = Describe("opa.go unit tests", func() {
 					},
 				},
 			},
-			Status: v1alpha.SecurityConfigStatus{
-				OpaBundleSource: &v1alpha.OpaBundleSource{
-					ConfigMapName: utilities.OpaNamer{SecurityConfigName: securityConfigName}.ConfigMapName(),
-					BundleNames:   []string{"bundle-a", "bundle-b"},
-				},
+		}
+		securityConfig.Status = v1alpha.SecurityConfigStatus{
+			OpaBundleSource: &v1alpha.OpaBundleSource{
+				ConfigMapName: utilities.NewOpaNamer(securityConfig).ConfigMapName(),
+				BundleNames:   []string{"bundle-a", "bundle-b"},
 			},
 		}
+		return securityConfig
 	}
 
 	Describe("GetOpaContainer", func() {
@@ -77,7 +78,7 @@ var _ = Describe("opa.go unit tests", func() {
 				},
 				Status: v1alpha.SecurityConfigStatus{
 					OpaBundleSource: &v1alpha.OpaBundleSource{
-						ConfigMapName: utilities.OpaNamer{SecurityConfigName: securityConfigName}.ConfigMapName(),
+						ConfigMapName: utilities.NewOpaNamer(v1alpha.SecurityConfig{ObjectMeta: metav1.ObjectMeta{Name: securityConfigName}}).ConfigMapName(),
 						BundleNames:   []string{"bundle-a", "bundle-b"},
 					},
 				},

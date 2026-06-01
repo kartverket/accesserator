@@ -30,9 +30,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						Enabled: true,
 					},
 				},
-				Status: v1alpha.SecurityConfigStatus{
-					JwkerSecretName: utilities.TokenxNamer{ApplicationRef: applicationRef}.SecretName(),
-				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				JwkerSecretName: utilities.NewTokenxNamer(securityConfig).SecretName(),
 			}
 			c := pods.GetTexasContainer(securityConfig)
 			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s@%s", config.Get().TexasImageName, config.Get().TexasImageTag, config.Get().TexasImageSha)))
@@ -71,9 +71,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						},
 					},
 				},
-				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSecretName: utilities.MaskinportenNamer{SecurityConfigName: securityConfigName}.SecretName(),
-				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				JwkerSecretName: utilities.NewTokenxNamer(securityConfig).SecretName(),
 			}
 			c := pods.GetTexasContainer(securityConfig)
 			Expect(c.ReadinessProbe).ToNot(BeNil())
@@ -119,11 +119,11 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						Enabled: true,
 					},
 				},
-				Status: v1alpha.SecurityConfigStatus{
-					JwkerSecretName:        utilities.TokenxNamer{SecurityConfigName: securityConfigName}.SecretName(),
-					MaskinportenSecretName: utilities.MaskinportenNamer{SecurityConfigName: securityConfigName}.SecretName(),
-					EntraIdSecretName:      utilities.EntraIdNamer{SecurityConfigName: securityConfigName}.SecretName(),
-				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				JwkerSecretName:        utilities.NewTokenxNamer(securityConfig).SecretName(),
+				MaskinportenSecretName: utilities.NewMaskinportenNamer(securityConfig).SecretName(),
+				EntraIdSecretName:      utilities.NewEntraIdNamer(securityConfig).SecretName(),
 			}
 			c := pods.GetTexasContainer(securityConfig)
 			Expect(c.ReadinessProbe).ToNot(BeNil())
@@ -205,9 +205,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						Enabled: true,
 					},
 				},
-				Status: v1alpha.SecurityConfigStatus{
-					JwkerSecretName: utilities.TokenxNamer{SecurityConfigName: securityConfigName}.SecretName(),
-				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				JwkerSecretName: utilities.NewTokenxNamer(securityConfig).SecretName(),
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.TokenXEnabled).To(Equal("true"))
@@ -264,9 +264,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						},
 					},
 				},
-				Status: v1alpha.SecurityConfigStatus{
-					MaskinportenSecretName: utilities.MaskinportenNamer{SecurityConfigName: securityConfigName}.SecretName(),
-				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				JwkerSecretName: utilities.NewTokenxNamer(securityConfig).SecretName(),
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.MaskinportenEnabled).To(Equal("true"))
@@ -314,9 +314,9 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						Enabled: true,
 					},
 				},
-				Status: v1alpha.SecurityConfigStatus{
-					EntraIdSecretName: utilities.EntraIdNamer{SecurityConfigName: securityConfigName}.SecretName(),
-				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				EntraIdSecretName: utilities.NewEntraIdNamer(securityConfig).SecretName(),
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.AzureEnabled).To(Equal("true"))
@@ -354,11 +354,11 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 						Enabled: true,
 					},
 				},
-				Status: v1alpha.SecurityConfigStatus{
-					EntraIdSecretName:      utilities.EntraIdNamer{ApplicationRef: applicationRef}.SecretName(),
-					MaskinportenSecretName: utilities.MaskinportenNamer{ApplicationRef: applicationRef}.SecretName(),
-					JwkerSecretName:        utilities.TokenxNamer{ApplicationRef: applicationRef}.SecretName(),
-				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				EntraIdSecretName:      utilities.NewEntraIdNamer(securityConfig).SecretName(),
+				MaskinportenSecretName: utilities.NewMaskinportenNamer(securityConfig).SecretName(),
+				JwkerSecretName:        utilities.NewTokenxNamer(securityConfig).SecretName(),
 			}
 			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.AzureEnabled).To(Equal("true"))

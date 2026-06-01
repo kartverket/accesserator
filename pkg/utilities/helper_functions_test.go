@@ -8,10 +8,18 @@ import (
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+func securityConfig() v1alpha.SecurityConfig {
+	return v1alpha.SecurityConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-name"},
+		Spec:       v1alpha.SecurityConfigSpec{ApplicationRef: v1alpha.ResourceName("my-ref")},
+	}
+}
 
 var _ = Describe("Helper Functions", func() {
 
@@ -72,70 +80,77 @@ var _ = Describe("Helper Functions", func() {
 	})
 
 	Describe("TokenxNamer", func() {
+		namer := utilities.NewTokenxNamer(securityConfig())
+
 		It("JwkerName returns the base", func() {
-			Expect(utilities.TokenxNamer{ApplicationRef: "my-app"}.JwkerName()).
-				To(Equal("my-app"))
+			Expect(namer.JwkerName()).
+				To(Equal("my-ref"))
 		})
 
 		It("SecretName returns base with jwker-secret suffix", func() {
-			Expect(utilities.TokenxNamer{ApplicationRef: "my-app"}.SecretName()).
-				To(Equal("my-app-jwker-secret"))
+			Expect(namer.SecretName()).
+				To(Equal("my-ref-jwker-secret"))
 		})
 
 		It("EgressName returns base with tokenx name and egress suffix", func() {
-			Expect(utilities.TokenxNamer{SecurityConfigName: "my-app"}.EgressName("tokenx")).
-				To(Equal("my-app-tokenx-egress"))
+			Expect(namer.EgressName("tokenx")).
+				To(Equal("my-name-tokenx-egress"))
 		})
 	})
 
 	Describe("MaskinportenNamer", func() {
+		namer := utilities.NewMaskinportenNamer(securityConfig())
+
 		It("MaskinportenClientName returns the base", func() {
-			Expect(utilities.MaskinportenNamer{ApplicationRef: "my-app"}.MaskinportenClientName()).
-				To(Equal("my-app"))
+			Expect(namer.MaskinportenClientName()).
+				To(Equal("my-ref"))
 		})
 
 		It("SecretName returns base with maskinporten suffix", func() {
-			Expect(utilities.MaskinportenNamer{ApplicationRef: "my-app"}.SecretName()).
-				To(Equal("my-app-maskinporten-86fb879f"))
+			Expect(namer.SecretName()).
+				To(Equal("my-ref-maskinporten-c593fd9d"))
 		})
 
 		It("SecretFromRefName returns base with maskinporten suffix and hash", func() {
-			Expect(utilities.MaskinportenNamer{SecurityConfigName: "my-app"}.SecretFromRefName()).
-				To(Equal("my-app-maskinporten-86fb879f"))
+			Expect(namer.SecretFromRefName()).
+				To(Equal("my-name-maskinporten-5f817fb7"))
 		})
 
 		It("ServiceEntryName returns base with maskinporten suffix", func() {
-			Expect(utilities.MaskinportenNamer{SecurityConfigName: "my-app"}.ServiceEntryName()).
-				To(Equal("my-app-maskinporten-86fb879f"))
+			Expect(namer.ServiceEntryName()).
+				To(Equal("my-name-maskinporten-5f817fb7"))
 		})
 	})
 
 	Describe("EntraIdNamer", func() {
+		namer := utilities.NewEntraIdNamer(securityConfig())
+
 		It("AzureAdApplicationName returns the base", func() {
-			Expect(utilities.EntraIdNamer{ApplicationRef: "my-app"}.AzureAdApplicationName()).
-				To(Equal("my-app"))
+			Expect(namer.AzureAdApplicationName()).
+				To(Equal("my-ref"))
 		})
 
 		It("SecretName returns base with entraid suffix", func() {
-			Expect(utilities.EntraIdNamer{ApplicationRef: "my-app"}.SecretName()).
-				To(Equal("my-app-entraid-ba831135"))
+			Expect(namer.SecretName()).
+				To(Equal("my-ref-entraid-a2dceed7"))
 		})
 
 		It("SecretFromRefName returns base with entraid suffix and hash", func() {
-			Expect(utilities.EntraIdNamer{SecurityConfigName: "my-app"}.SecretFromRefName()).
-				To(Equal("my-app-entraid-ba831135"))
+			Expect(namer.SecretFromRefName()).
+				To(Equal("my-name-entraid-848ad57d"))
 		})
 
 		It("ServiceEntryName returns base with entraid suffix", func() {
-			Expect(utilities.EntraIdNamer{SecurityConfigName: "my-app"}.ServiceEntryName()).
-				To(Equal("my-app-entraid-ba831135"))
+			Expect(namer.ServiceEntryName()).
+				To(Equal("my-name-entraid-848ad57d"))
 		})
 	})
 
 	Describe("OpaNamer", func() {
 		It("ConfigMapName returns base with opa suffix", func() {
-			Expect(utilities.OpaNamer{SecurityConfigName: "my-app"}.ConfigMapName()).
-				To(Equal("my-app-opa-1669dcfe"))
+			namer := utilities.NewOpaNamer(securityConfig())
+			Expect(namer.ConfigMapName()).
+				To(Equal("my-name-opa-bc75e7d6"))
 		})
 	})
 

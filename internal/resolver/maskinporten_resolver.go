@@ -45,7 +45,7 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 				Scopes: naisiov1.MaskinportenScope{
 					ConsumedScopes: consumedScopes,
 				},
-				SecretName: utilities.MaskinportenNamer{ApplicationRef: string(securityConfig.Spec.ApplicationRef)}.SecretName(),
+				SecretName: utilities.NewMaskinportenNamer(securityConfig).SecretName(),
 			},
 		}, nil
 	case state.ClientRef:
@@ -74,9 +74,9 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 			Enabled: true,
 			Type:    *maskinportenConfigType,
 			ClientSpec: &naisiov1.MaskinportenClientSpec{
-				ClientName: utilities.MaskinportenNamer{ApplicationRef: string(securityConfig.Spec.ApplicationRef)}.MaskinportenClientName(),
+				ClientName: utilities.NewMaskinportenNamer(securityConfig).MaskinportenClientName(),
 				Scopes:     naisiov1.MaskinportenScope{},
-				SecretName: utilities.MaskinportenNamer{ApplicationRef: string(securityConfig.Spec.ApplicationRef)}.SecretName(),
+				SecretName: utilities.NewMaskinportenNamer(securityConfig).SecretName(),
 			},
 		}, nil
 	default:

@@ -44,7 +44,7 @@ func newMockResource(kind, name string, isNil bool) reconciliation.ControllerRes
 func newTestJwker(namespace, appName, synchronizationState, secretName string) *naisiov1.Jwker {
 	return &naisiov1.Jwker{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      utilities.TokenxNamer{ApplicationRef: appName}.JwkerName(),
+			Name:      utilities.NewTokenxNamer(accesseratorv1alpha.SecurityConfig{Spec: accesseratorv1alpha.SecurityConfigSpec{ApplicationRef: accesseratorv1alpha.ResourceName(appName)}}).JwkerName(),
 			Namespace: namespace,
 		},
 		Status: naisiov1.JwkerStatus{
@@ -58,7 +58,7 @@ func newTestJwker(namespace, appName, synchronizationState, secretName string) *
 func newTestMaskinportenClient(namespace, appName, synchronizationState, secretName string) *naisiov1.MaskinportenClient {
 	return &naisiov1.MaskinportenClient{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      utilities.MaskinportenNamer{ApplicationRef: appName}.MaskinportenClientName(),
+			Name:      utilities.NewMaskinportenNamer(accesseratorv1alpha.SecurityConfig{Spec: accesseratorv1alpha.SecurityConfigSpec{ApplicationRef: accesseratorv1alpha.ResourceName(appName)}}).MaskinportenClientName(),
 			Namespace: namespace,
 		},
 		Status: naisiov1.DigdiratorStatus{

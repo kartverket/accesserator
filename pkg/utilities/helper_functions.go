@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/kartverket/accesserator/api/v1alpha"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,72 +50,96 @@ func GetJwker(ctx context.Context, k8sClient client.Client, objectKey client.Obj
 	return &jwker, nil
 }
 
+type nameBase struct {
+	applicationRef     string
+	securityConfigName string
+}
+
+func newNameBase(sc v1alpha.SecurityConfig) nameBase {
+	return nameBase{
+		applicationRef:     string(sc.Spec.ApplicationRef),
+		securityConfigName: sc.Name,
+	}
+}
+
 type TokenxNamer struct {
-	SecurityConfigName string
-	ApplicationRef     string
+	nameBase
+}
+
+func NewTokenxNamer(sc v1alpha.SecurityConfig) TokenxNamer {
+	return TokenxNamer{newNameBase(sc)}
 }
 
 func (n TokenxNamer) JwkerName() string {
-	return n.ApplicationRef
+	return n.applicationRef
 }
 
 func (n TokenxNamer) SecretName() string {
-	return fmt.Sprintf("%s-%s", n.ApplicationRef, JwkerSecretNameSuffix)
+	return fmt.Sprintf("%s-%s", n.applicationRef, JwkerSecretNameSuffix)
 }
 
 func (n TokenxNamer) EgressName(tokenxName string) string {
-	return fmt.Sprintf("%s-%s-%s", n.SecurityConfigName, tokenxName, EgressNameSuffix)
+	return fmt.Sprintf("%s-%s-%s", n.securityConfigName, tokenxName, EgressNameSuffix)
 }
 
 type MaskinportenNamer struct {
-	SecurityConfigName string
-	ApplicationRef     string
+	nameBase
+}
+
+func NewMaskinportenNamer(sc v1alpha.SecurityConfig) MaskinportenNamer {
+	return MaskinportenNamer{newNameBase(sc)}
 }
 
 func (n MaskinportenNamer) MaskinportenClientName() string {
-	return n.ApplicationRef
+	return n.applicationRef
 }
 
 func (n MaskinportenNamer) SecretName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.ApplicationRef, MaskinportenNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.applicationRef, MaskinportenNameSuffix))
 }
 
 func (n MaskinportenNamer) SecretFromRefName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, MaskinportenNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, MaskinportenNameSuffix))
 }
 
 func (n MaskinportenNamer) ServiceEntryName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, MaskinportenNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, MaskinportenNameSuffix))
 }
 
 type EntraIdNamer struct {
-	SecurityConfigName string
-	ApplicationRef     string
+	nameBase
+}
+
+func NewEntraIdNamer(sc v1alpha.SecurityConfig) EntraIdNamer {
+	return EntraIdNamer{newNameBase(sc)}
 }
 
 func (n EntraIdNamer) AzureAdApplicationName() string {
-	return n.ApplicationRef
+	return n.applicationRef
 }
 
 func (n EntraIdNamer) SecretName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.ApplicationRef, EntraIdNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.applicationRef, EntraIdNameSuffix))
 }
 
 func (n EntraIdNamer) SecretFromRefName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, EntraIdNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, EntraIdNameSuffix))
 }
 
 func (n EntraIdNamer) ServiceEntryName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, EntraIdNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, EntraIdNameSuffix))
 }
 
 type OpaNamer struct {
-	SecurityConfigName string
-	ApplicationRef     string
+	nameBase
+}
+
+func NewOpaNamer(sc v1alpha.SecurityConfig) OpaNamer {
+	return OpaNamer{newNameBase(sc)}
 }
 
 func (n OpaNamer) ConfigMapName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.SecurityConfigName, OpaConfigMapNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, OpaConfigMapNameSuffix))
 }
 
 func WithShortHashSuffix(s string) string {
