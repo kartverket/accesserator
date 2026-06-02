@@ -20,15 +20,6 @@ func Ptr[T any](v T) *T {
 	return &v
 }
 
-// SecurityConfigStandardLabels returns the set of labels applied to every resource created by Accesserator for the
-// SecurityConfig controller.
-func SecurityConfigStandardLabels() map[string]string {
-	return map[string]string{
-		ManagedByLabelKey:  ManagedByLabelValue,
-		ControllerLabelKey: SecurityConfigControllerLabelValue,
-	}
-}
-
 func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 	switch {
 	case i.IsZero() && j.IsZero():

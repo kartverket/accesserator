@@ -5,6 +5,7 @@ import (
 
 	"github.com/kartverket/accesserator/internal/controller"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/labels"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -976,8 +977,8 @@ var _ = Describe("SecurityConfig Controller", func() {
 			By("Verifying the SecurityConfig starts without the standard labels")
 			sc := &accesseratorv1alpha.SecurityConfig{}
 			Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
-			Expect(sc.Labels).NotTo(HaveKey(utilities.ManagedByLabelKey))
-			Expect(sc.Labels).NotTo(HaveKey(utilities.ControllerLabelKey))
+			Expect(sc.Labels).NotTo(HaveKey(labels.ManagedByLabelKey))
+			Expect(sc.Labels).NotTo(HaveKey(labels.ControllerLabelKey))
 
 			By("Reconciling the SecurityConfig")
 			fakeRecorder := events.NewFakeRecorder(100)
@@ -991,7 +992,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			Eventually(func(g Gomega) {
 				updated := &accesseratorv1alpha.SecurityConfig{}
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
-				g.Expect(updated.Labels).To(Equal(utilities.SecurityConfigStandardLabels()))
+				g.Expect(updated.Labels).To(Equal(labels.SecurityConfigStandardLabels()))
 			}).Should(Succeed())
 		})
 
@@ -1016,8 +1017,8 @@ var _ = Describe("SecurityConfig Controller", func() {
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
 				g.Expect(updated.Labels).To(SatisfyAll(
 					HaveKeyWithValue("custom.example.com/team", "platform"),
-					HaveKeyWithValue(utilities.ManagedByLabelKey, utilities.ManagedByLabelValue),
-					HaveKeyWithValue(utilities.ControllerLabelKey, utilities.SecurityConfigControllerLabelValue),
+					HaveKeyWithValue(labels.ManagedByLabelKey, labels.ManagedByLabelValue),
+					HaveKeyWithValue(labels.ControllerLabelKey, labels.SecurityConfigControllerLabelValue),
 				))
 			}).Should(Succeed())
 		})
@@ -1041,21 +1042,20 @@ var _ = Describe("SecurityConfig Controller", func() {
 			Eventually(func(g Gomega) {
 				sc := &accesseratorv1alpha.SecurityConfig{}
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
-				g.Expect(sc.Labels).To(Equal(utilities.SecurityConfigStandardLabels()))
+				g.Expect(sc.Labels).To(Equal(labels.SecurityConfigStandardLabels()))
 			}).Should(Succeed())
 
 			By("Verifying the first reconcile patched the SecurityConfig exactly once")
 			Expect(spyClient.securityConfigPatches).To(Equal(1))
 
 			By("Reconciling again now that the labels already match")
-			patchesAfterFirst := spyClient.securityConfigPatches
 			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Verifying the second reconcile issued no further SecurityConfig patch (maps.Equal guard holds)")
-			Expect(spyClient.securityConfigPatches).To(Equal(patchesAfterFirst))
+			By("Verifying the second reconcile issued no further SecurityConfig patch")
+			Expect(spyClient.securityConfigPatches).To(Equal(1))
 		})
 	})
 })

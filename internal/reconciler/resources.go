@@ -5,6 +5,7 @@ import (
 
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/labels"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadapplication"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadsecret"
@@ -52,7 +53,7 @@ func jwkerControllerResource(scope *state.Scope) ControllerResourceAdapter[*nais
 	jwkerObjectMeta := metav1.ObjectMeta{
 		Name:      jwkerName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := jwker.GetDesired(jwkerObjectMeta, scope.TokenXConfig)
 
@@ -85,7 +86,7 @@ func tokenxEgressControllerResource(scope *state.Scope) ControllerResourceAdapte
 	tokenxEgressObjectMeta := metav1.ObjectMeta{
 		Name:      tokenxEgressName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := egress.GetDesired(tokenxEgressObjectMeta, scope.TokenXConfig)
 
@@ -118,7 +119,7 @@ func maskinportenClientControllerResource(scope *state.Scope) ControllerResource
 	maskinportenClientObjectMeta := metav1.ObjectMeta{
 		Name:      maskinportenClientName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := maskinportenclient.GetDesired(maskinportenClientObjectMeta, scope.MaskinportenConfig)
 
@@ -150,7 +151,7 @@ func maskinportenSecretControllerResource(scope *state.Scope) ControllerResource
 	maskinportenSecretObjectMeta := metav1.ObjectMeta{
 		Name:      maskinportenSecretName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := maskinportensecret.GetDesired(maskinportenSecretObjectMeta, scope.MaskinportenConfig)
 
@@ -177,7 +178,7 @@ func maskinportenServiceEntryControllerResource(scope *state.Scope) ControllerRe
 	maskinportenServiceEntryObjectMeta := metav1.ObjectMeta{
 		Name:      maskinportenServiceEntryName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := maskinportenserviceentry.GetDesired(maskinportenServiceEntryObjectMeta, scope.MaskinportenConfig)
 
@@ -204,7 +205,7 @@ func azureAdApplicationControllerResource(scope *state.Scope) ControllerResource
 	azureAdApplicationObjectMeta := metav1.ObjectMeta{
 		Name:      azureAdApplicationName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := azureadapplication.GetDesired(azureAdApplicationObjectMeta, scope.EntraIdConfig)
 
@@ -221,6 +222,7 @@ func azureAdApplicationControllerResource(scope *state.Scope) ControllerResource
 				},
 				UpdateFields: func(current, desired *naisiov1.AzureAdApplication) {
 					current.Spec = desired.Spec
+					current.Labels = desired.Labels
 				},
 			},
 		},
@@ -235,7 +237,7 @@ func azureAdSecretControllerResource(scope *state.Scope) ControllerResourceAdapt
 	azureAdSecretObjectMeta := metav1.ObjectMeta{
 		Name:      azureAdSecretName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := azureadsecret.GetDesired(azureAdSecretObjectMeta, scope.EntraIdConfig)
 
@@ -261,7 +263,7 @@ func azureAdServiceEntryControllerResource(scope *state.Scope) ControllerResourc
 	azureAdServiceEntryObjectMeta := metav1.ObjectMeta{
 		Name:      azureAdServiceEntryName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := azureadserviceentry.GetDesired(azureAdServiceEntryObjectMeta, scope.EntraIdConfig)
 
@@ -287,7 +289,7 @@ func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapte
 	opaConfigMapObjectMeta := metav1.ObjectMeta{
 		Name:      opaConfigMapName,
 		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    utilities.SecurityConfigStandardLabels(),
+		Labels:    labels.SecurityConfigStandardLabels(),
 	}
 	desiredResource := opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)
 
