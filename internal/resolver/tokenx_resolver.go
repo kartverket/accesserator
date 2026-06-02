@@ -77,7 +77,10 @@ func resolveJwkerInboundRules(
 		return jwkerInboundRules, nil
 	}
 
-	if securityConfig.Spec.Tokenx.AccessPolicy.InheritInboundRules {
+	if securityConfig.Spec.Tokenx.AccessPolicy.InheritInboundRules &&
+		skiperatorApplication.Spec.AccessPolicy != nil &&
+		skiperatorApplication.Spec.AccessPolicy.Inbound != nil &&
+		len(skiperatorApplication.Spec.AccessPolicy.Inbound.Rules) > 0 {
 		for _, inboundAccessPolicyRule := range skiperatorApplication.Spec.AccessPolicy.Inbound.Rules {
 			namespaceList, errs := getNamespaceListForInboundRule(
 				ctx,

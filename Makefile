@@ -537,7 +537,28 @@ ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
+	@set -e; \
+	if [ -x "$(KUSTOMIZE)" ]; then \
+		echo "✅ kustomize already exists at $(JQ)"; \
+		exit 0; \
+	fi; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$arch" in \
+		x86_64|amd64) arch=amd64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "❌ Unsupported architecture: $$arch" >&2; exit 1 ;; \
+	esac; \
+	case "$$os" in \
+		linux) binary="kustomize_$(KUSTOMIZE_VERSION)_linux_$${arch}.tar.gz" ;; \
+		darwin) binary="kustomize_$(KUSTOMIZE_VERSION)_darwin_$${arch}.tar.gz" ;; \
+		*) echo "❌ Unsupported OS: $$os" >&2; exit 1 ;; \
+	esac; \
+	url="https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/$(KUSTOMIZE_VERSION)/$${binary}"; \
+	echo "Downloading kustomize $(KUSTOMIZE_VERSION) from $$url"; \
+	curl -fsSL "$$url" | tar -xz -C "$(LOCALBIN)"; \
+	chmod +x "$(KUSTOMIZE)"; \
+	echo "✅ kustomize installed at $(KUSTOMIZE)"
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
@@ -569,6 +590,7 @@ $(JQ): $(LOCALBIN)
 	curl -L -o "$(JQ)" "$$url"; \
 	chmod +x "$(JQ)"; \
 	echo "✅ jq installed at $(JQ)"
+
 kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))

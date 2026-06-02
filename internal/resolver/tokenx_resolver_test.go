@@ -98,6 +98,35 @@ var _ = Describe("TokenX Resolver", func() {
 				Expect(tokenXConfig.JwkerSpec.AccessPolicy.Outbound.Rules).To(BeEmpty())
 			})
 
+			It("should not include access policy when application does not have inbound rules and inherit is true", func() {
+				accessPolicy := &podtypes.AccessPolicy{
+					Outbound: podtypes.OutboundPolicy{
+						Rules: []podtypes.InternalRule{
+							{
+								Application: "another-app",
+							},
+						},
+					},
+				}
+				app := testApplication(accessPolicy)
+				Expect(k8sClient.Create(ctx, app)).To(Succeed())
+
+				sc := securityConfig(testAppName, &accesseratorv1alpha.TokenXSpec{
+					Enabled: true,
+					AccessPolicy: &accesseratorv1alpha.AccessPolicySpec{
+						InheritInboundRules: true,
+					},
+				})
+
+				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
+				Expect(result.Enabled).To(BeTrue())
+				Expect(result.JwkerSpec.AccessPolicy.Inbound).NotTo(BeNil())
+				Expect(result.JwkerSpec.AccessPolicy.Inbound.Rules).To(BeEmpty())
+			})
+
 			It("should include access policy when application has one and inherit is true", func() {
 				accessPolicy := &podtypes.AccessPolicy{
 					Inbound: &podtypes.InboundPolicy{

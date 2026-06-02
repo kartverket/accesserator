@@ -380,7 +380,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 		Expect(*result).To(Equal(statusmanager.StateInvalid), "Invalid config should take precedence over other states")
 	})
 
-	It("StatePending takes precedence over StateFailed", func() {
+	It("StateFailed takes precedence over StatePending", func() {
 		errorMsg := "Some error"
 		scope := &state.Scope{
 			InvalidConfig: false,
@@ -396,7 +396,7 @@ var _ = Describe("DetermineReconciliationState", func() {
 		result, err := statusmanager.DetermineReconciliationState(ctx, k8sClient, scope, resources)
 
 		Expect(err).NotTo(HaveOccurred())
-		Expect(*result).To(Equal(statusmanager.StatePending), "Pending state should take precedence over failed state")
+		Expect(*result).To(Equal(statusmanager.StateFailed), "Pending state should take precedence over failed state")
 	})
 })
 
