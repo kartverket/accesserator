@@ -461,7 +461,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.RequeueAfter).To(BeZero())
 
-			// Verify resource was NOT deleted
+			// Verify resource was deleted
 			Eventually(func() bool {
 				deletedJwker := &naisiov1.Jwker{}
 				err := k8sClient.Get(context.Background(), types.NamespacedName{
