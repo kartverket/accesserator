@@ -108,10 +108,10 @@ func DetermineReconciliationState(
 	switch {
 	case scope.InvalidConfig:
 		return utilities.Ptr(StateInvalid), nil
-	case len(scope.Descendants) != reconciliation.CountReconciledResources(controllerResources):
-		return utilities.Ptr(StatePending), nil
 	case len(scope.GetErrors()) > 0:
 		return utilities.Ptr(StateFailed), nil
+	case len(scope.Descendants) != reconciliation.CountNonNilResources(controllerResources):
+		return utilities.Ptr(StatePending), nil
 	}
 
 	waitingForJwker := false
