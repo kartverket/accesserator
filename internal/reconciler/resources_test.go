@@ -290,6 +290,12 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 			},
 			Type: corev1.SecretTypeOpaque,
 		}
+		// Set ownerReference to SecurityConfig
+		Expect(ctrl.SetControllerReference(
+			&scope.SecurityConfig,
+			existing,
+			scheme.Scheme,
+		)).To(Succeed())
 		Expect(k8sClient.Create(ctx, existing)).To(Succeed())
 
 		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
