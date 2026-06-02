@@ -971,6 +971,92 @@ var _ = Describe("SecurityConfig Controller", func() {
 				return k8sClient.Get(ctx, jwkerKey, jwker)
 			}).Should(Succeed())
 		})
+
+		It("adds the standard labels to the SecurityConfig itself when they are missing", func() {
+			By("Verifying the SecurityConfig starts without the standard labels")
+			sc := &accesseratorv1alpha.SecurityConfig{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+			Expect(sc.Labels).NotTo(HaveKey(utilities.ManagedByLabelKey))
+			Expect(sc.Labels).NotTo(HaveKey(utilities.ControllerLabelKey))
+
+			By("Reconciling the SecurityConfig")
+			fakeRecorder := events.NewFakeRecorder(100)
+			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the standard labels were added to the SecurityConfig")
+			Eventually(func(g Gomega) {
+				updated := &accesseratorv1alpha.SecurityConfig{}
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
+				g.Expect(updated.Labels).To(Equal(utilities.SecurityConfigStandardLabels()))
+			}).Should(Succeed())
+		})
+
+		It("preserves pre-existing labels on the SecurityConfig when adding the standard labels", func() {
+			By("Adding a custom label to the SecurityConfig")
+			sc := &accesseratorv1alpha.SecurityConfig{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+			sc.Labels = map[string]string{"custom.example.com/team": "platform"}
+			Expect(k8sClient.Update(ctx, sc)).To(Succeed())
+
+			By("Reconciling the SecurityConfig")
+			fakeRecorder := events.NewFakeRecorder(100)
+			controllerReconciler := getSecurityConfigReconciler(fakeRecorder)
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying both the custom label and the standard labels are present")
+			Eventually(func(g Gomega) {
+				updated := &accesseratorv1alpha.SecurityConfig{}
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
+				g.Expect(updated.Labels).To(SatisfyAll(
+					HaveKeyWithValue("custom.example.com/team", "platform"),
+					HaveKeyWithValue(utilities.ManagedByLabelKey, utilities.ManagedByLabelValue),
+					HaveKeyWithValue(utilities.ControllerLabelKey, utilities.SecurityConfigControllerLabelValue),
+				))
+			}).Should(Succeed())
+		})
+
+		It("patches the SecurityConfig labels exactly once and not again on a subsequent reconcile", func() {
+			By("Building a reconciler whose client counts SecurityConfig patches")
+			spyClient := &patchCountingClient{Client: gvkInjectingClient{k8sClient}}
+			fakeRecorder := events.NewFakeRecorder(100)
+			controllerReconciler := &controller.SecurityConfigReconciler{
+				Client:   spyClient,
+				Scheme:   spyClient.Scheme(),
+				Recorder: fakeRecorder,
+			}
+
+			By("Reconciling once to add the standard labels")
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				sc := &accesseratorv1alpha.SecurityConfig{}
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+				g.Expect(sc.Labels).To(Equal(utilities.SecurityConfigStandardLabels()))
+			}).Should(Succeed())
+
+			By("Verifying the first reconcile patched the SecurityConfig exactly once")
+			Expect(spyClient.securityConfigPatches).To(Equal(1))
+
+			By("Reconciling again now that the labels already match")
+			patchesAfterFirst := spyClient.securityConfigPatches
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying the second reconcile issued no further SecurityConfig patch (maps.Equal guard holds)")
+			Expect(spyClient.securityConfigPatches).To(Equal(patchesAfterFirst))
+		})
 	})
 })
 
@@ -1023,4 +1109,24 @@ func (c gvkInjectingClient) Get(ctx context.Context, key client.ObjectKey, obj c
 		obj.GetObjectKind().SetGroupVersionKind(accesseratorv1alpha.GroupVersion.WithKind("SecurityConfig"))
 	}
 	return nil
+}
+
+// patchCountingClient wraps a client.Client and counts how many times the SecurityConfig itself is
+// patched, so tests can assert the controller does not redundantly patch its own labels.
+// Status subresource writes go through Status().Update and are intentionally not counted here.
+type patchCountingClient struct {
+	client.Client
+	securityConfigPatches int
+}
+
+func (c *patchCountingClient) Patch(
+	ctx context.Context,
+	obj client.Object,
+	patch client.Patch,
+	opts ...client.PatchOption,
+) error {
+	if _, ok := obj.(*accesseratorv1alpha.SecurityConfig); ok {
+		c.securityConfigPatches++
+	}
+	return c.Client.Patch(ctx, obj, patch, opts...)
 }
