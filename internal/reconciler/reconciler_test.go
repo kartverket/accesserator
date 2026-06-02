@@ -14,9 +14,11 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ = Describe("ControllerResourceAdapter", func() {
@@ -196,11 +198,12 @@ var _ = Describe("ControllerResourceAdapter", func() {
 			Expect(createdJwker.Spec.SecretName).To(Equal("test-secret"))
 		})
 
-		It("should update a resource when it exists and needs updating", func() {
-			// First create the resource
+		It("should NOT update a resource when it exists and needs updating, but is not owned by SecurityConfig", func() {
+			jwkerName := "test-jwker-update"
+			// First, create the resource
 			existingJwker := &naisiov1.Jwker{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-jwker-update",
+					Name:      jwkerName,
 					Namespace: testNamespace,
 				},
 				Spec: naisiov1.JwkerSpec{
@@ -213,7 +216,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 			// Define the desired state with updated secret name
 			desiredJwker := &naisiov1.Jwker{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-jwker-update",
+					Name:      jwkerName,
 					Namespace: testNamespace,
 				},
 				Spec: naisiov1.JwkerSpec{
@@ -240,21 +243,69 @@ var _ = Describe("ControllerResourceAdapter", func() {
 			}
 
 			result, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result.RequeueAfter).To(BeZero())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("cannot update"))
+			Expect(err.Error()).To(ContainSubstring("as it is not owned by SecurityConfig"))
+			Expect(result.RequeueAfter).To(Equal(time.Duration(0)))
+		})
 
-			// Verify resource was updated
-			updatedJwker := &naisiov1.Jwker{}
-			err = k8sClient.Get(ctx, types.NamespacedName{
-				Name:      desiredJwker.Name,
-				Namespace: testNamespace,
-			}, updatedJwker)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(updatedJwker.Spec.SecretName).To(Equal("new-secret"))
+		It("should update a resource when it exists, is owned by SecurityConfig and needs updating", func() {
+			jwkerName := "test-jwker-update"
+			// First, create the resource
+			existingJwker := &naisiov1.Jwker{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      jwkerName,
+					Namespace: testNamespace,
+				},
+				Spec: naisiov1.JwkerSpec{
+					SecretName:   "old-secret",
+					AccessPolicy: &naisiov1.AccessPolicy{},
+				},
+			}
+			// Set ownerReference to SecurityConfig
+			Expect(ctrl.SetControllerReference(
+				&scope.SecurityConfig,
+				existingJwker,
+				scheme.Scheme,
+			)).To(Succeed())
+			Expect(k8sClient.Create(ctx, existingJwker)).To(Succeed())
+
+			// Define the desired state with updated secret name
+			desiredJwker := &naisiov1.Jwker{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      jwkerName,
+					Namespace: testNamespace,
+				},
+				Spec: naisiov1.JwkerSpec{
+					SecretName:   "new-secret",
+					AccessPolicy: &naisiov1.AccessPolicy{},
+				},
+			}
+
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
+				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
+					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
+						ResourceKind:    "Jwker",
+						ResourceName:    desiredJwker.Name,
+						DesiredResource: &desiredJwker,
+						Scope:           scope,
+						ShouldUpdate: func(current, desired *naisiov1.Jwker) bool {
+							return current.Spec.SecretName != desired.Spec.SecretName
+						},
+						UpdateFields: func(current, desired *naisiov1.Jwker) {
+							current.Spec = desired.Spec
+						},
+					},
+				},
+			}
+
+			result, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeZero())
 		})
 
 		It("should not update a resource when no changes are needed", func() {
-			// First create the resource
+			// First, create the resource
 			existingJwker := &naisiov1.Jwker{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-jwker-noupdate",
@@ -265,6 +316,12 @@ var _ = Describe("ControllerResourceAdapter", func() {
 					AccessPolicy: &naisiov1.AccessPolicy{},
 				},
 			}
+			// Set ownerReference to SecurityConfig
+			Expect(ctrl.SetControllerReference(
+				&scope.SecurityConfig,
+				existingJwker,
+				scheme.Scheme,
+			)).To(Succeed())
 			Expect(k8sClient.Create(ctx, existingJwker)).To(Succeed())
 
 			// Get the resource version before reconcile
@@ -317,8 +374,8 @@ var _ = Describe("ControllerResourceAdapter", func() {
 			Expect(afterJwker.ResourceVersion).To(Equal(resourceVersionBefore))
 		})
 
-		It("should delete a resource when desired is nil and resource exists", func() {
-			// First create the resource
+		It("should NOT delete a resource when desired is nil, the resource exists, but the resource is NOT owned by SecurityConfig", func() {
+			// First, create the resource
 			existingJwker := &naisiov1.Jwker{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-jwker-delete",
@@ -352,14 +409,66 @@ var _ = Describe("ControllerResourceAdapter", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.RequeueAfter).To(BeZero())
 
-			// Verify resource was deleted
+			// Verify resource was NOT deleted
+			Eventually(func() bool {
+				notDeletedJwker := &naisiov1.Jwker{}
+				err := k8sClient.Get(context.Background(), types.NamespacedName{
+					Name:      existingJwker.Name,
+					Namespace: testNamespace,
+				}, notDeletedJwker)
+				return err == nil
+			}).Should(BeTrue())
+		})
+
+		It("should delete a resource when desired is nil, the resource exists, and the resource is owned by SecurityConfig", func() {
+			// First, create the resource
+			existingJwker := &naisiov1.Jwker{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-jwker-delete",
+					Namespace: testNamespace,
+				},
+				Spec: naisiov1.JwkerSpec{
+					SecretName:   "to-be-deleted",
+					AccessPolicy: &naisiov1.AccessPolicy{},
+				},
+			}
+			// Set ownerReference to SecurityConfig
+			Expect(ctrl.SetControllerReference(
+				&scope.SecurityConfig,
+				existingJwker,
+				scheme.Scheme,
+			)).To(Succeed())
+			Expect(k8sClient.Create(ctx, existingJwker)).To(Succeed())
+
+			// Reconcile with nil desired resource
+			var nilJwker *naisiov1.Jwker
+			adapter := reconciler.ControllerResourceAdapter[*naisiov1.Jwker]{
+				ReconcilerAdapter: reconciliation.ReconcilerAdapter[*naisiov1.Jwker]{
+					Func: reconciliation.ResourceReconciler[*naisiov1.Jwker]{
+						ResourceKind:    "Jwker",
+						ResourceName:    existingJwker.Name,
+						DesiredResource: &nilJwker,
+						Scope:           scope,
+						ShouldUpdate: func(current, desired *naisiov1.Jwker) bool {
+							return false
+						},
+						UpdateFields: func(current, desired *naisiov1.Jwker) {},
+					},
+				},
+			}
+
+			result, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeZero())
+
+			// Verify resource was NOT deleted
 			Eventually(func() bool {
 				deletedJwker := &naisiov1.Jwker{}
 				err := k8sClient.Get(context.Background(), types.NamespacedName{
 					Name:      existingJwker.Name,
 					Namespace: testNamespace,
 				}, deletedJwker)
-				return err != nil
+				return err != nil && errors.IsNotFound(err)
 			}).Should(BeTrue())
 		})
 

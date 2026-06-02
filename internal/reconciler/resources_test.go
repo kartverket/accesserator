@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ = Describe("ControllerResources", func() {
@@ -203,7 +204,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 		))
 	})
 
-	It("updates a Secret when data changes", func() {
+	It("does NOT update a Secret when data changes, but the Secret is not owned by SecurityConfig", func() {
 		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
 
 		existing := &corev1.Secret{
@@ -225,7 +226,48 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 		adapter = getAdapter()
 
 		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("cannot update"))
+		Expect(err.Error()).To(ContainSubstring("as it is not owned by SecurityConfig"))
+
+		updated := &corev1.Secret{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: testNamespace,
+		}, updated)).To(Succeed())
+		Expect(updated.Data["token"]).ToNot(Equal([]byte("new-token")))
+		Expect(updated.Data["token"]).To(Equal([]byte("old-token")))
+	})
+
+	It("updates a Secret when data changes AND the Secret is owned by SecurityConfig", func() {
+		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
+
+		existing := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: testNamespace,
+			},
+			Data: map[string][]byte{
+				"token": []byte("old-token"),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		// Set ownerReference to SecurityConfig
+		Expect(ctrl.SetControllerReference(
+			&scope.SecurityConfig,
+			existing,
+			scheme.Scheme,
+		)).To(Succeed())
+		Expect(k8sClient.Create(ctx, existing)).To(Succeed())
+
+		newData := map[string][]byte{
+			"token": []byte("new-token"),
+		}
+		scope.MaskinportenConfig.SecretData = &newData
+		adapter = getAdapter()
+
+		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
+		Expect(err).ToNot(HaveOccurred())
 
 		updated := &corev1.Secret{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{
@@ -288,7 +330,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 		Expect(after.ResourceVersion).To(Equal(rvBefore))
 	})
 
-	It("updates a Secret when a new data key is added", func() {
+	It("does not update a Secret when a new data key is added and the Secret is NOT owned by SecurityConfig", func() {
 		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
 
 		existing := &corev1.Secret{
@@ -311,6 +353,47 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 		adapter = getAdapter()
 
 		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("cannot update"))
+		Expect(err.Error()).To(ContainSubstring("as it is not owned by SecurityConfig"))
+
+		updated := &corev1.Secret{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: testNamespace,
+		}, updated)).To(Succeed())
+		Expect(updated.Data).ToNot(HaveKey("extra"))
+	})
+
+	It("updates a Secret when a new data key is added and the Secret is owned by SecurityConfig", func() {
+		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
+
+		existing := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: testNamespace,
+			},
+			Data: map[string][]byte{
+				"token": []byte("a-token"),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		// Set ownerReference to SecurityConfig
+		Expect(ctrl.SetControllerReference(
+			&scope.SecurityConfig,
+			existing,
+			scheme.Scheme,
+		)).To(Succeed())
+		Expect(k8sClient.Create(ctx, existing)).To(Succeed())
+
+		newData := map[string][]byte{
+			"token": []byte("a-token"),
+			"extra": []byte("extra-value"),
+		}
+		scope.MaskinportenConfig.SecretData = &newData
+		adapter = getAdapter()
+
+		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
 		Expect(err).NotTo(HaveOccurred())
 
 		updated := &corev1.Secret{}
@@ -321,7 +404,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 		Expect(updated.Data).To(HaveKey("extra"))
 	})
 
-	It("updates a Secret when a data key is removed", func() {
+	It("does NOT update a Secret when a data key is removed AND when the Secret is NOT owned by SecurityConfig", func() {
 		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
 
 		existing := &corev1.Secret{
@@ -344,6 +427,47 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 		adapter = getAdapter()
 
 		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("cannot update"))
+		Expect(err.Error()).To(ContainSubstring("as it is not owned by SecurityConfig"))
+
+		updated := &corev1.Secret{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: testNamespace,
+		}, updated)).To(Succeed())
+		Expect(updated.Data).To(HaveKey("extra"))
+	})
+
+	It("updates a Secret when a data key is removed AND the Secret is owned by SecurityConfig", func() {
+		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
+
+		existing := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: testNamespace,
+			},
+			Data: map[string][]byte{
+				"token": []byte("a-token"),
+				"extra": []byte("extra-value"),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		// Set ownerReference to SecurityConfig
+		Expect(ctrl.SetControllerReference(
+			&scope.SecurityConfig,
+			existing,
+			scheme.Scheme,
+		)).To(Succeed())
+		Expect(k8sClient.Create(ctx, existing)).To(Succeed())
+
+		newData := map[string][]byte{
+			"token": []byte("a-token"),
+		}
+		scope.MaskinportenConfig.SecretData = &newData
+		adapter = getAdapter()
+
+		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
 		Expect(err).NotTo(HaveOccurred())
 
 		updated := &corev1.Secret{}
@@ -351,7 +475,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 			Name:      secretName,
 			Namespace: testNamespace,
 		}, updated)).To(Succeed())
-		Expect(updated.Data).NotTo(HaveKey("extra"))
+		Expect(updated.Data).ToNot(HaveKey("extra"))
 	})
 })
 
