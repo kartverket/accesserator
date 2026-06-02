@@ -4,7 +4,7 @@ package authz
 
 import rego.v1
 
-default allow = false
+default allow := false
 
 allow if {
 	input.password == "accesserator"
