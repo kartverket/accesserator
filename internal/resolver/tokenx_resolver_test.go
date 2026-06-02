@@ -123,8 +123,8 @@ var _ = Describe("TokenX Resolver", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
 				Expect(result.Enabled).To(BeTrue())
-				Expect(result.InboundRules).NotTo(BeNil())
-				Expect(result.InboundRules.GetRules()).To(BeEmpty())
+				Expect(result.JwkerSpec.AccessPolicy.Inbound).NotTo(BeNil())
+				Expect(result.JwkerSpec.AccessPolicy.Inbound.Rules).To(BeEmpty())
 			})
 
 			It("should include access policy when application has one and inherit is true", func() {

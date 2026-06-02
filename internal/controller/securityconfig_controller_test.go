@@ -1094,16 +1094,21 @@ var _ = Describe("SecurityConfig status conditions and phase", func() {
 		namespaceName      = "default"
 	)
 
+	securityConfig := accesseratorv1alpha.SecurityConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: securityConfigName},
+		Spec:       accesseratorv1alpha.SecurityConfigSpec{ApplicationRef: skiperatorAppName},
+	}
+
 	typeNamespacedName := types.NamespacedName{
 		Name:      securityConfigName,
 		Namespace: namespaceName,
 	}
 	jwkerNamespacedName := types.NamespacedName{
-		Name:      utilities.TokenxNamer{ApplicationRef: skiperatorAppName}.JwkerName(),
+		Name:      utilities.NewTokenxNamer(securityConfig).JwkerName(),
 		Namespace: namespaceName,
 	}
 	netpolNamespacedName := types.NamespacedName{
-		Name:      utilities.TokenxNamer{SecurityConfigName: securityConfigName}.EgressName(config.Get().TokenxName),
+		Name:      utilities.NewTokenxNamer(securityConfig).EgressName(config.Get().TokenxName),
 		Namespace: namespaceName,
 	}
 
