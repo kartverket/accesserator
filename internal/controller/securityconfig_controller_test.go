@@ -2,6 +2,8 @@ package controller_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/kartverket/accesserator/internal/controller"
 	"github.com/kartverket/accesserator/pkg/config"
@@ -33,7 +35,7 @@ var _ = Describe("SecurityConfig Controller", func() {
 			namespaceName      = "default"
 		)
 
-		ctx := context.Background()
+		ctx = context.Background()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      securityConfigName,
@@ -1081,6 +1083,244 @@ var _ = Describe("SecurityConfigController Validation", func() {
 
 			By("Cleanup the specific resource instance SecurityConfig")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		})
+	})
+})
+
+var _ = Describe("SecurityConfig status conditions and phase", func() {
+	const (
+		securityConfigName = "conditions-test-resource"
+		skiperatorAppName  = "conditions-test-app"
+		namespaceName      = "default"
+	)
+
+	typeNamespacedName := types.NamespacedName{
+		Name:      securityConfigName,
+		Namespace: namespaceName,
+	}
+	jwkerNamespacedName := types.NamespacedName{
+		Name:      utilities.TokenxNamer{ApplicationRef: skiperatorAppName}.JwkerName(),
+		Namespace: namespaceName,
+	}
+	netpolNamespacedName := types.NamespacedName{
+		Name:      utilities.TokenxNamer{SecurityConfigName: securityConfigName}.EgressName(config.Get().TokenxName),
+		Namespace: namespaceName,
+	}
+
+	var fakeRecorder *events.FakeRecorder
+	var controllerReconciler *controller.SecurityConfigReconciler
+
+	BeforeEach(func() {
+		appKey := types.NamespacedName{Name: skiperatorAppName, Namespace: namespaceName}
+		existing := &v1alpha1.Application{}
+		err := k8sClient.Get(ctx, appKey, existing)
+		if err != nil && errors.IsNotFound(err) {
+			Expect(k8sClient.Create(ctx, &v1alpha1.Application{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      skiperatorAppName,
+					Namespace: namespaceName,
+				},
+				Spec: v1alpha1.ApplicationSpec{
+					AccessPolicy: &podtypes.AccessPolicy{},
+				},
+			})).To(Succeed())
+		} else {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		fakeRecorder = events.NewFakeRecorder(100)
+		controllerReconciler = getSecurityConfigReconciler(fakeRecorder)
+	})
+
+	AfterEach(func() {
+		sc := &accesseratorv1alpha.SecurityConfig{}
+		if err := k8sClient.Get(ctx, typeNamespacedName, sc); err == nil {
+			Expect(k8sClient.Delete(ctx, sc)).To(Succeed())
+		}
+		jwker := &naisiov1.Jwker{}
+		if err := k8sClient.Get(ctx, jwkerNamespacedName, jwker); err == nil {
+			Expect(k8sClient.Delete(ctx, jwker)).To(Succeed())
+		}
+		netpol := &v1.NetworkPolicy{}
+		if err := k8sClient.Get(ctx, netpolNamespacedName, netpol); err == nil {
+			Expect(k8sClient.Delete(ctx, netpol)).To(Succeed())
+		}
+		app := &v1alpha1.Application{}
+		appKey := types.NamespacedName{Name: skiperatorAppName, Namespace: namespaceName}
+		if err := k8sClient.Get(ctx, appKey, app); err == nil {
+			Expect(k8sClient.Delete(ctx, app)).To(Succeed())
+		}
+	})
+
+	// hasConditionWithPrefix returns true if the SecurityConfig has at least
+	// one condition whose Type begins with the given prefix.
+	hasConditionWithPrefix := func(sc *accesseratorv1alpha.SecurityConfig, prefix string) bool {
+		for _, c := range sc.Status.Conditions {
+			if strings.HasPrefix(c.Type, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+
+	getSecurityConfig := func() *accesseratorv1alpha.SecurityConfig {
+		sc := &accesseratorv1alpha.SecurityConfig{}
+		Expect(k8sClient.Get(ctx, typeNamespacedName, sc)).To(Succeed())
+		return sc
+	}
+
+	Describe("expected conditions based on spec", func() {
+		It("includes Jwker and NetworkPolicy conditions when only TokenX is enabled", func() {
+			Expect(k8sClient.Create(ctx, &accesseratorv1alpha.SecurityConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      securityConfigName,
+					Namespace: namespaceName,
+				},
+				Spec: accesseratorv1alpha.SecurityConfigSpec{
+					ApplicationRef: skiperatorAppName,
+					Tokenx:         &accesseratorv1alpha.TokenXSpec{Enabled: true},
+				},
+			})).To(Succeed())
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() bool {
+				sc := getSecurityConfig()
+				return hasConditionWithPrefix(sc, "Jwker-") && hasConditionWithPrefix(sc, "NetworkPolicy-")
+			}).Should(BeTrue())
+
+			sc := getSecurityConfig()
+			Expect(hasConditionWithPrefix(sc, "MaskinportenClient-")).To(BeFalse())
+			Expect(hasConditionWithPrefix(sc, "AzureAdApplication-")).To(BeFalse())
+			Expect(hasConditionWithPrefix(sc, "ConfigMap-")).To(BeFalse())
+		})
+
+		It("includes no resource conditions when no security feature is enabled", func() {
+			Expect(k8sClient.Create(ctx, &accesseratorv1alpha.SecurityConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      securityConfigName,
+					Namespace: namespaceName,
+				},
+				Spec: accesseratorv1alpha.SecurityConfigSpec{
+					ApplicationRef: skiperatorAppName,
+					// no Tokenx, Maskinporten, EntraId, or Opa
+				},
+			})).To(Succeed())
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			sc := getSecurityConfig()
+			Expect(hasConditionWithPrefix(sc, "Jwker-")).To(BeFalse())
+			Expect(hasConditionWithPrefix(sc, "NetworkPolicy-")).To(BeFalse())
+			Expect(hasConditionWithPrefix(sc, "MaskinportenClient-")).To(BeFalse())
+			Expect(hasConditionWithPrefix(sc, "AzureAdApplication-")).To(BeFalse())
+		})
+	})
+
+	Describe("phase when a same-named foreign-owned resource already exists", func() {
+		// preCreateForeignJwker creates a Jwker at the same name the controller
+		// would generate for the test SecurityConfig, with no OwnerReference
+		// pointing at the SecurityConfig.
+		preCreateForeignJwker := func() {
+			Expect(k8sClient.Create(ctx, &naisiov1.Jwker{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      jwkerNamespacedName.Name,
+					Namespace: jwkerNamespacedName.Namespace,
+				},
+				Spec: naisiov1.JwkerSpec{
+					AccessPolicy: &naisiov1.AccessPolicy{},
+					SecretName:   "foreign-secret",
+				},
+			})).To(Succeed())
+		}
+
+		It("sets Phase=Failed when reconciling a SecurityConfig that would have created the conflicting Jwker", func() {
+			preCreateForeignJwker()
+
+			Expect(k8sClient.Create(ctx, &accesseratorv1alpha.SecurityConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      securityConfigName,
+					Namespace: namespaceName,
+				},
+				Spec: accesseratorv1alpha.SecurityConfigSpec{
+					ApplicationRef: skiperatorAppName,
+					Tokenx:         &accesseratorv1alpha.TokenXSpec{Enabled: true},
+				},
+			})).To(Succeed())
+
+			// Reconcile is expected to return an error because of the ownership conflict.
+			_, _ = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+
+			Eventually(func() accesseratorv1alpha.Phase {
+				return getSecurityConfig().Status.Phase
+			}).Should(Equal(accesseratorv1alpha.PhaseFailed))
+
+			Eventually(func() bool {
+				for _, c := range getSecurityConfig().Status.Conditions {
+					if c.Message == fmt.Sprintf(
+						"Failed to reconcile Jwker %s/%s: cannot update %s/%s as it is not owned by SecurityConfig",
+						namespaceName, jwkerNamespacedName.Name, namespaceName, jwkerNamespacedName.Name,
+					) {
+						return true
+					}
+				}
+				return false
+			}).Should(BeTrue())
+		})
+
+		It("transitions to Phase=Ready when the spec that triggered the conflict is removed", func() {
+			preCreateForeignJwker()
+
+			Expect(k8sClient.Create(ctx, &accesseratorv1alpha.SecurityConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      securityConfigName,
+					Namespace: namespaceName,
+				},
+				Spec: accesseratorv1alpha.SecurityConfigSpec{
+					ApplicationRef: skiperatorAppName,
+					Tokenx:         &accesseratorv1alpha.TokenXSpec{Enabled: true},
+				},
+			})).To(Succeed())
+
+			// First reconcile — Phase should land on Failed because of the conflict.
+			_, _ = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Eventually(func() accesseratorv1alpha.Phase {
+				return getSecurityConfig().Status.Phase
+			}).Should(Equal(accesseratorv1alpha.PhaseFailed))
+
+			Eventually(func() bool {
+				for _, c := range getSecurityConfig().Status.Conditions {
+					if c.Message == fmt.Sprintf(
+						"Failed to reconcile Jwker %s/%s: cannot update %s/%s as it is not owned by SecurityConfig",
+						namespaceName, jwkerNamespacedName.Name, namespaceName, jwkerNamespacedName.Name,
+					) {
+						return true
+					}
+				}
+				return false
+			}).Should(BeTrue())
+
+			By("Removing Tokenx from the SecurityConfig spec")
+			sc := getSecurityConfig()
+			sc.Spec.Tokenx = nil
+			Expect(k8sClient.Update(ctx, sc)).To(Succeed())
+
+			// Reconcile again — without the Tokenx feature requested, the
+			// foreign Jwker is no longer a conflict and reconciliation succeeds.
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() accesseratorv1alpha.Phase {
+				return getSecurityConfig().Status.Phase
+			}).Should(Equal(accesseratorv1alpha.PhaseReady))
+
+			foreignJwker := &naisiov1.Jwker{}
+			Expect(k8sClient.Get(ctx, jwkerNamespacedName, foreignJwker)).To(Succeed())
+			Expect(foreignJwker.Spec.AccessPolicy.Inbound).To(BeNil())
+			Expect(foreignJwker.Spec.AccessPolicy.Outbound).To(BeNil())
+			Expect(foreignJwker.Spec.SecretName).To(Equal("foreign-secret"))
 		})
 	})
 })
