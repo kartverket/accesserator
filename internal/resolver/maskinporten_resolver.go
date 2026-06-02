@@ -7,6 +7,7 @@ import (
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,14 +21,17 @@ const (
 	MaskinportenClientJwkEnvVar     = "MASKINPORTEN_CLIENT_JWK"
 )
 
-func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.MaskinportenConfig, error) {
+func ResolveMaskinportenConfig(logger log.Logger, ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.MaskinportenConfig, error) {
 	if securityConfig.Spec.Maskinporten == nil || !securityConfig.Spec.Maskinporten.Enabled {
 		return &state.MaskinportenConfig{
 			Enabled: false,
 		}, nil
 	}
+	logger.Info("Maskinporten enabled, resolving Maskinporten config", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
 	maskinportenConfigType, err := utilities.DetermineConfigType(securityConfig.Spec.Maskinporten)
+	logger.Info("Determined Maskinporten config type", "name", securityConfig.Name, "namespace", securityConfig.Namespace, "configType", maskinportenConfigType)
+
 	if err != nil {
 		return nil, err
 	}
@@ -37,6 +41,12 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 		if securityConfig.Spec.Maskinporten.Client.Scopes != nil {
 			consumedScopes = securityConfig.Spec.Maskinporten.Client.Scopes.ConsumedScopes
 		}
+		logger.Info(
+			"Maskinporten config resolved",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", maskinportenConfigType,
+		)
 		return &state.MaskinportenConfig{
 			Enabled: true,
 			Type:    *maskinportenConfigType,
@@ -49,6 +59,12 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 			},
 		}, nil
 	case state.ClientRef:
+		logger.Info(
+			"Maskinporten config resolved",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", maskinportenConfigType,
+		)
 		return &state.MaskinportenConfig{
 			Enabled:   true,
 			Type:      *maskinportenConfigType,
@@ -64,12 +80,24 @@ func ResolveMaskinportenConfig(ctx context.Context, k8sClient client.Client, sec
 		if maskinportenSecretDataErr != nil {
 			return nil, fmt.Errorf("failed to get Maskinporten secret data: %w", maskinportenSecretDataErr)
 		}
+		logger.Info(
+			"Maskinporten config resolved",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", maskinportenConfigType,
+		)
 		return &state.MaskinportenConfig{
 			Enabled:    true,
 			Type:       *maskinportenConfigType,
 			SecretData: maskinportenSecretData,
 		}, nil
 	case state.None:
+		logger.Info(
+			"Maskinporten config not specified, using default MaskinportenClient",
+			"name", securityConfig.Name,
+			"namespace", securityConfig.Namespace,
+			"configType", maskinportenConfigType,
+		)
 		return &state.MaskinportenConfig{
 			Enabled: true,
 			Type:    *maskinportenConfigType,

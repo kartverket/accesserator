@@ -50,7 +50,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -73,7 +73,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -105,7 +105,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -135,7 +135,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -163,7 +163,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -212,7 +212,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -251,7 +251,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to get Maskinporten secret data"))
@@ -295,7 +295,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("key client-jwk not found"))
@@ -349,7 +349,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveMaskinportenConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveMaskinportenConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
