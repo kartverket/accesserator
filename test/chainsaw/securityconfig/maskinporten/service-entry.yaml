@@ -2,6 +2,9 @@ apiVersion: networking.istio.io/v1
 kind: ServiceEntry
 metadata:
   name: security-config-maskinporten-f542b998
+  labels:
+    accesserator.kartverket.no/controller: securityconfig
+    app.kubernetes.io/managed-by: accesserator
 spec:
   exportTo:
     - .

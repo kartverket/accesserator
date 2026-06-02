@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/eventhandler"
@@ -10,6 +11,7 @@ import (
 	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/internal/statusmanager"
+	"github.com/kartverket/accesserator/pkg/labels"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -99,6 +101,17 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !securityConfig.DeletionTimestamp.IsZero() {
 		rlog.Info("SecurityConfig is marked for deletion.", "name", req.NamespacedName)
 		return reconcile.Result{}, nil
+	}
+
+	if deepCopiedSecurityConfig.Labels == nil {
+		deepCopiedSecurityConfig.Labels = make(map[string]string)
+	}
+	maps.Copy(deepCopiedSecurityConfig.Labels, labels.SecurityConfigStandardLabels())
+	if !maps.Equal(deepCopiedSecurityConfig.Labels, securityConfig.Labels) {
+		err := r.Patch(ctx, deepCopiedSecurityConfig, client.MergeFrom(securityConfig))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	scope, err := resolver.ResolveSecurityConfig(ctx, r.Client, *securityConfig)

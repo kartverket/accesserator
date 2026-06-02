@@ -2,6 +2,9 @@ apiVersion: nais.io/v1
 kind: AzureAdApplication
 metadata:
   name: app
+  labels:
+    accesserator.kartverket.no/controller: securityconfig
+    app.kubernetes.io/managed-by: accesserator
 spec:
   secretName: app-entraid-11a69e00
 status:
