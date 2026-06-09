@@ -91,6 +91,16 @@ spec defines the desired state of SecurityConfig
         </td>
         <td>true</td>
       </tr><tr>
+        <td><b><a href="#securityconfigspecentraid">entraid</a></b></td>
+        <td>object</td>
+        <td>
+          EntraID specifies whether to configure the Entra ID API consumer capability for an application referred to by `applicationRef`.
+The configuration can either be provided inline via the `client` field,
+by referencing an existing AzureAdApplication resource via the `clientRef` field,
+or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#securityconfigspecmaskinporten">maskinporten</a></b></td>
         <td>object</td>
         <td>
@@ -98,6 +108,14 @@ spec defines the desired state of SecurityConfig
 The configuration can either be provided inline via the `client` field,
 by referencing an existing MaskinportenClient resource via the `clientRef` field,
 or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecopa">opa</a></b></td>
+        <td>object</td>
+        <td>
+          Opa specifies whether to configure the open policy agent capability for an application referred to by `applicationRef`.
+The configuration includes which bundles compiled from rego policies, and how often OPA should check for updates to these bundles.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -109,6 +127,400 @@ accessPolicies of the application referred to by applicationRef
 will be used to restrict which applications can exchange tokens where the specified application is the intended audience.<br/>
         </td>
         <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid
+<sup><sup>[↩ Parent](#securityconfigspec)</sup></sup>
+
+
+
+EntraID specifies whether to configure the Entra ID API consumer capability for an application referred to by `applicationRef`.
+The configuration can either be provided inline via the `client` field,
+by referencing an existing AzureAdApplication resource via the `clientRef` field,
+or by sourcing credentials from existing Kubernetes secrets via the `secretRef` field.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>enabled</b></td>
+        <td>boolean</td>
+        <td>
+          Enabled indicates whether Entra ID should be configured for the application.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecentraidclient">client</a></b></td>
+        <td>object</td>
+        <td>
+          Client defines the Entra ID client configuration inline.
+Use this when you want to configure the client directly.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecentraidclientref">clientRef</a></b></td>
+        <td>object</td>
+        <td>
+          ClientRef references an existing AzureAdApplication by name.
+Use this when a AzureAdApplication exists, and you want to reference it.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecentraidsecretref">secretRef</a></b></td>
+        <td>object</td>
+        <td>
+          SecretRef sources the client registration credentials from one or more existing Kubernetes secrets.
+Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
+and AzureAdApplication CRD (e.g. manually registered at Entra).<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.client
+<sup><sup>[↩ Parent](#securityconfigspecentraid)</sup></sup>
+
+
+
+Client defines the Entra ID client configuration inline.
+Use this when you want to configure the client directly.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecentraidclientgroupsindex">groups</a></b></td>
+        <td>[]object</td>
+        <td>
+          Groups is a list of Entra ID group IDs to be emitted in the `groups` claim in tokens issued by Entra ID. This
+also assigns groups to the application for access control. Only direct members of the groups are granted access.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>logoutUrl</b></td>
+        <td>string</td>
+        <td>
+          LogoutUrl is the URL where Entra ID sends a request to have the application clear the user's session data. This
+is required if single sign-out should work correctly. Must start with 'https'<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecentraidclientpreauthorizedapplicationsindex">preAuthorizedApplications</a></b></td>
+        <td>[]object</td>
+        <td>
+          PreAuthorizedApplications is a list of Entra ID Applications that are authorized to perform client credential
+flow with this application as scope, or the on-behalf-of (OBO) flow.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecentraidclientreplyurlsindex">replyUrls</a></b></td>
+        <td>[]object</td>
+        <td>
+          ReplyUrls is a list of authorized redirect URIs Entra ID may use when performing authorization code flow. All
+production URLs must use the 'https' scheme.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>secretName</b></td>
+        <td>string</td>
+        <td>
+          SecretName is the name of the resulting Secret resource to be created. If not set, the secret will be given a
+a name based on the name of the SecurityConfig resource.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>singlePageApplication</b></td>
+        <td>boolean</td>
+        <td>
+          SinglePageApplication denotes whether this Entra ID application should be registered as a single-page-application
+for usage in client-side applications without access to secrets.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.client.groups[index]
+<sup><sup>[↩ Parent](#securityconfigspecentraidclient)</sup></sup>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>id</b></td>
+        <td>string</td>
+        <td>
+          ID is the actual `object ID` associated with the given group in Azure AD.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.client.preAuthorizedApplications[index]
+<sup><sup>[↩ Parent](#securityconfigspecentraidclient)</sup></sup>
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>application</b></td>
+        <td>string</td>
+        <td>
+          The application's name.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>cluster</b></td>
+        <td>string</td>
+        <td>
+          The application's cluster. May be omitted if it should be in the same cluster as your application.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>namespace</b></td>
+        <td>string</td>
+        <td>
+          The application's namespace. May be omitted if it should be in the same namespace as your application.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecentraidclientpreauthorizedapplicationsindexpermissions">permissions</a></b></td>
+        <td>object</td>
+        <td>
+          Permissions contains a set of permissions that are granted to the given application.
+Currently only applicable for Azure AD clients.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.client.preAuthorizedApplications[index].permissions
+<sup><sup>[↩ Parent](#securityconfigspecentraidclientpreauthorizedapplicationsindex)</sup></sup>
+
+
+
+Permissions contains a set of permissions that are granted to the given application.
+Currently only applicable for Azure AD clients.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>roles</b></td>
+        <td>[]string</td>
+        <td>
+          Roles is a set of custom permission roles that are granted to a given application.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>scopes</b></td>
+        <td>[]string</td>
+        <td>
+          Scopes is a set of custom permission scopes that are granted to a given application.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.client.replyUrls[index]
+<sup><sup>[↩ Parent](#securityconfigspecentraidclient)</sup></sup>
+
+
+
+AzureAdReplyUrl defines the valid reply URLs for callbacks after OIDC flows for this application
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>url</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.clientRef
+<sup><sup>[↩ Parent](#securityconfigspecentraid)</sup></sup>
+
+
+
+ClientRef references an existing AzureAdApplication by name.
+Use this when a AzureAdApplication exists, and you want to reference it.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name of the referenced resource.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.secretRef
+<sup><sup>[↩ Parent](#securityconfigspecentraid)</sup></sup>
+
+
+
+SecretRef sources the client registration credentials from one or more existing Kubernetes secrets.
+Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
+and AzureAdApplication CRD (e.g. manually registered at Entra).
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecentraidsecretrefclientid">clientID</a></b></td>
+        <td>object</td>
+        <td>
+          ClientID references the secret key containing the Maskinporten client ID (MASKINPORTEN_CLIENT_ID).<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecentraidsecretrefclientjwk">clientJWK</a></b></td>
+        <td>object</td>
+        <td>
+          ClientJWK references the secret key containing the Maskinporten client JWK (MASKINPORTEN_CLIENT_JWK).<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.secretRef.clientID
+<sup><sup>[↩ Parent](#securityconfigspecentraidsecretref)</sup></sup>
+
+
+
+ClientID references the secret key containing the Maskinporten client ID (MASKINPORTEN_CLIENT_ID).
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          Key is the key within the secret whose value should be used.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name is the name of the Kubernetes secret.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.entraid.secretRef.clientJWK
+<sup><sup>[↩ Parent](#securityconfigspecentraidsecretref)</sup></sup>
+
+
+
+ClientJWK references the secret key containing the Maskinporten client JWK (MASKINPORTEN_CLIENT_JWK).
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          Key is the key within the secret whose value should be used.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name is the name of the Kubernetes secret.<br/>
+        </td>
+        <td>true</td>
       </tr></tbody>
 </table>
 
@@ -152,14 +564,14 @@ Use this when you want to configure the client directly.<br/>
         <td>object</td>
         <td>
           ClientRef references an existing MaskinportenClient by name.
-Use this when a MaskinportenClient exists, and you want to reference it.<br/>
+Use this when a client registration resource exists, and you want to reference it.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#securityconfigspecmaskinportensecretref">secretRef</a></b></td>
         <td>object</td>
         <td>
-          SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
+          SecretRef sources the client registration client credentials from one or more existing Kubernetes secrets.
 Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
 and MaskinportenClient CRD (e.g. manually registered at DigDir).<br/>
         </td>
@@ -265,7 +677,7 @@ Ensure that the NAV organization has been granted access to the scope prior to r
 
 
 ClientRef references an existing MaskinportenClient by name.
-Use this when a MaskinportenClient exists, and you want to reference it.
+Use this when a client registration resource exists, and you want to reference it.
 
 <table>
     <thead>
@@ -280,7 +692,7 @@ Use this when a MaskinportenClient exists, and you want to reference it.
         <td><b>name</b></td>
         <td>string</td>
         <td>
-          Name of the referenced MaskinportenClient.<br/>
+          Name of the referenced resource.<br/>
         </td>
         <td>true</td>
       </tr></tbody>
@@ -292,7 +704,7 @@ Use this when a MaskinportenClient exists, and you want to reference it.
 
 
 
-SecretRef sources the Maskinporten client credentials from one or more existing Kubernetes secrets.
+SecretRef sources the client registration client credentials from one or more existing Kubernetes secrets.
 Use this when you have an existing OAuth client registered outside the SecurityConfig CRD
 and MaskinportenClient CRD (e.g. manually registered at DigDir).
 
@@ -391,6 +803,154 @@ ClientJWK references the secret key containing the Maskinporten client JWK (MASK
 </table>
 
 
+### SecurityConfig.spec.opa
+<sup><sup>[↩ Parent](#securityconfigspec)</sup></sup>
+
+
+
+Opa specifies whether to configure the open policy agent capability for an application referred to by `applicationRef`.
+The configuration includes which bundles compiled from rego policies, and how often OPA should check for updates to these bundles.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecopabundleurlsindex">bundleUrls</a></b></td>
+        <td>[]object</td>
+        <td>
+          BundleURLs is a list of URLs pointing to OPA bundles containing compiled rego policies.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>enabled</b></td>
+        <td>boolean</td>
+        <td>
+          Enabled indicates whether OPA should be configured for the application.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.opa.bundleUrls[index]
+<sup><sup>[↩ Parent](#securityconfigspecopa)</sup></sup>
+
+
+
+BundleSource defines a source for an OPA bundle.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name specifies a human-readable name for the OPA bundle.
+It is used to differentiate between bundles which is used by OPA.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>url</b></td>
+        <td>string</td>
+        <td>
+          URL is the OCI registry location of the OPA bundle.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecopabundleurlsindexverification">verification</a></b></td>
+        <td>object</td>
+        <td>
+          Verification specifies how to verify the integrity of the bundle.
+If not specified, the bundle will not be verified.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.opa.bundleUrls[index].verification
+<sup><sup>[↩ Parent](#securityconfigspecopabundleurlsindex)</sup></sup>
+
+
+
+Verification specifies how to verify the integrity of the bundle.
+If not specified, the bundle will not be verified.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecopabundleurlsindexverificationsource">source</a></b></td>
+        <td>object</td>
+        <td>
+          Source is the GitHub repository where the bundle was created.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.opa.bundleUrls[index].verification.source
+<sup><sup>[↩ Parent](#securityconfigspecopabundleurlsindexverification)</sup></sup>
+
+
+
+Source is the GitHub repository where the bundle was created.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>repository</b></td>
+        <td>string</td>
+        <td>
+          Repository is the GitHub repository where the bundle was created,
+in the form "<org-or-user>/<repo>" (e.g. "kartverket/accesserator").<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>ref</b></td>
+        <td>string</td>
+        <td>
+          Ref is the Git reference (branch, tag, or commit) of the bundle.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>workflow</b></td>
+        <td>string</td>
+        <td>
+          Workflow is the name of the GitHub workflow that created the bundle.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
 ### SecurityConfig.spec.tokenx
 <sup><sup>[↩ Parent](#securityconfigspec)</sup></sup>
 
@@ -416,6 +976,86 @@ will be used to restrict which applications can exchange tokens where the specif
           Enabled indicates whether token exchange should be configured for the application.<br/>
         </td>
         <td>true</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspectokenxaccesspolicy">accessPolicy</a></b></td>
+        <td>object</td>
+        <td>
+          AccessPolicy specifies configuration of which clients can exchange tokens with the application as target when
+token exchange is enabled. If not specified, no clients are allowed.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.tokenx.accessPolicy
+<sup><sup>[↩ Parent](#securityconfigspectokenx)</sup></sup>
+
+
+
+AccessPolicy specifies configuration of which clients can exchange tokens with the application as target when
+token exchange is enabled. If not specified, no clients are allowed.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspectokenxaccesspolicyclientsindex">clients</a></b></td>
+        <td>[]object</td>
+        <td>
+          Clients which may perform token exchange with your application as target.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>inheritInboundRules</b></td>
+        <td>boolean</td>
+        <td>
+          InheritInboundRules specifies whether the inbound access policy rules of the corresponding Skiperator Application
+should be used as clients for token exchange. Defaults to false. When set to true, the complete list of clients
+will be the union of the explicitly specified clients in Clients and the clients resolved from inbound rules.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.tokenx.accessPolicy.clients[index]
+<sup><sup>[↩ Parent](#securityconfigspectokenxaccesspolicy)</sup></sup>
+
+
+
+AccessPolicyClient define client applications which may perform token exchange with your application as target.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>application</b></td>
+        <td>string</td>
+        <td>
+          Application is the name of the client application that can exchange tokens with the target application.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>namespace</b></td>
+        <td>string</td>
+        <td>
+          Namespace is the namespace which the client application resides. If not specified, the namespace of the
+SecurityConfig's referenced application will be used.<br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -451,6 +1091,13 @@ status defines the observed state of SecurityConfig
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b>entraIdSecretName</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>jwkerSecretName</b></td>
         <td>string</td>
         <td>
@@ -478,6 +1125,13 @@ status defines the observed state of SecurityConfig
           <br/>
           <br/>
             <i>Format</i>: int64<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigstatusopabundlesource">opaBundleSource</a></b></td>
+        <td>object</td>
+        <td>
+          OpaBundleSource defines the source of OPA bundles used for policy evaluation.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -562,6 +1216,40 @@ with respect to the current state of the instance.<br/>
           <br/>
             <i>Format</i>: int64<br/>
             <i>Minimum</i>: 0<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.status.opaBundleSource
+<sup><sup>[↩ Parent](#securityconfigstatus)</sup></sup>
+
+
+
+OpaBundleSource defines the source of OPA bundles used for policy evaluation.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>bundleNames</b></td>
+        <td>[]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>configMapName</b></td>
+        <td>string</td>
+        <td>
+          <br/>
         </td>
         <td>false</td>
       </tr></tbody>
