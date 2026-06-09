@@ -245,7 +245,7 @@ func checkSourceExtensions(cert *certificate.Summary, src v1alpha.GitHubReposito
 	ext := cert.Extensions
 
 	if ext.SourceRepositoryURI != wantSourceURI {
-		return fmt.Errorf("%w: GitHub repository: got %q, want %q",
+		return fmt.Errorf("%w: GitHub repository mismatch: got %q, want %q",
 			ErrSourceMismatch, ext.SourceRepositoryURI, wantSourceURI)
 	}
 

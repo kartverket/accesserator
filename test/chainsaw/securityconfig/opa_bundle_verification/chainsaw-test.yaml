@@ -20,7 +20,8 @@ spec:
             file: securityconfig-with-repository-incorrect.yaml
             expect:
               - check:
-                  (contains($error, 'source repository mismatch')): true
+                  (contains($error, 'source identity mismatch')): true
+                  (contains($error, 'GitHub repository')): true
                   (contains($error, 'kartverket/accesserator')): true
                   (contains($error, 'kartverket/not-accesserator')): true
 
@@ -33,7 +34,8 @@ spec:
             file: securityconfig-with-workflow-incorrect.yaml
             expect:
               - check:
-                  (contains($error, 'source workflow mismatch')): true
+                  (contains($error, 'source identity mismatch')): true
+                  (contains($error, 'workflow file mismatch')): true
                   (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/build-and-push-opa-bundle.yml')): true
                   (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/not-correct.yml')): true
 
@@ -46,7 +48,8 @@ spec:
             file: securityconfig-with-ref-incorrect.yaml
             expect:
               - check:
-                  (contains($error, 'source ref mismatch')): true
+                  (contains($error, 'source identity mismatch')): true
+                  (contains($error, 'git ref mismatch')): true
                   (contains($error, 'refs/pull/73/merge')): true
                   (contains($error, 'refs/pull/incorrect/merge')): true
 
