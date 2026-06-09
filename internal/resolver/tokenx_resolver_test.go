@@ -43,7 +43,7 @@ var _ = Describe("TokenX Resolver", func() {
 			It("should return disabled config", func() {
 				sc := securityConfig(testAppName, nil)
 
-				tokenXConfig, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				tokenXConfig, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(tokenXConfig).NotTo(BeNil())
@@ -57,7 +57,7 @@ var _ = Describe("TokenX Resolver", func() {
 					Enabled: false,
 				})
 
-				tokenXConfig, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				tokenXConfig, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(tokenXConfig).NotTo(BeNil())
@@ -71,7 +71,7 @@ var _ = Describe("TokenX Resolver", func() {
 					Enabled: true,
 				})
 
-				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(
@@ -88,7 +88,7 @@ var _ = Describe("TokenX Resolver", func() {
 					Enabled: true,
 				})
 
-				tokenXConfig, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				tokenXConfig, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(tokenXConfig).NotTo(BeNil())
@@ -118,7 +118,7 @@ var _ = Describe("TokenX Resolver", func() {
 					},
 				})
 
-				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -146,7 +146,7 @@ var _ = Describe("TokenX Resolver", func() {
 					},
 				})
 
-				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -175,7 +175,7 @@ var _ = Describe("TokenX Resolver", func() {
 					Enabled: true,
 				})
 
-				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -211,7 +211,7 @@ var _ = Describe("TokenX Resolver", func() {
 					},
 				})
 
-				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -273,7 +273,7 @@ var _ = Describe("TokenX Resolver", func() {
 					},
 				})
 
-				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())

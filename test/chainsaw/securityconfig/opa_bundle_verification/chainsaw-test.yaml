@@ -1,0 +1,59 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: opa-bundle-verification
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+        istio.io/rev: default
+  steps:
+    - try:
+        - create:
+            file: securityconfig-without-verification.yaml
+
+        - patch:
+            file: securityconfig-with-repository-incorrect.yaml
+            expect:
+              - check:
+                  (contains($error, 'source identity mismatch')): true
+                  (contains($error, 'GitHub repository')): true
+                  (contains($error, 'kartverket/accesserator')): true
+                  (contains($error, 'kartverket/not-accesserator')): true
+
+        - patch:
+            file: securityconfig-with-repository-correct.yaml
+        - assert:
+            file: securityconfig-ready.yaml
+
+        - patch:
+            file: securityconfig-with-workflow-incorrect.yaml
+            expect:
+              - check:
+                  (contains($error, 'source identity mismatch')): true
+                  (contains($error, 'workflow file mismatch')): true
+                  (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/build-and-push-opa-bundle.yml')): true
+                  (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/not-correct.yml')): true
+
+        - patch:
+            file: securityconfig-with-workflow-correct.yaml
+        - assert:
+            file: securityconfig-ready.yaml
+
+        - patch:
+            file: securityconfig-with-ref-incorrect.yaml
+            expect:
+              - check:
+                  (contains($error, 'source identity mismatch')): true
+                  (contains($error, 'git ref mismatch')): true
+                  (contains($error, 'refs/pull/73/merge')): true
+                  (contains($error, 'refs/pull/incorrect/merge')): true
+
+        - patch:
+            file: securityconfig-with-ref-correct.yaml
+        - assert:
+            file: securityconfig-ready.yaml

@@ -25,6 +25,7 @@ const (
 	defaultOpaPort                             = int32(3010)
 	defaultOpaUrlEnvVarName                    = "OPA_URL"
 	defaultOpaAllowedBundleRegistryUrlPrefixes = "http://bundle-source,oci://bundle-source"
+	defaultOpaAllowedBundleSignatureSourceOrgs = "kartverket,kartverket-skip"
 	defaultRunsInProduction                    = "false"
 )
 
@@ -46,6 +47,7 @@ var defaultEnvVars = map[string]string{
 	"ACCESSERATOR_OPA_PORT":                                 fmt.Sprintf("%d", defaultOpaPort),
 	"ACCESSERATOR_OPA_URL_ENV_VAR_NAME":                     defaultOpaUrlEnvVarName,
 	"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES": defaultOpaAllowedBundleRegistryUrlPrefixes,
+	"ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS": defaultOpaAllowedBundleSignatureSourceOrgs,
 }
 
 func setAllEnvVars(t *testing.T) {
@@ -106,6 +108,13 @@ func TestLoad_AllRequiredSet(t *testing.T) {
 			"OpaAllowedBundleRegistryUrlPrefixes = %v, want %v",
 			c.OpaAllowedBundleRegistryUrlPrefixes,
 			[]string{"http://bundle-source", "oci://bundle-source"},
+		)
+	}
+	if !reflect.DeepEqual(c.OpaAllowedBundleSignatureSourceOrgs, []string{"kartverket", "kartverket-skip"}) {
+		t.Errorf(
+			"OpaAllowedBundleSignatureSourceOrgs = %v, want %v",
+			c.OpaAllowedBundleSignatureSourceOrgs,
+			[]string{"kartverket", "kartverket-skip"},
 		)
 	}
 }
@@ -245,6 +254,18 @@ func TestLoad_MissingOpaAllowedBundleRegistryUrlPrefixes(t *testing.T) {
 	}
 }
 
+func TestLoad_MissingOpaAllowedBundleSignatureSourceOrgs(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for missing OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS", got)
+	}
+}
+
 func TestLoad_AllRequiredMissing(t *testing.T) {
 	err := config.Load()
 	if err == nil {
@@ -260,6 +281,7 @@ func TestLoad_AllRequiredMissing(t *testing.T) {
 		"ACCESSERATOR_OPA_IMAGE_TAG",
 		"ACCESSERATOR_OPA_IMAGE_SHA",
 		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS",
 		"ACCESSERATOR_RUNS_IN_PRODUCTION",
 	} {
 		if !contains(got, key) {
@@ -294,6 +316,7 @@ func TestLoad_CustomValues(t *testing.T) {
 	t.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "456def")
 	t.Setenv("ACCESSERATOR_OPA_URL_ENV_VAR_NAME", "CUSTOM_OPA_URL")
 	t.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", "https://allowed.example,oci://allowed.example")
+	t.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS", "custom-org,another-org")
 
 	if err := config.Load(); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -350,6 +373,16 @@ func TestLoad_CustomValues(t *testing.T) {
 			"OpaAllowedBundleRegistryUrlPrefixes = %v, want %v",
 			c.OpaAllowedBundleRegistryUrlPrefixes,
 			[]string{"https://allowed.example", "oci://allowed.example"},
+		)
+	}
+	if !reflect.DeepEqual(
+		c.OpaAllowedBundleSignatureSourceOrgs,
+		[]string{"custom-org", "another-org"},
+	) {
+		t.Errorf(
+			"OpaAllowedBundleSignatureSourceOrgs = %v, want %v",
+			c.OpaAllowedBundleSignatureSourceOrgs,
+			[]string{"custom-org", "another-org"},
 		)
 	}
 }

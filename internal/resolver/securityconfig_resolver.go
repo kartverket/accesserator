@@ -6,26 +6,29 @@ import (
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/state"
+	"github.com/kartverket/accesserator/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.Scope, error) {
-	tokenxConfig, tokenxConfigResolveErr := ResolveTokenXConfig(ctx, k8sClient, securityConfig)
+	logger := log.GetLogger(ctx)
+	logger.Info("Resolving SecurityConfig", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
+	tokenxConfig, tokenxConfigResolveErr := ResolveTokenXConfig(logger, ctx, k8sClient, securityConfig)
 	if tokenxConfigResolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve TokenX config: %w", tokenxConfigResolveErr)
 	}
 
-	maskinportenConfig, maskinportenConfigResolveErr := ResolveMaskinportenConfig(ctx, k8sClient, securityConfig)
+	maskinportenConfig, maskinportenConfigResolveErr := ResolveMaskinportenConfig(logger, ctx, k8sClient, securityConfig)
 	if maskinportenConfigResolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve Maskinporten config: %w", maskinportenConfigResolveErr)
 	}
 
-	entraIdConfig, entraIdConfigResolveErr := ResolveEntraIdConfig(ctx, k8sClient, securityConfig)
+	entraIdConfig, entraIdConfigResolveErr := ResolveEntraIdConfig(logger, ctx, k8sClient, securityConfig)
 	if entraIdConfigResolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve Entra ID config: %w", entraIdConfigResolveErr)
 	}
 
-	opaConfig, opaConfigResolveErr := ResolveOpaConfig(securityConfig)
+	opaConfig, opaConfigResolveErr := ResolveOpaConfig(logger, securityConfig)
 	if opaConfigResolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve OPA config: %w", opaConfigResolveErr)
 	}

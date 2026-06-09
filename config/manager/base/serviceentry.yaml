@@ -11,6 +11,8 @@ spec:
   hosts:
     - ghcr.io
     - pkg-containers.githubusercontent.com
+    - tuf-repo-cdn.sigstore.dev
+    - github.com
   ports:
     - name: https
       number: 443

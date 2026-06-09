@@ -8,6 +8,7 @@ import (
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	. "github.com/onsi/ginkgo/v2"
@@ -27,6 +28,7 @@ var (
 	testEnv   *envtest.Environment
 	cfg       *rest.Config
 	k8sClient client.Client
+	logger    log.Logger
 )
 
 func TestResolvers(t *testing.T) {
@@ -38,40 +40,26 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	ctx, cancel = context.WithCancel(context.TODO())
+	logger = log.GetLogger(ctx)
 
-	var err error
-	err = corev1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = accesseratorv1alpha.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = v1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = naisiov1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(corev1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(accesseratorv1alpha.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(v1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(naisiov1.AddToScheme(scheme.Scheme)).To(Succeed())
 
 	// Load environment variables
-	err = os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "test-tag")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "test-sha")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "test-uuid")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", "http://bundle-source")
-	Expect(err).NotTo(HaveOccurred())
-	err = config.Load()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "test-tag")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "test-sha")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "test-uuid")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", "http://bundle-source")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS", "kartverket")).To(Succeed())
+	Expect(config.Load()).To(Succeed())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -87,6 +75,8 @@ var _ = BeforeSuite(func() {
 		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
 	}
 
+	var err error
+	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())

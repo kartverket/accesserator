@@ -311,6 +311,50 @@ type BundleSource struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=253
 	URL string `json:"url"`
+
+	// Verification specifies how to verify the integrity of the bundle.
+	// If not specified, the bundle will not be verified.
+	//
+	// +kubebuilder:validation:Optional
+	Verification *BundleSourceVerification `json:"verification,omitempty"`
+}
+
+// BundleSourceVerification specifies how to verify the integrity of the bundle.
+//
+// +kubebuilder:object:generate=true
+type BundleSourceVerification struct {
+	// Source is the GitHub repository where the bundle was created.
+	//
+	// +kubebuilder:validation:Required
+	Source GitHubRepositorySource `json:"source"`
+}
+
+type GitHubRepositorySource struct {
+	// Repository is the GitHub repository where the bundle was created,
+	// in the form "<org-or-user>/<repo>" (e.g. "kartverket/accesserator").
+	//
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}/[a-zA-Z0-9_][a-zA-Z0-9._-]{0,99}$`
+	// +kubebuilder:validation:MinLength=3
+	// +kubebuilder:validation:MaxLength=140
+	// +kubebuilder:validation:Required
+	Repository string `json:"repository"`
+
+	// Workflow is the name of the GitHub workflow that created the bundle.
+	//
+	// +kubebuilder:validation:Pattern=`^\.github/workflows/[a-zA-Z0-9_.-]+\.(yml|yaml)$`
+	// +kubebuilder:validation:MaxLength=300
+	// +kubebuilder:validation:Optional
+	Workflow string `json:"workflow,omitempty"`
+
+	// Ref is the Git reference (branch, tag, or commit) of the bundle.
+	//
+	// +kubebuilder:validation:Pattern=`^refs/(heads|tags|pull)/[a-zA-Z0-9/_.-]{1,243}$`
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
+	// +kubebuilder:validation:XValidation:rule="!self.contains('..')",message="ref must not contain '..'"
+	// +kubebuilder:validation:XValidation:rule="!self.endsWith('.lock')",message="ref must not end with '.lock'"
+	// +kubebuilder:validation:Optional
+	Ref string `json:"ref,omitempty"`
 }
 
 // DataKey is a type for keys within Kubernetes secrets and configmaps.

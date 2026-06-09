@@ -9,6 +9,7 @@ import (
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	"github.com/kartverket/skiperator/api/v1alpha1/podtypes"
@@ -19,13 +20,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ResolveTokenXConfig(ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.TokenXConfig, error) {
+func ResolveTokenXConfig(logger log.Logger, ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.TokenXConfig, error) {
 	tokenXEnabled := securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled
 	if !tokenXEnabled {
 		return &state.TokenXConfig{
 			Enabled: tokenXEnabled,
 		}, nil
 	}
+	logger.Info("TokenX enabled, resolving TokenX config", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
 	var skiperatorApplication v1alpha1.Application
 	if exists := k8sClient.Get(ctx, types.NamespacedName{
@@ -48,6 +50,8 @@ func ResolveTokenXConfig(ctx context.Context, k8sClient client.Client, securityC
 	if jwkerInboundRules != nil {
 		naisIoV1AccessPolicyInboundRules = jwkerInboundRules
 	}
+
+	logger.Info("TokenX config resolved", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
 	return &state.TokenXConfig{
 		Enabled:        tokenXEnabled,

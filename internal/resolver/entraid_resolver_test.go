@@ -50,7 +50,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -73,7 +73,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -99,7 +99,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -128,7 +128,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -177,7 +177,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
@@ -215,7 +215,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to get Entra ID secret data"))
@@ -259,7 +259,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("key client-jwk not found"))
@@ -313,7 +313,7 @@ var _ = Describe("Entra ID Resolver", func() {
 					},
 				}
 
-				result, err := resolver.ResolveEntraIdConfig(ctx, k8sClient, sc)
+				result, err := resolver.ResolveEntraIdConfig(logger, ctx, k8sClient, sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())

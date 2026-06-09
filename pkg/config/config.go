@@ -31,6 +31,7 @@ type Config struct {
 	OpaPort                             int32    `split_words:"true" default:"3010"`
 	OpaUrlEnvVarName                    string   `split_words:"true" default:"OPA_URL"`
 	OpaAllowedBundleRegistryUrlPrefixes []string `split_words:"true"`
+	OpaAllowedBundleSignatureSourceOrgs []string `split_words:"true"`
 }
 
 var appCfg Config
@@ -68,6 +69,9 @@ func Load() error {
 	}
 	if len(cfg.OpaAllowedBundleRegistryUrlPrefixes) == 0 {
 		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES")
+	}
+	if len(cfg.OpaAllowedBundleSignatureSourceOrgs) == 0 {
+		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))

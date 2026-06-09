@@ -928,6 +928,336 @@ var _ = Describe("SecurityConfig CRD", func() {
 				err = k8sClient.Create(ctx, sc)
 				Expect(err).ToNot(HaveOccurred())
 			})
+
+			Describe("When spec.opa.bundleUrls[*].verification is specified", func() {
+				// makeOpaWithVerification builds an spec.opa block with one bundle whose
+				// verification.source equals the given map. Returns it wrapped in a
+				// SecurityConfig ready for k8sClient.Create.
+				makeOpaWithVerification := func(source map[string]interface{}) *unstructured.Unstructured {
+					return makeSecurityConfig(map[string]interface{}{
+						"applicationRef": skiperatorAppName,
+						"opa": map[string]interface{}{
+							"enabled": true,
+							"bundleUrls": []map[string]interface{}{
+								{
+									"name": "opa-bundle",
+									"url":  AllowedOpaBundleSourcePrefix + "bundle:latest",
+									"verification": map[string]interface{}{
+										"source": source,
+									},
+								},
+							},
+						},
+					})
+				}
+
+				It("should accept when source.repository is the only field set", func() {
+					sc := makeOpaWithVerification(map[string]interface{}{
+						"repository": "valid-org/valid-repo",
+					})
+					Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+				})
+
+				It("should accept when all source fields are set with valid values", func() {
+					sc := makeOpaWithVerification(map[string]interface{}{
+						"repository": "valid-org/valid-repo",
+						"workflow":   ".github/workflows/build.yml",
+						"ref":        "refs/heads/main",
+					})
+					Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+				})
+
+				It("should accept when verification block is omitted entirely", func() {
+					sc := makeSecurityConfig(map[string]interface{}{
+						"applicationRef": skiperatorAppName,
+						"opa": map[string]interface{}{
+							"enabled": true,
+							"bundleUrls": []map[string]interface{}{
+								{
+									"name": "opa-bundle",
+									"url":  AllowedOpaBundleSourcePrefix + "bundle:latest",
+								},
+							},
+						},
+					})
+					Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+				})
+
+				Describe("source.repository", func() {
+					It("should reject when verification is set but source is missing", func() {
+						sc := makeSecurityConfig(map[string]interface{}{
+							"applicationRef": skiperatorAppName,
+							"opa": map[string]interface{}{
+								"enabled": true,
+								"bundleUrls": []map[string]interface{}{
+									{
+										"name":         "opa-bundle",
+										"url":          AllowedOpaBundleSourcePrefix + "bundle:latest",
+										"verification": map[string]interface{}{},
+									},
+								},
+							},
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+						Expect(err.Error()).To(ContainSubstring("source"))
+					})
+
+					It("should reject when repository is missing", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+						Expect(err.Error()).To(ContainSubstring("repository"))
+					})
+
+					It("should reject when repository is empty", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should accept the minimum-length repository 'a/b'", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "a/b",
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should accept repository at the maximum length (39 org + 1 + 100 repo)", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": strings.Repeat("a", 39) + "/" + strings.Repeat("b", 100),
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should reject repository longer than 140 characters", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": strings.Repeat("a", 39) + "/" + strings.Repeat("b", 101),
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject when the org part is longer than 39 characters", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": strings.Repeat("a", 40) + "/b",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should accept hyphens and dots inside the repo name", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "my-org/my.repo-name_v2",
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should reject when the slash is missing", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "my-org",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject when the org part is empty", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "/accesserator",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject when the repo part is empty", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "my-org/",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject when there are multiple slashes", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "my-org/accesserator/extra",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject when the org starts with a hyphen", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "-my-org/accesserator",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject when the repo starts with a dot", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "my-org/.accesserator",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject when the repo starts with a hyphen", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "my-org/-accesserator",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+				})
+
+				Describe("source.workflow", func() {
+					It("should accept a .yml workflow path", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"workflow":   ".github/workflows/build.yml",
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should accept a .yaml workflow path", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"workflow":   ".github/workflows/build.yaml",
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should reject workflow without the .github/workflows/ prefix", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"workflow":   "build.yml",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject workflow with an unsupported extension", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"workflow":   ".github/workflows/build.txt",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject workflow with nested directories", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"workflow":   ".github/workflows/nested/build.yml",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject workflow longer than 300 characters", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"workflow":   ".github/workflows/" + strings.Repeat("a", 290) + ".yml",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+				})
+
+				Describe("source.ref", func() {
+					It("should accept refs/heads/<branch>", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "refs/heads/main",
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should accept refs/tags/<tag>", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "refs/tags/v1.2.3",
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should accept refs/pull/<n>/merge", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "refs/pull/42/merge",
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+					})
+
+					It("should reject a short ref without refs/ prefix", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "main",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject ref with an unsupported namespace", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "refs/remotes/origin/main",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject ref containing path traversal", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "refs/heads/foo/../bar",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject ref ending with .lock", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "refs/heads/main.lock",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+
+					It("should reject empty ref", func() {
+						sc := makeOpaWithVerification(map[string]interface{}{
+							"repository": "valid-org/valid-repo",
+							"ref":        "",
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(errors.IsInvalid(err)).To(BeTrue())
+					})
+				})
+			})
 		})
 
 	})

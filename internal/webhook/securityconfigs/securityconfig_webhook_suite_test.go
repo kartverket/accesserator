@@ -58,38 +58,25 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	var err error
-	err = corev1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = v1alpha.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = v1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(corev1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(v1alpha.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(v1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
 
 	// Load environment variables
-	err = os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "a-random-tag")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "a-random-uuid")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", allowedBundleURLPrefixes)
-	Expect(err).NotTo(HaveOccurred())
-	err = config.Load()
-	Expect(err).NotTo(HaveOccurred())
+	Expect(os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_CLUSTER_NAME", "test-cluster")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TOKENX_NAMESPACE", "test-namespace")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "a-random-tag")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "a-random-uuid")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES", allowedBundleURLPrefixes)).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS", "kartverket")).To(Succeed())
+	Expect(config.Load()).To(Succeed())
 
+	var err error
 	webhookManifestsDir, err = buildWebhookManifestsWithKustomize()
 	Expect(err).NotTo(HaveOccurred())
 
@@ -298,5 +285,66 @@ var _ = Describe("SecurityConfig validating webhook", func() {
 
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set"))
+	})
+
+	It("rejects a SecurityConfig with verification when the registry is unreachable", func() {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "securityconfig-verification-unreachable-"},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		sc := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "security-config", Namespace: ns.Name},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "myapp",
+				Opa: &v1alpha.OpenPolicyAgentSpec{
+					Enabled: true,
+					BundleURLs: []v1alpha.BundleSource{{
+						Name: "authz-bundle",
+						URL:  allowedBundleURLPrefixes + "/bundle:latest",
+						Verification: &v1alpha.BundleSourceVerification{
+							Source: v1alpha.GitHubRepositorySource{
+								Repository: "kartverket/accesserator",
+							},
+						},
+					}},
+				},
+			},
+		}
+
+		err := k8sClient.Create(ctx, sc)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(Equal(
+			fmt.Sprintf(
+				"admission webhook \"vsecurityconfig-v1alpha.kb.io\" denied the request: "+
+					"failed to resolve OCI bundle digest for %s", sc.Spec.Opa.BundleURLs[0].URL,
+			),
+		))
+	})
+
+	It("accepts a SecurityConfig when no bundle has verification set", func() {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "securityconfig-no-verification-"},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		sc := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "security-config", Namespace: ns.Name},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "myapp",
+				Opa: &v1alpha.OpenPolicyAgentSpec{
+					Enabled: true,
+					BundleURLs: []v1alpha.BundleSource{{
+						Name: "authz-bundle",
+						URL:  allowedBundleURLPrefixes + "/bundle:latest",
+						// Verification intentionally omitted
+					}},
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, sc)).To(Succeed())
 	})
 })
