@@ -118,7 +118,7 @@ var _ = Describe("TokenX Resolver", func() {
 					},
 				})
 
-				result, err := resolver.ResolveTokenXConfig(ctx, k8sClient, *sc)
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(result).NotTo(BeNil())
