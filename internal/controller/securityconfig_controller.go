@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
 	"github.com/kartverket/accesserator/pkg/utilities"
+	"github.com/kartverket/accesserator/pkg/validation"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -116,7 +118,14 @@ func (r *SecurityConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	scope, err := resolver.ResolveSecurityConfig(ctx, r.Client, *securityConfig)
 	if err != nil {
-		rlog.Error(err, "failed to resolve SecurityConfig", "name", req.NamespacedName)
+		if errors.Is(err, validation.ErrSourceMismatch) {
+			rlog.Warning(
+				fmt.Sprintf("failed to resolve SecurityConfig: %s", err.Error()),
+				"name", req.NamespacedName,
+			)
+		} else {
+			rlog.Error(err, "failed to resolve SecurityConfig", "name", req.NamespacedName)
+		}
 		securityConfig.Status.Phase = accesseratorv1alpha.PhaseFailed
 		securityConfig.Status.Message = err.Error()
 		updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *securityConfig)

@@ -34,6 +34,8 @@ const (
 	tufClientWritableDir    = "/tmp/tuf"
 )
 
+var ErrSourceMismatch = errors.New("source identity mismatch")
+
 // AttestationFetcher fetches the inputs needed for cosign signature
 // verification: an OCI manifest digest, and the cosign bundle attached as an
 // OCI 1.1 referrer. Layer content is intentionally out of scope.
@@ -142,7 +144,14 @@ func ValidateBundleSourceSignature(
 		bundleSource.Verification.Source,
 		trustedMaterial,
 	); validateBundleSignatureErr != nil {
-		logger.Error(validateBundleSignatureErr, "Bundle verification failed", "bundleURL", bundleSource.URL)
+		if errors.Is(validateBundleSignatureErr, ErrSourceMismatch) {
+			logger.Warning(
+				fmt.Sprintf("Bundle verification failed: %s", validateBundleSignatureErr.Error()),
+				"bundleURL", bundleSource.URL,
+			)
+		} else {
+			logger.Error(validateBundleSignatureErr, "Bundle verification failed", "bundleURL", bundleSource.URL)
+		}
 		return fmt.Errorf("cosign bundle verification failed for %s: %w", bundleSource.URL, validateBundleSignatureErr)
 	}
 	logger.Info("Bundle verification succeeded", "bundleURL", bundleSource.URL)
@@ -236,13 +245,13 @@ func checkSourceExtensions(cert *certificate.Summary, src v1alpha.GitHubReposito
 	ext := cert.Extensions
 
 	if ext.SourceRepositoryURI != wantSourceURI {
-		return fmt.Errorf("source repository mismatch: got %q, want %q",
-			ext.SourceRepositoryURI, wantSourceURI)
+		return fmt.Errorf("%w: GitHub repository: got %q, want %q",
+			ErrSourceMismatch, ext.SourceRepositoryURI, wantSourceURI)
 	}
 
 	if src.Ref != "" && ext.SourceRepositoryRef != src.Ref {
-		return fmt.Errorf("source ref mismatch: got %q, want %q",
-			ext.SourceRepositoryRef, src.Ref)
+		return fmt.Errorf("%w: git ref mismatch: got %q, want %q",
+			ErrSourceMismatch, ext.SourceRepositoryRef, src.Ref)
 	}
 
 	if src.Workflow != "" {
@@ -252,8 +261,8 @@ func checkSourceExtensions(cert *certificate.Summary, src v1alpha.GitHubReposito
 		wantBase := fmt.Sprintf("%s/%s", wantSourceURI, strings.TrimPrefix(src.Workflow, "/"))
 		gotBase, _, _ := strings.Cut(ext.BuildConfigURI, "@")
 		if gotBase != wantBase {
-			return fmt.Errorf("source workflow mismatch: got %q, want %q",
-				gotBase, wantBase)
+			return fmt.Errorf("%w: workflow file mismatch: got %q, want %q",
+				ErrSourceMismatch, gotBase, wantBase)
 		}
 	}
 
