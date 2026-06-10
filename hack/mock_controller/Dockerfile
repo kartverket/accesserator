@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.25.7 AS builder
+FROM golang:1.26.4-alpine3.23@sha256:f23e8b227fb4493eabe03bede4d5a32d04092da71962f1fb79b5f7d1e6c2a17f AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o mo
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+FROM scratch
 WORKDIR /
 COPY --from=builder /workspace/mock-controller .
 USER 65532:65532

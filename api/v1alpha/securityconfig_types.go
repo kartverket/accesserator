@@ -461,10 +461,6 @@ type SecurityConfigList struct {
 	Items           []SecurityConfig `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&SecurityConfig{}, &SecurityConfigList{})
-}
-
 func (s *SecurityConfig) InitializeStatus() {
 	if s.Status.Conditions == nil {
 		s.Status.Conditions = []metav1.Condition{}
