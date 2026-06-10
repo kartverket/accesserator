@@ -12,3 +12,4 @@ spec:
           source:
             repository: kartverket/accesserator
             workflow: .github/workflows/build-and-push-opa-bundle.yml
+  applicationRef: app

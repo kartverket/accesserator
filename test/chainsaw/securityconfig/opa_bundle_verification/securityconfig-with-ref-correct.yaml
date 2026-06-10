@@ -13,3 +13,4 @@ spec:
             repository: kartverket/accesserator
             workflow: .github/workflows/build-and-push-opa-bundle.yml
             ref: refs/pull/73/merge
+  applicationRef: app
