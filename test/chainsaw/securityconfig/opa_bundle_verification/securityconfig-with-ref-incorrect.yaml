@@ -3,7 +3,6 @@ kind: SecurityConfig
 metadata:
   name: security-config
 spec:
-  applicationRef: app
   opa:
     enabled: true
     bundleUrls:
@@ -14,3 +13,4 @@ spec:
             repository: kartverket/accesserator
             workflow: .github/workflows/build-and-push-opa-bundle.yml
             ref: refs/pull/incorrect/merge
+  applicationRef: app

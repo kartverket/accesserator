@@ -12,3 +12,4 @@ spec:
           source:
             repository: kartverket/accesserator
             workflow: .github/workflows/not-correct.yml
+  applicationRef: app

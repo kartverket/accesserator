@@ -15,22 +15,24 @@ spec:
     - try:
         - create:
             file: securityconfig-without-verification.yaml
+        - assert:
+            file: securityconfig-ready.yaml
 
-        - patch:
+        - apply:
             file: securityconfig-with-repository-incorrect.yaml
             expect:
               - check:
                   (contains($error, 'source identity mismatch')): true
-                  (contains($error, 'GitHub repository')): true
-                  (contains($error, 'kartverket/accesserator')): true
-                  (contains($error, 'kartverket/not-accesserator')): true
+                  (contains($error, 'GitHub repository mismatch')): true
+                  (contains($error, 'https://github.com/kartverket/accesserator')): true
+                  (contains($error, 'https://github.com/kartverket/not-accesserator')): true
 
-        - patch:
+        - apply:
             file: securityconfig-with-repository-correct.yaml
         - assert:
             file: securityconfig-ready.yaml
 
-        - patch:
+        - apply:
             file: securityconfig-with-workflow-incorrect.yaml
             expect:
               - check:
@@ -39,12 +41,12 @@ spec:
                   (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/build-and-push-opa-bundle.yml')): true
                   (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/not-correct.yml')): true
 
-        - patch:
+        - apply:
             file: securityconfig-with-workflow-correct.yaml
         - assert:
             file: securityconfig-ready.yaml
 
-        - patch:
+        - apply:
             file: securityconfig-with-ref-incorrect.yaml
             expect:
               - check:
@@ -53,7 +55,7 @@ spec:
                   (contains($error, 'refs/pull/73/merge')): true
                   (contains($error, 'refs/pull/incorrect/merge')): true
 
-        - patch:
+        - apply:
             file: securityconfig-with-ref-correct.yaml
         - assert:
             file: securityconfig-ready.yaml
