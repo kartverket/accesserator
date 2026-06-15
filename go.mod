@@ -8,7 +8,7 @@ require (
 	github.com/kartverket/skiperator v1.1.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nais/liberator v0.0.0-20260216142648-ee49a9372bc4
-	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/ginkgo/v2 v2.31.0
 	github.com/onsi/gomega v1.41.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
