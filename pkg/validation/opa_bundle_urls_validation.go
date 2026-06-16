@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -31,7 +34,14 @@ import (
 const (
 	githubActionsOIDCIssuer = "https://token.actions.githubusercontent.com"
 	sigstoreBundleMediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
-	tufClientWritableDir    = "/tmp/tuf"
+
+	// GitHub's Sigstore TUF repository. Attestations created by
+	// actions/attest-build-provenance are signed against this root, not the
+	// public Sigstore TUF (tuf-repo.sigstore.dev).
+	githubTUFRepositoryURL    = "https://tuf-repo.github.com"
+	githubTUFInitialRootURL   = "https://tuf-repo.github.com/1.root.json"
+	githubTUFInitialRootCache = "/tmp/github-tuf-1.root.json"
+	githubTUFCacheDir         = "/tmp/tuf-github"
 )
 
 var ErrSourceMismatch = errors.New("source identity mismatch")
@@ -216,8 +226,10 @@ func ValidateBundleSignature(
 	}
 
 	v, err := verify.NewVerifier(trustedRoot,
-		verify.WithSignedCertificateTimestamps(1),
-		verify.WithTransparencyLog(1),
+		// GitHub attestation bundles use GitHub's own TSA for timestamping.
+		// They do not carry SCT or Rekor tlog entries, so only the TSA
+		// observer timestamp is required — matching what gh attestation verify
+		// enforces.
 		verify.WithObserverTimestamps(1),
 	)
 	if err != nil {
@@ -282,8 +294,8 @@ func DecodeManifestDigest(d string) ([]byte, error) {
 	return raw, nil
 }
 
-// trustedRoot caches the Sigstore trusted root, fetched lazily from TUF on
-// the first verification.
+// trustedRoot caches GitHub's Sigstore trusted root, fetched lazily via TUF
+// on the first verification call.
 var (
 	trustedRootOnce sync.Once
 	trustedRoot     root.TrustedMaterial
@@ -292,16 +304,46 @@ var (
 
 func getTrustedRoot() (root.TrustedMaterial, error) {
 	trustedRootOnce.Do(func() {
+		initialRoot, err := fetchGitHubTUFInitialRoot()
+		if err != nil {
+			trustedRootErr = fmt.Errorf("fetch GitHub TUF initial root: %w", err)
+			return
+		}
 		opts := tuf.DefaultOptions()
-		opts.CachePath = tufClientWritableDir
+		opts.RepositoryBaseURL = githubTUFRepositoryURL
+		opts.CachePath = githubTUFCacheDir
+		opts.Root = initialRoot
 		tufClient, err := tuf.New(opts)
 		if err != nil {
-			trustedRootErr = fmt.Errorf("init tuf client: %w", err)
+			trustedRootErr = fmt.Errorf("init GitHub TUF client: %w", err)
 			return
 		}
 		trustedRoot, trustedRootErr = root.GetTrustedRoot(tufClient)
 	})
 	return trustedRoot, trustedRootErr
+}
+
+// fetchGitHubTUFInitialRoot returns GitHub's TUF 1.root.json bytes, using a
+// local cache to avoid re-fetching on every pod restart.
+func fetchGitHubTUFInitialRoot() ([]byte, error) {
+	if data, err := os.ReadFile(githubTUFInitialRootCache); err == nil {
+		return data, nil
+	}
+
+	resp, err := http.Get(githubTUFInitialRootURL)
+	if err != nil {
+		return nil, fmt.Errorf("GET %s: %w", githubTUFInitialRootURL, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s: unexpected HTTP %d", githubTUFInitialRootURL, resp.StatusCode)
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	_ = os.WriteFile(githubTUFInitialRootCache, data, 0600)
+	return data, nil
 }
 
 // ociAttestationFetcher implements AttestationFetcher using oras-go.
