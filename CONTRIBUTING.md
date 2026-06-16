@@ -73,6 +73,36 @@ or run a single test with
 make chainsaw-test-single dir=<TEST FOLDER>
 ```
 
+## Git conventions
+
+### Commit strategy
+
+- Separate features, bug fixes, and refactorings into different commits.
+- Each commit should represent one logical change that compiles and passes tests on its own.
+- Do not mix refactoring or unrelated changes with feature changes in the same commit.
+- Keep changes and their corresponding tests in the same commit.
+
+### Commit messages
+
+- Limit the subject line to 50 characters.
+- Capitalize the subject line.
+- Use the imperative mood in the subject line.
+- Do not end the subject line with a period.
+- Separate the subject from the body with a blank line.
+- Wrap the body at 72 characters.
+- Use the body to explain what and why, not how.
+
+Example:
+```
+Add secretRef support for Entra ID config
+
+Previously, Entra ID credentials could only be configured via an
+inline AzureAdApplication or by referencing an existing one. This
+adds a third path: sourcing credentials directly from existing
+Kubernetes secrets, mirroring the existing Maskinporten secretRef
+behaviour.
+```
+
 ## Managing dependencies and patching vulnerabilities
 
 ### Managing Kubernetes, Istio and CertManager versions
