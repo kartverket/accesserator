@@ -331,6 +331,59 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			))
 		})
 
+		It("returns env vars with idporten disabled and no integration secrets when idporten is not configured in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+				},
+			}
+			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.IdportenEnabled).To(Equal("false"))
+			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
+		})
+
+		It("returns env vars with idporten disabled and no integration secrets when idporten is disabled in SecurityConfig", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Idporten: &v1alpha.IdPortenSpec{
+						Enabled: false,
+					},
+				},
+			}
+			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.IdportenEnabled).To(Equal("false"))
+			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
+		})
+
+		It("sets idporten enabled plus the well-known URL and audience env vars on the container, with no integration secret, when idporten is enabled", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Idporten: &v1alpha.IdPortenSpec{
+						Enabled: true,
+						AllowedAudiences: []v1alpha.AllowedAudience{
+							{Value: utilities.Ptr("my-idporten-client-id")},
+						},
+					},
+				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				IdportenAudience: "my-idporten-client-id",
+			}
+
+			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.IdportenEnabled).To(Equal("true"))
+			// ID-porten no longer contributes an integration secret.
+			Expect(envVars.IntegrationSecretsRefs).To(BeEmpty())
+
+			c := pods.GetTexasContainer(securityConfig)
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.IdportenEnabledEnvVarName, Value: "true"}))
+			// Suite sets ACCESSERATOR_RUNS_IN_PRODUCTION=false.
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.IdportenWellKnownUrlEnvVarName, Value: utilities.IdPortenTestWellKnownURL}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.IdportenAudienceEnvVarName, Value: "my-idporten-client-id"}))
+		})
+
 		It("returns env vars with maskinporten and entraid and tokenx enabled and the expected integration secret refs when both are enabled in SecurityConfig", func() {
 			securityConfig := v1alpha.SecurityConfig{
 				Spec: v1alpha.SecurityConfigSpec{

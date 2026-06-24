@@ -92,6 +92,7 @@ var _ = Describe("ControllerResources", func() {
 					"AzureAdApplication",
 					"Secret",
 					"ServiceEntry",
+					"ServiceEntry",
 					"ConfigMap",
 				),
 			)
@@ -115,6 +116,7 @@ var _ = Describe("ControllerResources", func() {
 					fmt.Sprintf("%s/%s", "AzureAdApplication", utilities.NewEntraIdNamer(securityConfig).AzureAdApplicationName()),
 					fmt.Sprintf("%s/%s", "Secret", utilities.NewEntraIdNamer(securityConfig).SecretFromRefName()),
 					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.NewEntraIdNamer(securityConfig).ServiceEntryName()),
+					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.NewIdPortenNamer(securityConfig).ServiceEntryName()),
 					fmt.Sprintf("%s/%s", "ConfigMap", utilities.NewOpaNamer(securityConfig).ConfigMapName()),
 				),
 			)

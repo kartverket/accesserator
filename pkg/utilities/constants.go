@@ -33,6 +33,14 @@ const (
 	EntraIdTokenEndpointTemplate = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
 	EntraIdJwksUriTemplate       = "https://login.microsoftonline.com/%s/discovery/v2.0/keys"
 
+	IdPortenNameSuffix = "idporten"
+
+	IdPortenProdHost         = "idporten.no"
+	IdPortenProdWellKnownURL = "https://idporten.no/.well-known/openid-configuration"
+
+	IdPortenTestHost         = "test.idporten.no"
+	IdPortenTestWellKnownURL = "https://test.idporten.no/.well-known/openid-configuration"
+
 	OpaConfigMapNameSuffix = "opa"
 
 	IstioReadinessProbeRewritePathPattern = "/app-health/%s/readyz"

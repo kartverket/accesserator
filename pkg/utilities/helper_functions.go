@@ -130,6 +130,18 @@ func (n EntraIdNamer) ServiceEntryName() string {
 	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, EntraIdNameSuffix))
 }
 
+type IdPortenNamer struct {
+	nameBase
+}
+
+func NewIdPortenNamer(sc v1alpha.SecurityConfig) IdPortenNamer {
+	return IdPortenNamer{newNameBase(sc)}
+}
+
+func (n IdPortenNamer) ServiceEntryName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, IdPortenNameSuffix))
+}
+
 type OpaNamer struct {
 	nameBase
 }
@@ -160,6 +172,14 @@ func GetSecret(ctx context.Context, k8sClient client.Client, key client.ObjectKe
 		return nil, fmt.Errorf("failed to get Secret %s/%s: %w", key.Name, key.Namespace, err)
 	}
 	return &secret, nil
+}
+
+func GetConfigMap(ctx context.Context, k8sClient client.Client, key client.ObjectKey) (*corev1.ConfigMap, error) {
+	var configMap corev1.ConfigMap
+	if err := k8sClient.Get(ctx, key, &configMap); err != nil {
+		return nil, fmt.Errorf("failed to get ConfigMap %s/%s: %w", key.Name, key.Namespace, err)
+	}
+	return &configMap, nil
 }
 
 func GetSecretDataByKey(

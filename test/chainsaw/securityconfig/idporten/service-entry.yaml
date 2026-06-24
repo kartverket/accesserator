@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: security-config-idporten-79c0114e
+  labels:
+    accesserator.kartverket.no/controller: securityconfig
+    app.kubernetes.io/managed-by: accesserator
+spec:
+  exportTo:
+    - .
+    - istio-gateway
+    - istio-system
+  hosts:
+    - test.idporten.no
+  ports:
+    - name: https
+      number: 443
+      protocol: HTTPS
+  resolution: DNS

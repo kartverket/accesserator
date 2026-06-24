@@ -28,6 +28,11 @@ func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securit
 		return nil, fmt.Errorf("failed to resolve Entra ID config: %w", entraIdConfigResolveErr)
 	}
 
+	idPortenConfig, idPortenConfigResolveErr := ResolveIdPortenConfig(logger, ctx, k8sClient, securityConfig)
+	if idPortenConfigResolveErr != nil {
+		return nil, fmt.Errorf("failed to resolve ID-porten config: %w", idPortenConfigResolveErr)
+	}
+
 	opaConfig, opaConfigResolveErr := ResolveOpaConfig(logger, securityConfig)
 	if opaConfigResolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve OPA config: %w", opaConfigResolveErr)
@@ -38,6 +43,7 @@ func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securit
 		TokenXConfig:       *tokenxConfig,
 		MaskinportenConfig: *maskinportenConfig,
 		EntraIdConfig:      *entraIdConfig,
+		IdPortenConfig:     *idPortenConfig,
 		OpaConfig:          *opaConfig,
 	}, nil
 }

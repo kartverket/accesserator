@@ -21,6 +21,9 @@ const (
 	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
 	AzureEnabledEnvVarName        = "AZURE_ENABLED"
 	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
+
+	IdportenWellKnownUrlEnvVarName = "IDPORTEN_WELL_KNOWN_URL"
+	IdportenAudienceEnvVarName     = "IDPORTEN_AUDIENCE"
 )
 
 // TexasEnvVars holds the resolved environment variable values for the Texas sidecar.
@@ -75,9 +78,24 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 		{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
 		{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
 	}
+
+	if securityConfig.Spec.Idporten != nil && securityConfig.Spec.Idporten.Enabled {
+		texasContainer.Env = append(texasContainer.Env,
+			corev1.EnvVar{Name: IdportenWellKnownUrlEnvVarName, Value: idportenWellKnownURL()},
+			corev1.EnvVar{Name: IdportenAudienceEnvVarName, Value: securityConfig.Status.IdportenAudience},
+		)
+	}
 	texasContainer.EnvFrom = envVars.IntegrationSecretsRefs
 
 	return texasContainer
+}
+
+// idportenWellKnownURL returns the ID-porten OIDC discovery (well-known) URL for the current environment.
+func idportenWellKnownURL() string {
+	if *config.Get().RunsInProduction {
+		return utilities.IdPortenProdWellKnownURL
+	}
+	return utilities.IdPortenTestWellKnownURL
 }
 
 // GetTexasEnvVars resolves the env var values for the Texas container from the SecurityConfig.
@@ -119,11 +137,14 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 		})
 	}
 
+	// ID-porten does not contribute an integration secret; its config is set as plain env vars in GetTexasContainer.
+	idportenEnabled := securityConfig.Spec.Idporten != nil && securityConfig.Spec.Idporten.Enabled
+
 	return TexasEnvVars{
 		TokenXEnabled:          strconv.FormatBool(tokenxEnabled),
 		MaskinportenEnabled:    strconv.FormatBool(maskinportenEnabled),
 		AzureEnabled:           strconv.FormatBool(entraIdEnabled),
-		IdportenEnabled:        strconv.FormatBool(false),
+		IdportenEnabled:        strconv.FormatBool(idportenEnabled),
 		IntegrationSecretsRefs: integrationSecrets,
 	}
 }

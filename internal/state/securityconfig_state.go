@@ -22,6 +22,7 @@ type Scope struct {
 	TokenXConfig           TokenXConfig
 	MaskinportenConfig     MaskinportenConfig
 	EntraIdConfig          EntraIdConfig
+	IdPortenConfig         IdPortenConfig
 	OpaConfig              OpaConfig
 	Descendants            []Descendant[client.Object]
 	InvalidConfig          bool
@@ -48,6 +49,11 @@ type EntraIdConfig struct {
 	ClientSpec *naisiov1.AzureAdApplicationSpec
 	ClientRef  *v1alpha.ResourceRef
 	SecretData *map[string][]byte
+}
+
+type IdPortenConfig struct {
+	Enabled  bool
+	Audience string
 }
 
 type OpaConfig struct {
