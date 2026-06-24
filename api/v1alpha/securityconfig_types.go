@@ -267,14 +267,10 @@ type AzureAdApplicationSpec struct {
 	SinglePageApplication *bool `json:"singlePageApplication,omitempty"`
 }
 
-// ResourceRef defines a reference to an existing resource by name.
 //
 // +kubebuilder:object:generate=true
-type ResourceRef struct {
-	// Name of the referenced resource.
 	//
 	// +kubebuilder:validation:Required
-	Name ResourceName `json:"name"`
 }
 
 // OpenPolicyAgentSpec defines the OPA sidecar configuration.
@@ -357,6 +353,17 @@ type GitHubRepositorySource struct {
 	Ref string `json:"ref,omitempty"`
 }
 
+}
+
+// ResourceRef defines a reference to an existing resource by name.
+//
+// +kubebuilder:object:generate=true
+type ResourceRef struct {
+	// Name of the referenced resource.
+	//
+	// +kubebuilder:validation:Required
+	Name ResourceName `json:"name"`
+}
 // DataKey is a type for keys within Kubernetes secrets and configmaps.
 //
 // +kubebuilder:validation:Pattern=`^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$`
