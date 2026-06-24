@@ -73,6 +73,69 @@ var _ = Describe("HandleSecretEvent", func() {
 		))
 	})
 
+	It("enqueues SecurityConfigs in the same namespace referencing the secret in entraid clientID or clientJWK", func() {
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "shared-secret", Namespace: "team-a"}}
+
+		scClientIDMatch := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-entraid-client-id", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				EntraID: &v1alpha.EntraIDSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "shared-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "other-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+		scClientJWKMatch := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-entraid-client-jwk", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				EntraID: &v1alpha.EntraIDSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "other-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "shared-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+		scNoMatch := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-entraid-no-match", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				EntraID: &v1alpha.EntraIDSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "another-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "another-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+		scWrongNamespace := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-entraid-wrong-ns", Namespace: "team-b"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				EntraID: &v1alpha.EntraIDSpec{
+					SecretRef: &v1alpha.SecretRef{
+						ClientID:  v1alpha.SecretKeySelector{Name: "shared-secret", Key: "id"},
+						ClientJWK: v1alpha.SecretKeySelector{Name: "shared-secret", Key: "jwk"},
+					},
+				},
+			},
+		}
+
+		c := buildClient(scClientIDMatch, scClientJWKMatch, scNoMatch, scWrongNamespace)
+		h := eventhandler.HandleSecretEvent(c)
+
+		requests := runCreateEvent(h, secret)
+
+		Expect(requests).To(ConsistOf(
+			req("team-a", "sc-entraid-client-id"),
+			req("team-a", "sc-entraid-client-jwk"),
+		))
+	})
+
 	It("returns no requests for unrelated object type", func() {
 		c := buildClient()
 		h := eventhandler.HandleSecretEvent(c)
