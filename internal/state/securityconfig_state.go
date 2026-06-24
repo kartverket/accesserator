@@ -23,6 +23,7 @@ type Scope struct {
 	MaskinportenConfig     MaskinportenConfig
 	EntraIdConfig          EntraIdConfig
 	IdPortenConfig         IdPortenConfig
+	AnsattportenConfig     AnsattportenConfig
 	OpaConfig              OpaConfig
 	Descendants            []Descendant[client.Object]
 	InvalidConfig          bool
@@ -52,6 +53,11 @@ type EntraIdConfig struct {
 }
 
 type IdPortenConfig struct {
+	Enabled  bool
+	Audience string
+}
+
+type AnsattportenConfig struct {
 	Enabled  bool
 	Audience string
 }

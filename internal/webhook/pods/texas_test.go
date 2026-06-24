@@ -374,7 +374,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 			envVars := pods.GetTexasEnvVars(securityConfig)
 			Expect(envVars.IdportenEnabled).To(Equal("true"))
-			// ID-porten no longer contributes an integration secret.
+			Expect(envVars.EnvVars).To(Not(BeEmpty()))
 			Expect(envVars.EnvFromSources).To(BeEmpty())
 
 			c := pods.GetTexasContainer(securityConfig)
@@ -382,6 +382,34 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			// Suite sets ACCESSERATOR_RUNS_IN_PRODUCTION=false.
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.IdportenWellKnownUrlEnvVarName, Value: utilities.IdPortenTestWellKnownURL}))
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.IdportenAudienceEnvVarName, Value: "my-idporten-client-id"}))
+		})
+
+		It("sets ansattporten enabled plus the well-known URL and audience env vars on the container, with no integration secret, when ansattporten is enabled", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+					Ansattporten: &v1alpha.AnsattportenSpec{
+						Enabled: true,
+						AllowedAudience: v1alpha.AllowedAudience{
+							Value: utilities.Ptr("my-ansattporten-client-id"),
+						},
+					},
+				},
+			}
+			securityConfig.Status = v1alpha.SecurityConfigStatus{
+				AnsattportenAudience: "my-ansattporten-client-id",
+			}
+
+			envVars := pods.GetTexasEnvVars(securityConfig)
+			Expect(envVars.AnsattportenEnabled).To(Equal("true"))
+			Expect(envVars.EnvVars).To(Not(BeEmpty()))
+			Expect(envVars.EnvFromSources).To(BeEmpty())
+
+			c := pods.GetTexasContainer(securityConfig)
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.AnsattportenEnabledEnvVarName, Value: "true"}))
+			// Suite sets ACCESSERATOR_RUNS_IN_PRODUCTION=false.
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.AnsattportenWellKnownUrlEnvVarName, Value: utilities.AnsattportenTestWellKnownURL}))
+			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.AnsattportenAudienceEnvVarName, Value: "my-ansattporten-client-id"}))
 		})
 
 		It("returns env vars with maskinporten and entraid and tokenx enabled and the expected integration secret refs when both are enabled in SecurityConfig", func() {

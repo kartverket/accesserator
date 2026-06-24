@@ -31,6 +31,8 @@ spec:
           value: "true"
         - name: IDPORTEN_ENABLED
           value: "false"
+        - name: ANSATTPORTEN_ENABLED
+          value: "false"
       envFrom:
         - secretRef:
             name: app-entraid-11a69e00

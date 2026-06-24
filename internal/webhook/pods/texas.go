@@ -21,9 +21,13 @@ const (
 	MaskinportenEnabledEnvVarName = "MASKINPORTEN_ENABLED"
 	AzureEnabledEnvVarName        = "AZURE_ENABLED"
 	IdportenEnabledEnvVarName     = "IDPORTEN_ENABLED"
+	AnsattportenEnabledEnvVarName = "ANSATTPORTEN_ENABLED"
 
 	IdportenWellKnownUrlEnvVarName = "IDPORTEN_WELL_KNOWN_URL"
 	IdportenAudienceEnvVarName     = "IDPORTEN_AUDIENCE"
+
+	AnsattportenWellKnownUrlEnvVarName = "ANSATTPORTEN_WELL_KNOWN_URL"
+	AnsattportenAudienceEnvVarName     = "ANSATTPORTEN_AUDIENCE"
 )
 
 // TexasEnvVars holds the resolved environment variable values for the Texas sidecar.
@@ -32,6 +36,7 @@ type TexasEnvVars struct {
 	MaskinportenEnabled string
 	AzureEnabled        string
 	IdportenEnabled     string
+	AnsattportenEnabled string
 	EnvVars             []corev1.EnvVar
 	EnvFromSources      []corev1.EnvFromSource
 }
@@ -78,6 +83,7 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 		{Name: MaskinportenEnabledEnvVarName, Value: envVars.MaskinportenEnabled},
 		{Name: AzureEnabledEnvVarName, Value: envVars.AzureEnabled},
 		{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
+		{Name: AnsattportenEnabledEnvVarName, Value: envVars.AnsattportenEnabled},
 	}
 
 	texasContainer.Env = append(texasContainer.Env, envVars.EnvVars...)
@@ -92,6 +98,14 @@ func idportenWellKnownURL() string {
 		return utilities.IdPortenProdWellKnownURL
 	}
 	return utilities.IdPortenTestWellKnownURL
+}
+
+// ansattportenWellKnownURL returns the Ansattporten OIDC discovery (well-known) URL for the current environment.
+func ansattportenWellKnownURL() string {
+	if *config.Get().RunsInProduction {
+		return utilities.AnsattportenProdWellKnownURL
+	}
+	return utilities.AnsattportenTestWellKnownURL
 }
 
 // GetTexasEnvVars resolves the env var values for the Texas container from the SecurityConfig.
@@ -143,11 +157,20 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 		)
 	}
 
+	ansattportenEnabled := securityConfig.Spec.Ansattporten != nil && securityConfig.Spec.Ansattporten.Enabled
+	if ansattportenEnabled {
+		envVars = append(envVars,
+			corev1.EnvVar{Name: AnsattportenWellKnownUrlEnvVarName, Value: ansattportenWellKnownURL()},
+			corev1.EnvVar{Name: AnsattportenAudienceEnvVarName, Value: securityConfig.Status.AnsattportenAudience},
+		)
+	}
+
 	return TexasEnvVars{
 		TokenXEnabled:       strconv.FormatBool(tokenxEnabled),
 		MaskinportenEnabled: strconv.FormatBool(maskinportenEnabled),
 		AzureEnabled:        strconv.FormatBool(entraIdEnabled),
 		IdportenEnabled:     strconv.FormatBool(idportenEnabled),
+		AnsattportenEnabled: strconv.FormatBool(ansattportenEnabled),
 		EnvVars:             envVars,
 		EnvFromSources:      envFromSources,
 	}

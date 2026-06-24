@@ -11,8 +11,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// HandleConfigMapEvent enqueues SecurityConfigs that reference the changed ConfigMap as an ID-porten allowed
-// audience source (spec.idporten.allowedAudience.valueFrom.configMapKeyRef).
+// HandleConfigMapEvent enqueues SecurityConfigs that reference the changed ConfigMap as an ID-porten or Ansattporten
+// allowed audience source (spec.idporten/ansattporten.allowedAudience.valueFrom.configMapKeyRef).
 func HandleConfigMapEvent(c client.Client) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		configMap, ok := obj.(*corev1.ConfigMap)
@@ -27,20 +27,28 @@ func HandleConfigMapEvent(c client.Client) handler.EventHandler {
 
 		reqs := make([]reconcile.Request, 0, len(securityConfigList.Items))
 		for _, securityConfig := range securityConfigList.Items {
-			if securityConfig.Spec.Idporten != nil {
-				if securityConfig.Spec.Idporten.AllowedAudience.ValueFrom != nil &&
-					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.ConfigMapKeyRef != nil &&
-					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.ConfigMapKeyRef.Name == configMap.Name {
-					reqs = append(reqs, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Namespace: securityConfig.GetNamespace(),
-							Name:      securityConfig.GetName(),
-						},
-					})
-				}
+			isReferencedInIdportenSpec := securityConfig.Spec.Idporten != nil &&
+				referencesConfigMap(securityConfig.Spec.Idporten.AllowedAudience, configMap.Name)
+			isReferencedInAnsattportenSpec := securityConfig.Spec.Ansattporten != nil &&
+				referencesConfigMap(securityConfig.Spec.Ansattporten.AllowedAudience, configMap.Name)
+
+			if isReferencedInIdportenSpec || isReferencedInAnsattportenSpec {
+				reqs = append(reqs, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: securityConfig.GetNamespace(),
+						Name:      securityConfig.GetName(),
+					},
+				})
 			}
 		}
 
 		return reqs
 	})
+}
+
+// referencesConfigMap returns whether any entry in allowedAudience references the given ConfigMap by name.
+func referencesConfigMap(allowedAudience v1alpha.AllowedAudience, configMapName string) bool {
+	return allowedAudience.ValueFrom != nil &&
+		allowedAudience.ValueFrom.ConfigMapKeyRef != nil &&
+		allowedAudience.ValueFrom.ConfigMapKeyRef.Name == configMapName
 }

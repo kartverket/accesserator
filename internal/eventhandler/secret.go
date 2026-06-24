@@ -25,46 +25,44 @@ func HandleSecretEvent(c client.Client) handler.EventHandler {
 
 		reqs := make([]reconcile.Request, 0, len(securityConfigList.Items))
 		for _, securityConfig := range securityConfigList.Items {
-			if securityConfig.Spec.Maskinporten != nil {
-				if securityConfig.Spec.Maskinporten.SecretRef != nil {
-					if string(securityConfig.Spec.Maskinporten.SecretRef.ClientID.Name) == secret.Name ||
-						string(securityConfig.Spec.Maskinporten.SecretRef.ClientJWK.Name) == secret.Name {
-						reqs = append(reqs, reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Namespace: securityConfig.GetNamespace(),
-								Name:      securityConfig.GetName(),
-							},
-						})
-					}
-				}
-			}
-			if securityConfig.Spec.EntraID != nil {
-				if securityConfig.Spec.EntraID.SecretRef != nil {
-					if string(securityConfig.Spec.EntraID.SecretRef.ClientID.Name) == secret.Name ||
-						string(securityConfig.Spec.EntraID.SecretRef.ClientJWK.Name) == secret.Name {
-						reqs = append(reqs, reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Namespace: securityConfig.GetNamespace(),
-								Name:      securityConfig.GetName(),
-							},
-						})
-					}
-				}
-			}
-			if securityConfig.Spec.Idporten != nil {
-				if securityConfig.Spec.Idporten.AllowedAudience.ValueFrom != nil &&
-					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.SecretKeyRef != nil &&
-					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.SecretKeyRef.Name == secret.Name {
-					reqs = append(reqs, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Namespace: securityConfig.GetNamespace(),
-							Name:      securityConfig.GetName(),
-						},
-					})
-				}
+			isReferencedInMaskinportenSpec := securityConfig.Spec.Maskinporten != nil &&
+				referencesSecretRef(securityConfig.Spec.Maskinporten.GetSecretRef(), secret.Name)
+			isReferencedInEntraIDSpec := securityConfig.Spec.EntraID != nil &&
+				referencesSecretRef(securityConfig.Spec.EntraID.GetSecretRef(), secret.Name)
+			isReferencedInIdportenSpec := securityConfig.Spec.Idporten != nil &&
+				referencesSecret(securityConfig.Spec.Idporten.AllowedAudience, secret.Name)
+			isReferencedInAnsattportenSpec := securityConfig.Spec.Ansattporten != nil &&
+				referencesSecret(securityConfig.Spec.Ansattporten.AllowedAudience, secret.Name)
+
+			if isReferencedInMaskinportenSpec ||
+				isReferencedInEntraIDSpec ||
+				isReferencedInIdportenSpec ||
+				isReferencedInAnsattportenSpec {
+				reqs = append(reqs, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: securityConfig.GetNamespace(),
+						Name:      securityConfig.GetName(),
+					},
+				})
 			}
 		}
 
 		return reqs
 	})
+}
+
+// referencesSecretRef returns whether the given SecretRef references the given secret by name.
+func referencesSecretRef(secretRef *v1alpha.SecretRef, secretName string) bool {
+	if secretRef == nil {
+		return false
+	}
+	return string(secretRef.ClientID.Name) == secretName ||
+		string(secretRef.ClientJWK.Name) == secretName
+}
+
+// referencesSecret returns whether any entry in allowedAudience references the given secret by name.
+func referencesSecret(allowedAudience v1alpha.AllowedAudience, secretName string) bool {
+	return allowedAudience.ValueFrom != nil &&
+		allowedAudience.ValueFrom.SecretKeyRef != nil &&
+		allowedAudience.ValueFrom.SecretKeyRef.Name == secretName
 }

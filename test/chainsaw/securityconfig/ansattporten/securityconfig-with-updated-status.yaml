@@ -1,0 +1,18 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+  labels:
+    accesserator.kartverket.no/controller: securityconfig
+    app.kubernetes.io/managed-by: accesserator
+spec:
+  applicationRef: app
+  ansattporten:
+    enabled: true
+    allowedAudience:
+      value: my-ansattporten-client-id
+status:
+  ansattportenAudience: my-ansattporten-client-id
+  message: SecurityConfig ready.
+  phase: Ready
+  ready: true

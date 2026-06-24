@@ -1,0 +1,42 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: ansattporten-audience-referencing
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        - create:
+            file: skiperator-application.yaml
+        - create:
+            file: valid-audience-sources.yaml
+        - create:
+            file: empty-audience-configmap.yaml
+        - create:
+            file: empty-audience-secret.yaml
+        # Audience sourced from a ConfigMap key is resolved into status.ansattportenAudience.
+        - create:
+            file: securityconfig-configmap-ref.yaml
+        - assert:
+            file: securityconfig-configmap-ref-assert.yaml
+        # Referencing a ConfigMap key with an empty value fails resolution (Ready -> Failed).
+        - update:
+            file: securityconfig-illegal-configmap-ref.yaml
+        - assert:
+            file: securityconfig-illegal-assert.yaml
+        # Audience sourced from a Secret key is resolved into status.ansattportenAudience (Failed -> Ready).
+        - update:
+            file: securityconfig-secret-ref.yaml
+        - assert:
+            file: securityconfig-secret-ref-assert.yaml
+        # Referencing a Secret key with an empty value fails resolution (Ready -> Failed).
+        - update:
+            file: securityconfig-illegal-secret-ref.yaml
+        - assert:
+            file: securityconfig-illegal-assert.yaml
