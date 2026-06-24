@@ -12,6 +12,8 @@ permissions:
   packages: write
   id-token: write
   attestations: write
+  actions: read
+  security-events: write
 
 jobs:
   tags:
@@ -35,7 +37,7 @@ jobs:
 
   build:
     needs: tags
-    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml@515a07cce4515e83410b962db42d1a421a78eddb
+    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-bundle.yml@v4.13.1
     with:
       artifact-name: ghcr.io/${{ github.repository }}/opa-bundle
       path: .opa
