@@ -51,6 +51,22 @@ func HandleSecretEvent(c client.Client) handler.EventHandler {
 					}
 				}
 			}
+			if securityConfig.Spec.Idporten != nil {
+				if securityConfig.Spec.Idporten.AllowedAudiences != nil {
+					for _, audience := range securityConfig.Spec.Idporten.AllowedAudiences {
+						if audience.ValueFrom != nil &&
+							audience.ValueFrom.SecretKeyRef != nil &&
+							audience.ValueFrom.SecretKeyRef.Name == secret.Name {
+							reqs = append(reqs, reconcile.Request{
+								NamespacedName: types.NamespacedName{
+									Namespace: securityConfig.GetNamespace(),
+									Name:      securityConfig.GetName(),
+								},
+							})
+						}
+					}
+				}
+			}
 		}
 
 		return reqs
