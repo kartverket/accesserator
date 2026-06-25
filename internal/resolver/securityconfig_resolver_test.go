@@ -229,8 +229,8 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						EntraID:        nil,
 						Idporten: &accesseratorv1alpha.IdPortenSpec{
 							Enabled: true,
-							AllowedAudiences: []accesseratorv1alpha.AllowedAudience{
-								{Value: utilities.Ptr(testIdPortenAud)},
+							AllowedAudience: accesseratorv1alpha.AllowedAudience{
+								Value: utilities.Ptr(testIdPortenAud),
 							},
 						},
 					},
@@ -257,10 +257,10 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						ApplicationRef: testAppName,
 						Idporten: &accesseratorv1alpha.IdPortenSpec{
 							Enabled: true,
-							AllowedAudiences: []accesseratorv1alpha.AllowedAudience{
-								{ValueFrom: &accesseratorv1alpha.ValueFrom{
+							AllowedAudience: accesseratorv1alpha.AllowedAudience{
+								ValueFrom: &accesseratorv1alpha.ValueFrom{
 									ConfigMapKeyRef: &accesseratorv1alpha.KeyRef{Name: "missing-configmap", Key: "AUDIENCE"},
-								}},
+								},
 							},
 						},
 					},
@@ -330,8 +330,8 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						},
 						Idporten: &accesseratorv1alpha.IdPortenSpec{
 							Enabled: true,
-							AllowedAudiences: []accesseratorv1alpha.AllowedAudience{
-								{Value: utilities.Ptr(testIdPortenAud)},
+							AllowedAudience: accesseratorv1alpha.AllowedAudience{
+								Value: utilities.Ptr(testIdPortenAud),
 							},
 						},
 					},

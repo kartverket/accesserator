@@ -79,8 +79,8 @@ var _ = Describe("ID-porten Resolver", func() {
 			It("should resolve the audience", func() {
 				sc := newSecurityConfig(&accesseratorv1alpha.IdPortenSpec{
 					Enabled: true,
-					AllowedAudiences: []accesseratorv1alpha.AllowedAudience{
-						{Value: utilities.Ptr(testAudience)},
+					AllowedAudience: accesseratorv1alpha.AllowedAudience{
+						Value: utilities.Ptr(testAudience),
 					},
 				})
 
@@ -103,10 +103,10 @@ var _ = Describe("ID-porten Resolver", func() {
 
 				sc := newSecurityConfig(&accesseratorv1alpha.IdPortenSpec{
 					Enabled: true,
-					AllowedAudiences: []accesseratorv1alpha.AllowedAudience{
-						{ValueFrom: &accesseratorv1alpha.ValueFrom{
+					AllowedAudience: accesseratorv1alpha.AllowedAudience{
+						ValueFrom: &accesseratorv1alpha.ValueFrom{
 							ConfigMapKeyRef: &accesseratorv1alpha.KeyRef{Name: "idporten-cm", Key: "audience"},
-						}},
+						},
 					},
 				})
 
@@ -127,10 +127,10 @@ var _ = Describe("ID-porten Resolver", func() {
 
 				sc := newSecurityConfig(&accesseratorv1alpha.IdPortenSpec{
 					Enabled: true,
-					AllowedAudiences: []accesseratorv1alpha.AllowedAudience{
-						{ValueFrom: &accesseratorv1alpha.ValueFrom{
+					AllowedAudience: accesseratorv1alpha.AllowedAudience{
+						ValueFrom: &accesseratorv1alpha.ValueFrom{
 							SecretKeyRef: &accesseratorv1alpha.KeyRef{Name: "idporten-secret", Key: "audience"},
-						}},
+						},
 					},
 				})
 
@@ -141,29 +141,14 @@ var _ = Describe("ID-porten Resolver", func() {
 			})
 		})
 
-		Context("when no audience is specified", func() {
-			It("should return an error because Texas requires exactly one audience", func() {
-				sc := newSecurityConfig(&accesseratorv1alpha.IdPortenSpec{
-					Enabled:          true,
-					AllowedAudiences: nil,
-				})
-
-				result, err := resolver.ResolveIdPortenConfig(logger, ctx, k8sClient, sc)
-
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("exactly one allowed audience"))
-				Expect(result).To(BeNil())
-			})
-		})
-
 		Context("when a referenced ConfigMap does not exist", func() {
 			It("should return an error", func() {
 				sc := newSecurityConfig(&accesseratorv1alpha.IdPortenSpec{
 					Enabled: true,
-					AllowedAudiences: []accesseratorv1alpha.AllowedAudience{
-						{ValueFrom: &accesseratorv1alpha.ValueFrom{
+					AllowedAudience: accesseratorv1alpha.AllowedAudience{
+						ValueFrom: &accesseratorv1alpha.ValueFrom{
 							ConfigMapKeyRef: &accesseratorv1alpha.KeyRef{Name: "missing-cm", Key: "audience"},
-						}},
+						},
 					},
 				})
 

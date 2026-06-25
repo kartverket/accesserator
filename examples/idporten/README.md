@@ -20,8 +20,8 @@ metadata:
 spec:
   idporten:
     enabled: true
-    allowedAudiences:
-      - value: my-idporten-client-id
+    allowedAudience:
+      value: my-idporten-client-id
   applicationRef: app
 ```
 
@@ -35,11 +35,11 @@ metadata:
 spec:
   idporten:
     enabled: true
-    allowedAudiences:
-      - valueFrom:
-          configMapKeyRef:
-            name: my-config
-            key: idporten-audience
+    allowedAudience:
+      valueFrom:
+        configMapKeyRef:
+          name: my-config
+          key: idporten-audience
   applicationRef: app
 ```
 
@@ -53,15 +53,15 @@ metadata:
 spec:
   idporten:
     enabled: true
-    allowedAudiences:
-      - valueFrom:
-          secretKeyRef:
-            name: my-secret
-            key: idporten-audience
+    allowedAudience:
+      valueFrom:
+        secretKeyRef:
+          name: my-secret
+          key: idporten-audience
   applicationRef: app
 ```
 
-> **Note:** ID-porten tokens are validated against a single audience, so exactly one `allowedAudiences` entry must be
+> **Note:** ID-porten tokens are validated against a single audience, so exactly one `allowedAudience` entry must be
 > specified when `idporten.enabled` is `true`. This is enforced by CRD validation at admission time.
 
 ## Validating ID-porten tokens with `texas`

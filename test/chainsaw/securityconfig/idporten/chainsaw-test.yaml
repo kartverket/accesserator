@@ -29,8 +29,8 @@ spec:
               spec:
                 idporten:
                   enabled: true
-                  allowedAudiences:
-                    - value: my-idporten-client-id
+                  allowedAudience:
+                    value: my-idporten-client-id
                 applicationRef: app
         - assert:
             file: securityconfig-with-updated-status.yaml

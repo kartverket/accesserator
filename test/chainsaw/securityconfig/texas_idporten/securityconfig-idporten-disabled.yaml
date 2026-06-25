@@ -6,3 +6,5 @@ spec:
   applicationRef: app
   idporten:
     enabled: false
+    allowedAudience:
+      value: ignored

@@ -145,10 +145,10 @@ var _ = Describe("HandleSecretEvent", func() {
 				ApplicationRef: "app-a",
 				Idporten: &v1alpha.IdPortenSpec{
 					Enabled: true,
-					AllowedAudiences: []v1alpha.AllowedAudience{
-						{ValueFrom: &v1alpha.ValueFrom{
+					AllowedAudience: v1alpha.AllowedAudience{
+						ValueFrom: &v1alpha.ValueFrom{
 							SecretKeyRef: &v1alpha.KeyRef{Name: "audience-secret", Key: "AUDIENCE"},
-						}},
+						},
 					},
 				},
 			},
@@ -160,10 +160,10 @@ var _ = Describe("HandleSecretEvent", func() {
 				ApplicationRef: "app-a",
 				Idporten: &v1alpha.IdPortenSpec{
 					Enabled: true,
-					AllowedAudiences: []v1alpha.AllowedAudience{
-						{ValueFrom: &v1alpha.ValueFrom{
+					AllowedAudience: v1alpha.AllowedAudience{
+						ValueFrom: &v1alpha.ValueFrom{
 							ConfigMapKeyRef: &v1alpha.KeyRef{Name: "audience-secret", Key: "AUDIENCE"},
-						}},
+						},
 					},
 				},
 			},

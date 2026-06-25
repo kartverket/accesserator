@@ -6,8 +6,8 @@ spec:
   applicationRef: app
   idporten:
     enabled: true
-    allowedAudiences:
-      - valueFrom:
-          configMapKeyRef:
-            name: empty-audience-configmap
-            key: AUDIENCE
+    allowedAudience:
+      valueFrom:
+        configMapKeyRef:
+          name: empty-audience-configmap
+          key: AUDIENCE

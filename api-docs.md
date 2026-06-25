@@ -106,7 +106,7 @@ or by sourcing credentials from existing Kubernetes secrets via the `secretRef` 
         <td>
           Idporten specifies whether to configure ID-porten token validation for an application referred to by `applicationRef`.
 When enabled, an Istio ServiceEntry is created to allow egress to ID-porten, and the Texas sidecar is configured
-to validate ID-porten tokens against the audiences specified in `allowedAudiences`.<br/>
+to validate ID-porten tokens against the audience specified in `allowedAudience`.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -541,7 +541,7 @@ ClientJWK references the secret key containing the Maskinporten client JWK (MASK
 
 Idporten specifies whether to configure ID-porten token validation for an application referred to by `applicationRef`.
 When enabled, an Istio ServiceEntry is created to allow egress to ID-porten, and the Texas sidecar is configured
-to validate ID-porten tokens against the audiences specified in `allowedAudiences`.
+to validate ID-porten tokens against the audience specified in `allowedAudience`.
 
 <table>
     <thead>
@@ -553,32 +553,31 @@ to validate ID-porten tokens against the audiences specified in `allowedAudience
         </tr>
     </thead>
     <tbody><tr>
+        <td><b><a href="#securityconfigspecidportenallowedaudience">allowedAudience</a></b></td>
+        <td>object</td>
+        <td>
+          AllowedAudience defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
+sidecar. Either a static value or sourced from a ConfigMap or Secret.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
         <td><b>enabled</b></td>
         <td>boolean</td>
         <td>
           Enabled indicates whether ID-porten token validation should be configured for the application.<br/>
         </td>
         <td>true</td>
-      </tr><tr>
-        <td><b><a href="#securityconfigspecidportenallowedaudiencesindex">allowedAudiences</a></b></td>
-        <td>[]object</td>
-        <td>
-          AllowedAudiences defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
-sidecar. Exactly one audience must be specified when ID-porten is enabled. The single entry may be a static
-value or sourced from a ConfigMap or Secret.<br/>
-        </td>
-        <td>false</td>
       </tr></tbody>
 </table>
 
 
-### SecurityConfig.spec.idporten.allowedAudiences[index]
+### SecurityConfig.spec.idporten.allowedAudience
 <sup><sup>[↩ Parent](#securityconfigspecidporten)</sup></sup>
 
 
 
-AllowedAudience defines an audience that is validated against the `aud` claim in the JWT.
-An audience can be defined as a static value or retrieved from a kubernetes resource.
+AllowedAudience defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
+sidecar. Either a static value or sourced from a ConfigMap or Secret.
 
 <table>
     <thead>
@@ -597,7 +596,7 @@ An audience can be defined as a static value or retrieved from a kubernetes reso
         </td>
         <td>false</td>
       </tr><tr>
-        <td><b><a href="#securityconfigspecidportenallowedaudiencesindexvaluefrom">valueFrom</a></b></td>
+        <td><b><a href="#securityconfigspecidportenallowedaudiencevaluefrom">valueFrom</a></b></td>
         <td>object</td>
         <td>
           ValueFrom specifies a reference to a kubernetes resource to retrieve the audience value from.<br/>
@@ -607,8 +606,8 @@ An audience can be defined as a static value or retrieved from a kubernetes reso
 </table>
 
 
-### SecurityConfig.spec.idporten.allowedAudiences[index].valueFrom
-<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudiencesindex)</sup></sup>
+### SecurityConfig.spec.idporten.allowedAudience.valueFrom
+<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudience)</sup></sup>
 
 
 
@@ -624,14 +623,14 @@ ValueFrom specifies a reference to a kubernetes resource to retrieve the audienc
         </tr>
     </thead>
     <tbody><tr>
-        <td><b><a href="#securityconfigspecidportenallowedaudiencesindexvaluefromconfigmapkeyref">configMapKeyRef</a></b></td>
+        <td><b><a href="#securityconfigspecidportenallowedaudiencevaluefromconfigmapkeyref">configMapKeyRef</a></b></td>
         <td>object</td>
         <td>
           ConfigMapKeyRef specifies a reference to a key in a ConfigMap.<br/>
         </td>
         <td>false</td>
       </tr><tr>
-        <td><b><a href="#securityconfigspecidportenallowedaudiencesindexvaluefromsecretkeyref">secretKeyRef</a></b></td>
+        <td><b><a href="#securityconfigspecidportenallowedaudiencevaluefromsecretkeyref">secretKeyRef</a></b></td>
         <td>object</td>
         <td>
           SecretKeyRef specifies a reference to a key in a Secret.<br/>
@@ -641,8 +640,8 @@ ValueFrom specifies a reference to a kubernetes resource to retrieve the audienc
 </table>
 
 
-### SecurityConfig.spec.idporten.allowedAudiences[index].valueFrom.configMapKeyRef
-<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudiencesindexvaluefrom)</sup></sup>
+### SecurityConfig.spec.idporten.allowedAudience.valueFrom.configMapKeyRef
+<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudiencevaluefrom)</sup></sup>
 
 
 
@@ -675,8 +674,8 @@ ConfigMapKeyRef specifies a reference to a key in a ConfigMap.
 </table>
 
 
-### SecurityConfig.spec.idporten.allowedAudiences[index].valueFrom.secretKeyRef
-<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudiencesindexvaluefrom)</sup></sup>
+### SecurityConfig.spec.idporten.allowedAudience.valueFrom.secretKeyRef
+<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudiencevaluefrom)</sup></sup>
 
 
 

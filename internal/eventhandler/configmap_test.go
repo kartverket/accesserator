@@ -16,10 +16,10 @@ func idportenWithConfigMapAudience(name, namespace, configMapName string) *v1alp
 			ApplicationRef: "app-a",
 			Idporten: &v1alpha.IdPortenSpec{
 				Enabled: true,
-				AllowedAudiences: []v1alpha.AllowedAudience{
-					{ValueFrom: &v1alpha.ValueFrom{
+				AllowedAudience: v1alpha.AllowedAudience{
+					ValueFrom: &v1alpha.ValueFrom{
 						ConfigMapKeyRef: &v1alpha.KeyRef{Name: configMapName, Key: "AUDIENCE"},
-					}},
+					},
 				},
 			},
 		},
@@ -41,10 +41,10 @@ var _ = Describe("HandleConfigMapEvent", func() {
 				ApplicationRef: "app-a",
 				Idporten: &v1alpha.IdPortenSpec{
 					Enabled: true,
-					AllowedAudiences: []v1alpha.AllowedAudience{
-						{ValueFrom: &v1alpha.ValueFrom{
+					AllowedAudience: v1alpha.AllowedAudience{
+						ValueFrom: &v1alpha.ValueFrom{
 							SecretKeyRef: &v1alpha.KeyRef{Name: "shared-configmap", Key: "AUDIENCE"},
-						}},
+						},
 					},
 				},
 			},

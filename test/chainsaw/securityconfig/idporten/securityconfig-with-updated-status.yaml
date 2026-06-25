@@ -9,8 +9,8 @@ spec:
   applicationRef: app
   idporten:
     enabled: true
-    allowedAudiences:
-      - value: my-idporten-client-id
+    allowedAudience:
+      value: my-idporten-client-id
 status:
   idportenAudience: my-idporten-client-id
   message: SecurityConfig ready.

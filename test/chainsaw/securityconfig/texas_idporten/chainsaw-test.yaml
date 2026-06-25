@@ -72,8 +72,8 @@ spec:
               spec:
                 idporten:
                   enabled: true
-                  allowedAudiences:
-                    - value: my-idporten-client-id
+                  allowedAudience:
+                    value: my-idporten-client-id
         - assert:
             # Ensure the controller has resolved and published the audience before the pod is recreated,
             # since the webhook reads it from status to set IDPORTEN_AUDIENCE on the sidecar.

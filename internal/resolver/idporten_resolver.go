@@ -12,7 +12,7 @@ import (
 
 // ResolveIdPortenConfig resolves the ID-porten configuration. ID-porten is validation-only: the only thing to
 // resolve is the single audience that the Texas sidecar validates incoming tokens against. The audience is resolved
-// from `allowedAudiences`, which may source its value from a ConfigMap or Secret. The well-known URL is
+// from `allowedAudience`, which may source its value from a ConfigMap or Secret. The well-known URL is
 // environment-derived and set directly on the Texas container by the webhook, so it is not resolved here.
 func ResolveIdPortenConfig(
 	logger log.Logger,
@@ -31,7 +31,7 @@ func ResolveIdPortenConfig(
 		ctx,
 		k8sClient,
 		securityConfig.Namespace,
-		securityConfig.Spec.Idporten.AllowedAudiences,
+		[]v1alpha.AllowedAudience{securityConfig.Spec.Idporten.AllowedAudience},
 	)
 	if resolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve ID-porten allowed audiences: %w", resolveErr)

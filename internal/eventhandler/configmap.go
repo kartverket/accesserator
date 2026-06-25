@@ -12,7 +12,7 @@ import (
 )
 
 // HandleConfigMapEvent enqueues SecurityConfigs that reference the changed ConfigMap as an ID-porten allowed
-// audience source (spec.idporten.allowedAudiences[].valueFrom.configMapKeyRef).
+// audience source (spec.idporten.allowedAudience.valueFrom.configMapKeyRef).
 func HandleConfigMapEvent(c client.Client) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 		configMap, ok := obj.(*corev1.ConfigMap)
@@ -28,17 +28,15 @@ func HandleConfigMapEvent(c client.Client) handler.EventHandler {
 		reqs := make([]reconcile.Request, 0, len(securityConfigList.Items))
 		for _, securityConfig := range securityConfigList.Items {
 			if securityConfig.Spec.Idporten != nil {
-				for _, audience := range securityConfig.Spec.Idporten.AllowedAudiences {
-					if audience.ValueFrom != nil &&
-						audience.ValueFrom.ConfigMapKeyRef != nil &&
-						audience.ValueFrom.ConfigMapKeyRef.Name == configMap.Name {
-						reqs = append(reqs, reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Namespace: securityConfig.GetNamespace(),
-								Name:      securityConfig.GetName(),
-							},
-						})
-					}
+				if securityConfig.Spec.Idporten.AllowedAudience.ValueFrom != nil &&
+					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.ConfigMapKeyRef != nil &&
+					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.ConfigMapKeyRef.Name == configMap.Name {
+					reqs = append(reqs, reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Namespace: securityConfig.GetNamespace(),
+							Name:      securityConfig.GetName(),
+						},
+					})
 				}
 			}
 		}

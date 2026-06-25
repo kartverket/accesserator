@@ -62,7 +62,7 @@ Validation-only — no client is registered (no external operator involved) and 
 |---|---|---|
 | `ServiceEntry` | `<securityConfigName>-idporten-<hash>` | Allows egress to `idporten.no` / `test.idporten.no` through Istio |
 
-The audience is resolved from `spec.idporten.allowedAudiences`, which accepts a single entry sourced either inline (`value`) or from a `ConfigMap`/`Secret` (`valueFrom`). Texas validates the `aud` claim against exactly one audience, so exactly one entry is required when enabled (enforced by CEL). The Texas sidecar is configured via plain env vars set by the pod webhook: `IDPORTEN_WELL_KNOWN_URL` (environment-derived) and `IDPORTEN_AUDIENCE` (the resolved audience, published to `status.idportenAudience`).
+The audience is resolved from `spec.idporten.allowedAudience`, which accepts a single entry sourced either inline (`value`) or from a `ConfigMap`/`Secret` (`valueFrom`). Texas validates the `aud` claim against exactly one audience, so exactly one entry is required when enabled (enforced by CEL). The Texas sidecar is configured via plain env vars set by the pod webhook: `IDPORTEN_WELL_KNOWN_URL` (environment-derived) and `IDPORTEN_AUDIENCE` (the resolved audience, published to `status.idportenAudience`).
 
 #### OPA
 
@@ -102,7 +102,7 @@ SecurityConfigReconciler.Reconcile()
   │   ├─ ResolveTokenXConfig               (fetches Skiperator Application + resolves Jwker inbound rules)
   │   ├─ ResolveMaskinportenConfig         (determines config type; fetches secret data for SecretRef)
   │   ├─ ResolveEntraIdConfig              (determines config type; fetches secret data for SecretRef)
-  │   ├─ ResolveIdPortenConfig             (resolves allowedAudiences from value/configMap/secret; builds Texas secret data)
+  │   ├─ ResolveIdPortenConfig             (resolves allowedAudience from value/configMap/secret; builds Texas secret data)
   │   └─ ResolveOpaConfig                 (fetches + verifies OCI bundles; cluster-feature-gated)
   ├─ reconciler.ControllerResources()     ← Builds list of 10 reconcile adapters (internal/reconciler/resources.go)
   │   ├─ Jwker
@@ -127,7 +127,7 @@ SecurityConfigReconciler.Reconcile()
 | `cmd/main.go` | Entrypoint; scheme registration, manager setup, webhook registration |
 | `internal/controller/` | Reconciler loop; resolves, reconciles, updates status |
 | `internal/reconciler/` | `ControllerResourceAdapter[T]` — thin wrapper that calls the generic reconciler. `resources.go` defines the 9 adapters |
-| `internal/resolver/` | Per-feature resolvers: `tokenx_resolver.go`, `maskinporten_resolver.go`, `entraid_resolver.go`, `idporten_resolver.go`, `opa_resolver.go`, plus `audience_resolver.go` (resolves `allowedAudiences` value/valueFrom) |
+| `internal/resolver/` | Per-feature resolvers: `tokenx_resolver.go`, `maskinporten_resolver.go`, `entraid_resolver.go`, `idporten_resolver.go`, `opa_resolver.go`, plus `audience_resolver.go` (resolves `allowedAudience` value/valueFrom) |
 | `internal/state/` | `Scope` struct — the resolved state bag threaded through all reconciliation (holds config per feature + descendants) |
 | `internal/statusmanager/` | Condition building, phase determination, status updates |
 | `internal/eventhandler/` | Watches related resources and enqueues affected `SecurityConfig` objects for re-reconciliation: `skiperator_application.go`, `maskinporten_client.go`, `azure_ad_application.go`, `secret.go` |

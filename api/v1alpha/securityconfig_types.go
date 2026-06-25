@@ -48,7 +48,7 @@ type SecurityConfigSpec struct {
 
 	// Idporten specifies whether to configure ID-porten token validation for an application referred to by `applicationRef`.
 	// When enabled, an Istio ServiceEntry is created to allow egress to ID-porten, and the Texas sidecar is configured
-	// to validate ID-porten tokens against the audiences specified in `allowedAudiences`.
+	// to validate ID-porten tokens against the audience specified in `allowedAudience`.
 	//
 	// +kubebuilder:validation:Optional
 	Idporten *IdPortenSpec `json:"idporten,omitempty"`
@@ -277,20 +277,17 @@ type AzureAdApplicationSpec struct {
 // IdPortenSpec defines the configuration for ID-porten token validation.
 //
 // +kubebuilder:object:generate=true
-// +kubebuilder:validation:XValidation:rule="!self.enabled || (has(self.allowedAudiences) && size(self.allowedAudiences) == 1)",message="When ID-porten is enabled, exactly one allowedAudience must be specified."
 type IdPortenSpec struct {
 	// Enabled indicates whether ID-porten token validation should be configured for the application.
 	//
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
 
-	// AllowedAudiences defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
-	// sidecar. Exactly one audience must be specified when ID-porten is enabled. The single entry may be a static
-	// value or sourced from a ConfigMap or Secret.
+	// AllowedAudience defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
+	// sidecar. Either a static value or sourced from a ConfigMap or Secret.
 	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:MaxItems=1
-	AllowedAudiences []AllowedAudience `json:"allowedAudiences,omitempty"`
+	// +kubebuilder:validation:Required
+	AllowedAudience AllowedAudience `json:"allowedAudience"`
 }
 
 // OpenPolicyAgentSpec defines the OPA sidecar configuration.

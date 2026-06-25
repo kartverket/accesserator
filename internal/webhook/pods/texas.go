@@ -28,11 +28,12 @@ const (
 
 // TexasEnvVars holds the resolved environment variable values for the Texas sidecar.
 type TexasEnvVars struct {
-	TokenXEnabled          string
-	MaskinportenEnabled    string
-	AzureEnabled           string
-	IdportenEnabled        string
-	IntegrationSecretsRefs []corev1.EnvFromSource
+	TokenXEnabled       string
+	MaskinportenEnabled string
+	AzureEnabled        string
+	IdportenEnabled     string
+	EnvVars             []corev1.EnvVar
+	EnvFromSources      []corev1.EnvFromSource
 }
 
 // GetTexasContainer builds the Texas sidecar container for the given SecurityConfig.
@@ -79,13 +80,8 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 		{Name: IdportenEnabledEnvVarName, Value: envVars.IdportenEnabled},
 	}
 
-	if securityConfig.Spec.Idporten != nil && securityConfig.Spec.Idporten.Enabled {
-		texasContainer.Env = append(texasContainer.Env,
-			corev1.EnvVar{Name: IdportenWellKnownUrlEnvVarName, Value: idportenWellKnownURL()},
-			corev1.EnvVar{Name: IdportenAudienceEnvVarName, Value: securityConfig.Status.IdportenAudience},
-		)
-	}
-	texasContainer.EnvFrom = envVars.IntegrationSecretsRefs
+	texasContainer.Env = append(texasContainer.Env, envVars.EnvVars...)
+	texasContainer.EnvFrom = append(texasContainer.EnvFrom, envVars.EnvFromSources...)
 
 	return texasContainer
 }
@@ -100,11 +96,13 @@ func idportenWellKnownURL() string {
 
 // GetTexasEnvVars resolves the env var values for the Texas container from the SecurityConfig.
 func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
-	var integrationSecrets []corev1.EnvFromSource
+	var envVars []corev1.EnvVar
+	var envFromSources []corev1.EnvFromSource
 	tokenxEnabled := false
+
 	if securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled {
 		tokenxEnabled = true
-		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
+		envFromSources = append(envFromSources, corev1.EnvFromSource{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: securityConfig.Status.JwkerSecretName,
@@ -116,7 +114,7 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 	maskinportenEnabled := false
 	if securityConfig.Spec.Maskinporten != nil && securityConfig.Spec.Maskinporten.Enabled {
 		maskinportenEnabled = true
-		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
+		envFromSources = append(envFromSources, corev1.EnvFromSource{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: securityConfig.Status.MaskinportenSecretName,
@@ -128,7 +126,7 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 	entraIdEnabled := false
 	if securityConfig.Spec.EntraID != nil && securityConfig.Spec.EntraID.Enabled {
 		entraIdEnabled = true
-		integrationSecrets = append(integrationSecrets, corev1.EnvFromSource{
+		envFromSources = append(envFromSources, corev1.EnvFromSource{
 			SecretRef: &corev1.SecretEnvSource{
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: securityConfig.Status.EntraIdSecretName,
@@ -137,15 +135,21 @@ func GetTexasEnvVars(securityConfig v1alpha.SecurityConfig) TexasEnvVars {
 		})
 	}
 
-	// ID-porten does not contribute an integration secret; its config is set as plain env vars in GetTexasContainer.
 	idportenEnabled := securityConfig.Spec.Idporten != nil && securityConfig.Spec.Idporten.Enabled
+	if idportenEnabled {
+		envVars = append(envVars,
+			corev1.EnvVar{Name: IdportenWellKnownUrlEnvVarName, Value: idportenWellKnownURL()},
+			corev1.EnvVar{Name: IdportenAudienceEnvVarName, Value: securityConfig.Status.IdportenAudience},
+		)
+	}
 
 	return TexasEnvVars{
-		TokenXEnabled:          strconv.FormatBool(tokenxEnabled),
-		MaskinportenEnabled:    strconv.FormatBool(maskinportenEnabled),
-		AzureEnabled:           strconv.FormatBool(entraIdEnabled),
-		IdportenEnabled:        strconv.FormatBool(idportenEnabled),
-		IntegrationSecretsRefs: integrationSecrets,
+		TokenXEnabled:       strconv.FormatBool(tokenxEnabled),
+		MaskinportenEnabled: strconv.FormatBool(maskinportenEnabled),
+		AzureEnabled:        strconv.FormatBool(entraIdEnabled),
+		IdportenEnabled:     strconv.FormatBool(idportenEnabled),
+		EnvVars:             envVars,
+		EnvFromSources:      envFromSources,
 	}
 }
 
