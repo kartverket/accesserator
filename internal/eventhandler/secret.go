@@ -38,6 +38,31 @@ func HandleSecretEvent(c client.Client) handler.EventHandler {
 					}
 				}
 			}
+			if securityConfig.Spec.EntraID != nil {
+				if securityConfig.Spec.EntraID.SecretRef != nil {
+					if string(securityConfig.Spec.EntraID.SecretRef.ClientID.Name) == secret.Name ||
+						string(securityConfig.Spec.EntraID.SecretRef.ClientJWK.Name) == secret.Name {
+						reqs = append(reqs, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Namespace: securityConfig.GetNamespace(),
+								Name:      securityConfig.GetName(),
+							},
+						})
+					}
+				}
+			}
+			if securityConfig.Spec.Idporten != nil {
+				if securityConfig.Spec.Idporten.AllowedAudience.ValueFrom != nil &&
+					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.SecretKeyRef != nil &&
+					securityConfig.Spec.Idporten.AllowedAudience.ValueFrom.SecretKeyRef.Name == secret.Name {
+					reqs = append(reqs, reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Namespace: securityConfig.GetNamespace(),
+							Name:      securityConfig.GetName(),
+						},
+					})
+				}
+			}
 		}
 
 		return reqs

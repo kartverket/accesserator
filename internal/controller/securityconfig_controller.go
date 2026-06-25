@@ -58,6 +58,7 @@ func (r *SecurityConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&naisiov1.MaskinportenClient{}, eventhandler.HandleMaskinportenClientEvent(r.Client)).
 		Watches(&naisiov1.AzureAdApplication{}, eventhandler.HandleAzureAdApplicationEvent(r.Client)).
 		Watches(&corev1.Secret{}, eventhandler.HandleSecretEvent(r.Client)).
+		Watches(&corev1.ConfigMap{}, eventhandler.HandleConfigMapEvent(r.Client)).
 		Named("securityconfig").
 		Complete(r)
 }

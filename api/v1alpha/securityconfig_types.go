@@ -46,6 +46,13 @@ type SecurityConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	EntraID *EntraIDSpec `json:"entraid,omitempty"`
 
+	// Idporten specifies whether to configure ID-porten token validation for an application referred to by `applicationRef`.
+	// When enabled, an Istio ServiceEntry is created to allow egress to ID-porten, and the Texas sidecar is configured
+	// to validate ID-porten tokens against the audience specified in `allowedAudience`.
+	//
+	// +kubebuilder:validation:Optional
+	Idporten *IdPortenSpec `json:"idporten,omitempty"`
+
 	// Opa specifies whether to configure the open policy agent capability for an application referred to by `applicationRef`.
 	// The configuration includes which bundles compiled from rego policies, and how often OPA should check for updates to these bundles.
 	//
@@ -267,14 +274,20 @@ type AzureAdApplicationSpec struct {
 	SinglePageApplication *bool `json:"singlePageApplication,omitempty"`
 }
 
-// ResourceRef defines a reference to an existing resource by name.
+// IdPortenSpec defines the configuration for ID-porten token validation.
 //
 // +kubebuilder:object:generate=true
-type ResourceRef struct {
-	// Name of the referenced resource.
+type IdPortenSpec struct {
+	// Enabled indicates whether ID-porten token validation should be configured for the application.
 	//
 	// +kubebuilder:validation:Required
-	Name ResourceName `json:"name"`
+	Enabled bool `json:"enabled"`
+
+	// AllowedAudience defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
+	// sidecar. Either a static value or sourced from a ConfigMap or Secret.
+	//
+	// +kubebuilder:validation:Required
+	AllowedAudience AllowedAudience `json:"allowedAudience"`
 }
 
 // OpenPolicyAgentSpec defines the OPA sidecar configuration.
@@ -357,6 +370,71 @@ type GitHubRepositorySource struct {
 	Ref string `json:"ref,omitempty"`
 }
 
+// AllowedAudience defines an audience that is validated against the `aud` claim in the JWT.
+// An audience can be defined as a static value or retrieved from a kubernetes resource.
+//
+// +kubebuilder:validation:XValidation:message="either 'value' or 'valueFrom' must be set",rule="has(self.value) || has(self.valueFrom)"
+// +kubebuilder:validation:XValidation:message="one audience cannot be defined from both 'value' and 'valueFrom'",rule="!(has(self.value) && has(self.valueFrom))"
+// +kubebuilder:validation:XValidation:message="field 'value' cannot be empty string",rule="!has(self.value) || size(self.value) > 0"
+// +kubebuilder:object:generate=true
+type AllowedAudience struct {
+	// Value specifies a static audience value.
+	//
+	// +kubebuilder:validation:Optional
+	Value *string `json:"value,omitempty"`
+
+	// ValueFrom specifies a reference to a kubernetes resource to retrieve the audience value from.
+	//
+	// +kubebuilder:validation:Optional
+	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
+}
+
+// ValueFrom specifies a reference to a kubernetes resource to retrieve a value from.
+//
+// +kubebuilder:validation:XValidation:message="either 'configMapKeyRef' or 'secretKeyRef' must be set",rule="has(self.configMapKeyRef) || has(self.secretKeyRef)"
+// +kubebuilder:validation:XValidation:message="cannot reference both a ConfigMap and a Secret",rule="!(has(self.configMapKeyRef) && has(self.secretKeyRef))"
+// +kubebuilder:object:generate=true
+type ValueFrom struct {
+	// ConfigMapKeyRef specifies a reference to a key in a ConfigMap.
+	//
+	// +kubebuilder:validation:Optional
+	ConfigMapKeyRef *KeyRef `json:"configMapKeyRef,omitempty"`
+
+	// SecretKeyRef specifies a reference to a key in a Secret.
+	//
+	// +kubebuilder:validation:Optional
+	SecretKeyRef *KeyRef `json:"secretKeyRef,omitempty"`
+}
+
+// KeyRef specifies a reference to a specific key within a kubernetes resource.
+//
+// +kubebuilder:object:generate=true
+type KeyRef struct {
+	// Name specifies the name of the ConfigMap/Secret; must satisfy DNS-1123 subdomain naming.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Key specifies the data entry name within the ConfigMap/Secret; must follow key naming rules.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+}
+
+// ResourceRef defines a reference to an existing resource by name.
+//
+// +kubebuilder:object:generate=true
+type ResourceRef struct {
+	// Name of the referenced resource.
+	//
+	// +kubebuilder:validation:Required
+	Name ResourceName `json:"name"`
+}
+
 // DataKey is a type for keys within Kubernetes secrets and configmaps.
 //
 // +kubebuilder:validation:Pattern=`^[a-zA-Z0-9]([-._a-zA-Z0-9]*[a-zA-Z0-9])?$`
@@ -412,6 +490,7 @@ type SecurityConfigStatus struct {
 	JwkerSecretName        string             `json:"jwkerSecretName,omitempty"`
 	MaskinportenSecretName string             `json:"maskinportenSecretName,omitempty"`
 	EntraIdSecretName      string             `json:"entraIdSecretName,omitempty"`
+	IdportenAudience       string             `json:"idportenAudience,omitempty"`
 	OpaBundleSource        *OpaBundleSource   `json:"opaBundleSource,omitempty"`
 	Ready                  bool               `json:"ready"`
 }

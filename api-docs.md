@@ -101,6 +101,15 @@ or by sourcing credentials from existing Kubernetes secrets via the `secretRef` 
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#securityconfigspecidporten">idporten</a></b></td>
+        <td>object</td>
+        <td>
+          Idporten specifies whether to configure ID-porten token validation for an application referred to by `applicationRef`.
+When enabled, an Istio ServiceEntry is created to allow egress to ID-porten, and the Texas sidecar is configured
+to validate ID-porten tokens against the audience specified in `allowedAudience`.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#securityconfigspecmaskinporten">maskinporten</a></b></td>
         <td>object</td>
         <td>
@@ -519,6 +528,180 @@ ClientJWK references the secret key containing the Maskinporten client JWK (MASK
         <td>string</td>
         <td>
           Name is the name of the Kubernetes secret.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.idporten
+<sup><sup>[↩ Parent](#securityconfigspec)</sup></sup>
+
+
+
+Idporten specifies whether to configure ID-porten token validation for an application referred to by `applicationRef`.
+When enabled, an Istio ServiceEntry is created to allow egress to ID-porten, and the Texas sidecar is configured
+to validate ID-porten tokens against the audience specified in `allowedAudience`.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecidportenallowedaudience">allowedAudience</a></b></td>
+        <td>object</td>
+        <td>
+          AllowedAudience defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
+sidecar. Either a static value or sourced from a ConfigMap or Secret.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>enabled</b></td>
+        <td>boolean</td>
+        <td>
+          Enabled indicates whether ID-porten token validation should be configured for the application.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.idporten.allowedAudience
+<sup><sup>[↩ Parent](#securityconfigspecidporten)</sup></sup>
+
+
+
+AllowedAudience defines the audience (`aud`) value that ID-porten tokens are validated against by the Texas
+sidecar. Either a static value or sourced from a ConfigMap or Secret.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>value</b></td>
+        <td>string</td>
+        <td>
+          Value specifies a static audience value.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecidportenallowedaudiencevaluefrom">valueFrom</a></b></td>
+        <td>object</td>
+        <td>
+          ValueFrom specifies a reference to a kubernetes resource to retrieve the audience value from.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.idporten.allowedAudience.valueFrom
+<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudience)</sup></sup>
+
+
+
+ValueFrom specifies a reference to a kubernetes resource to retrieve the audience value from.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#securityconfigspecidportenallowedaudiencevaluefromconfigmapkeyref">configMapKeyRef</a></b></td>
+        <td>object</td>
+        <td>
+          ConfigMapKeyRef specifies a reference to a key in a ConfigMap.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#securityconfigspecidportenallowedaudiencevaluefromsecretkeyref">secretKeyRef</a></b></td>
+        <td>object</td>
+        <td>
+          SecretKeyRef specifies a reference to a key in a Secret.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.idporten.allowedAudience.valueFrom.configMapKeyRef
+<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudiencevaluefrom)</sup></sup>
+
+
+
+ConfigMapKeyRef specifies a reference to a key in a ConfigMap.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          Key specifies the data entry name within the ConfigMap/Secret; must follow key naming rules.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name specifies the name of the ConfigMap/Secret; must satisfy DNS-1123 subdomain naming.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### SecurityConfig.spec.idporten.allowedAudience.valueFrom.secretKeyRef
+<sup><sup>[↩ Parent](#securityconfigspecidportenallowedaudiencevaluefrom)</sup></sup>
+
+
+
+SecretKeyRef specifies a reference to a key in a Secret.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          Key specifies the data entry name within the ConfigMap/Secret; must follow key naming rules.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name specifies the name of the ConfigMap/Secret; must satisfy DNS-1123 subdomain naming.<br/>
         </td>
         <td>true</td>
       </tr></tbody>
@@ -1092,6 +1275,13 @@ status defines the observed state of SecurityConfig
         <td>false</td>
       </tr><tr>
         <td><b>entraIdSecretName</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>idportenAudience</b></td>
         <td>string</td>
         <td>
           <br/>

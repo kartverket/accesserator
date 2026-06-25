@@ -1,0 +1,118 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: texas-idporten
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-texas-idporten
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+        istio.io/rev: default
+  steps:
+    - try:
+        - create:
+            file: skiperator-application.yaml
+        - create:
+            file: securityconfig-idporten-disabled.yaml
+        - error:
+            file: pod-with-texas-without-idporten.yaml
+        - error:
+            file: pod-with-texas-with-idporten.yaml
+        - assert:
+            file: pod-without-texas.yaml
+        - script:
+            content: |
+              # Verify that TEXAS_URL is not set and assert that the number of containers in the app is 2.
+              kubectl exec -n chainsaw-texas-idporten deploy/app -c app -- printenv TEXAS_URL && exit 1 || exit 0
+        - patch:
+            resource:
+              apiVersion: skiperator.kartverket.no/v1alpha1
+              kind: Application
+              metadata:
+                name: app
+              spec:
+                podSettings:
+                  annotations:
+                    accesserator.kartverket.no/services: "texas"
+        - error:
+            file: pod-with-texas-with-idporten.yaml
+        - error:
+            file: pod-without-texas.yaml
+        - assert:
+            file: pod-with-texas-without-idporten.yaml
+        - script:
+            content: |
+              # Verify TEXAS_URL is set
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas-idporten deploy/app -c app -- printenv TEXAS_URL)
+              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set"; exit 1; fi
+              echo "✅ TEXAS_URL=$TEXAS_URL"
+
+              # ID-porten is validation-only, so we use the introspection endpoint. Introspection always returns
+              # HTTP 200 with {"active": <bool>, "error": <message>}. With idporten disabled, texas reports the
+              # provider is not enabled.
+              RESPONSE=$(kubectl exec -n chainsaw-texas-idporten deploy/app -c app -- \
+                curl -sX POST $TEXAS_URL/api/v1/introspect \
+                  -H "Content-Type: application/json" \
+                  -d "{\"identity_provider\":\"idporten\",\"token\":\"dummy-token\"}")
+              ACTIVE=$(echo "$RESPONSE" | jq -r '.active')
+              if [ "$ACTIVE" != "false" ]; then echo "❌ Expected active=false, got: $ACTIVE. Body: $RESPONSE"; exit 1; fi
+              ERROR=$(echo "$RESPONSE" | jq -r '.error // empty')
+              if [ "$ERROR" != "identity provider 'idporten' is not enabled" ]; then echo "❌ Unexpected error: $ERROR. Body: $RESPONSE"; exit 1; fi
+              echo "✅ Texas correctly reports idporten is not enabled"
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                idporten:
+                  enabled: true
+                  allowedAudience:
+                    value: my-idporten-client-id
+        - assert:
+            # Ensure the controller has resolved and published the audience before the pod is recreated,
+            # since the webhook reads it from status to set IDPORTEN_AUDIENCE on the sidecar.
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              status:
+                idportenAudience: my-idporten-client-id
+                ready: true
+        - script:
+            content: |
+              kubectl rollout restart deploy/app -n chainsaw-texas-idporten
+              # Wait for the app deployment to be ready again after the restart
+              kubectl wait --for=condition=available --timeout=20s deploy/app -n chainsaw-texas-idporten
+        - error:
+            file: pod-with-texas-without-idporten.yaml
+        - error:
+            file: pod-without-texas.yaml
+        - assert:
+            file: pod-with-texas-with-idporten.yaml
+        - script:
+            content: |
+              # Verify TEXAS_URL is still set
+              TEXAS_URL=$(kubectl exec -n chainsaw-texas-idporten deploy/app -c app -- printenv TEXAS_URL)
+              if [ -z "$TEXAS_URL" ]; then echo "❌ TEXAS_URL is not set after enabling idporten"; exit 1; fi
+              echo "✅ TEXAS_URL=$TEXAS_URL"
+
+              # With idporten enabled, texas should now perform validation. An invalid token must be rejected as
+              # inactive (active=false) with a validation error other than 'not enabled', proving idporten
+              # validation is configured on the sidecar.
+              RESPONSE=$(kubectl exec -n chainsaw-texas-idporten deploy/app -c app -- \
+                curl -sX POST $TEXAS_URL/api/v1/introspect \
+                  -H "Content-Type: application/json" \
+                  -d "{\"identity_provider\":\"idporten\",\"token\":\"not-a-valid-token\"}")
+              echo "Response: $RESPONSE"
+              ERROR=$(echo "$RESPONSE" | jq -r '.error // empty')
+              if [ "$ERROR" = "identity provider 'idporten' is not enabled" ]; then echo "❌ idporten still reported as not enabled. Body: $RESPONSE"; exit 1; fi
+              ACTIVE=$(echo "$RESPONSE" | jq -r '.active')
+              if [ "$ACTIVE" != "false" ]; then echo "❌ Expected active=false for an invalid token, got: $ACTIVE. Body: $RESPONSE"; exit 1; fi
+              echo "✅ Texas validated the request against idporten and rejected the invalid token (active=false)"

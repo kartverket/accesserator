@@ -4,9 +4,9 @@
 
 Accesserator is a Kubernetes operator built with **Kubebuilder** that lets teams configure security capabilities for [Skiperator](https://github.com/kartverket/skiperator) applications through a single custom resource called `SecurityConfig`. It is part of Kartverket's **SKIP platform** (`skip.kartverket.no`) and is owned by team **tilgangsstyring** (access management).
 
-The operator manages four independent feature groups — **TokenX**, **Maskinporten**, **Entra ID**, and **OPA** — each generating their own set of child Kubernetes resources. When requested, it injects two types of sidecar containers into application pods via admission webhooks:
+The operator manages five independent feature groups — **TokenX**, **Maskinporten**, **Entra ID**, **ID-porten**, and **OPA** — each generating their own set of child Kubernetes resources. When requested, it injects two types of sidecar containers into application pods via admission webhooks:
 
-- **[Texas](https://github.com/nais/texas)** (`texas`): A sidecar that provides an API for token-related operations (retrieval, exchange, introspection) for TokenX, Maskinporten, and Entra ID.
+- **[Texas](https://github.com/nais/texas)** (`texas`): A sidecar that provides an API for token-related operations (retrieval, exchange, introspection) for TokenX, Maskinporten, Entra ID, and ID-porten (validation-only).
 - **OPA** (`opa`): An Open Policy Agent sidecar for policy evaluation, fed with bundles fetched from OCI registries.
 
 The sidecar injection is triggered by the pod annotation `accesserator.kartverket.no/services: texas,opa`.
@@ -23,6 +23,7 @@ SecurityConfig
   ├─ spec.tokenx                  (optional) — TokenX / token exchange configuration
   ├─ spec.maskinporten            (optional) — Maskinporten API consumer configuration
   ├─ spec.entraid                 (optional) — Entra ID (Azure AD) configuration
+  ├─ spec.idporten                (optional) — ID-porten token validation configuration
   └─ spec.opa                     (optional) — Open Policy Agent bundle configuration
 ```
 
@@ -52,6 +53,16 @@ Each enabled feature generates a specific set of child resources, all owned via 
 | `AzureAdApplication` | `<applicationRef>` | Registers a client in Azure AD via nais/azurerator (only for `InlineClient` and `None` config types) |
 | `Secret` | `<applicationRef>-entraid-<hash>` (inline) or `<securityConfigName>-entraid-<hash>` (ref/secretRef) | Holds Entra ID credentials for the Texas sidecar |
 | `ServiceEntry` | `<securityConfigName>-entraid-<hash>` | Allows egress to `login.microsoftonline.com` through Istio |
+
+#### ID-porten
+
+Validation-only — no client is registered (no external operator involved) and no credentials are stored, so no integration `Secret` is generated.
+
+| Generated Resource | Naming Convention | Purpose |
+|---|---|---|
+| `ServiceEntry` | `<securityConfigName>-idporten-<hash>` | Allows egress to `idporten.no` / `test.idporten.no` through Istio |
+
+The audience is resolved from `spec.idporten.allowedAudience`, which accepts a single entry sourced either inline (`value`) or from a `ConfigMap`/`Secret` (`valueFrom`). Texas validates the `aud` claim against exactly one audience, so exactly one entry is required when enabled (enforced by CEL). The Texas sidecar is configured via plain env vars set by the pod webhook: `IDPORTEN_WELL_KNOWN_URL` (environment-derived) and `IDPORTEN_AUDIENCE` (the resolved audience, published to `status.idportenAudience`).
 
 #### OPA
 
@@ -91,8 +102,9 @@ SecurityConfigReconciler.Reconcile()
   │   ├─ ResolveTokenXConfig               (fetches Skiperator Application + resolves Jwker inbound rules)
   │   ├─ ResolveMaskinportenConfig         (determines config type; fetches secret data for SecretRef)
   │   ├─ ResolveEntraIdConfig              (determines config type; fetches secret data for SecretRef)
+  │   ├─ ResolveIdPortenConfig             (resolves allowedAudience from value/configMap/secret; builds Texas secret data)
   │   └─ ResolveOpaConfig                 (fetches + verifies OCI bundles; cluster-feature-gated)
-  ├─ reconciler.ControllerResources()     ← Builds list of 9 reconcile adapters (internal/reconciler/resources.go)
+  ├─ reconciler.ControllerResources()     ← Builds list of 10 reconcile adapters (internal/reconciler/resources.go)
   │   ├─ Jwker
   │   ├─ TokenX NetworkPolicy (egress)
   │   ├─ MaskinportenClient
@@ -101,6 +113,7 @@ SecurityConfigReconciler.Reconcile()
   │   ├─ AzureAdApplication
   │   ├─ Entra ID Secret
   │   ├─ Entra ID ServiceEntry
+  │   ├─ ID-porten ServiceEntry
   │   └─ OPA ConfigMap
   ├─ doReconcile()                        ← Iterates and executes all adapters
   └─ statusmanager.UpdateSecurityConfigStatus()
@@ -114,7 +127,7 @@ SecurityConfigReconciler.Reconcile()
 | `cmd/main.go` | Entrypoint; scheme registration, manager setup, webhook registration |
 | `internal/controller/` | Reconciler loop; resolves, reconciles, updates status |
 | `internal/reconciler/` | `ControllerResourceAdapter[T]` — thin wrapper that calls the generic reconciler. `resources.go` defines the 9 adapters |
-| `internal/resolver/` | Per-feature resolvers: `tokenx_resolver.go`, `maskinporten_resolver.go`, `entraid_resolver.go`, `opa_resolver.go` |
+| `internal/resolver/` | Per-feature resolvers: `tokenx_resolver.go`, `maskinporten_resolver.go`, `entraid_resolver.go`, `idporten_resolver.go`, `opa_resolver.go`, plus `audience_resolver.go` (resolves `allowedAudience` value/valueFrom) |
 | `internal/state/` | `Scope` struct — the resolved state bag threaded through all reconciliation (holds config per feature + descendants) |
 | `internal/statusmanager/` | Condition building, phase determination, status updates |
 | `internal/eventhandler/` | Watches related resources and enqueues affected `SecurityConfig` objects for re-reconciliation: `skiperator_application.go`, `maskinporten_client.go`, `azure_ad_application.go`, `secret.go` |
@@ -123,6 +136,7 @@ SecurityConfigReconciler.Reconcile()
 | `pkg/resourcegenerators/tokenx/` | Desired-state generators for `Jwker` (`jwker/`) and egress `NetworkPolicy` (`egress/`) |
 | `pkg/resourcegenerators/maskinporten/` | Desired-state generators for `MaskinportenClient`, `Secret`, `ServiceEntry` |
 | `pkg/resourcegenerators/entraid/` | Desired-state generators for `AzureAdApplication`, `Secret`, `ServiceEntry` |
+| `pkg/resourcegenerators/idporten/` | Desired-state generators for ID-porten `Secret` and `ServiceEntry` |
 | `pkg/resourcegenerators/opa/` | Desired-state generator for the OPA `ConfigMap` |
 | `pkg/reconciliation/` | Generic `ReconcileControllerResource[T]` function + `ControllerResource` interface; handles create/update/delete lifecycle |
 | `pkg/validation/` | OPA bundle URL validation (allowed registry prefixes) + cosign/sigstore signature verification via `ValidateBundleSourceSignature` |
@@ -156,6 +170,7 @@ type Scope struct {
     TokenXConfig           TokenXConfig
     MaskinportenConfig     MaskinportenConfig   // Type: InlineClient | ClientRef | SecretRef | None
     EntraIdConfig          EntraIdConfig        // Type: InlineClient | ClientRef | SecretRef | None
+    IdPortenConfig         IdPortenConfig       // validation-only: Enabled + resolved SecretData
     OpaConfig              OpaConfig
     Descendants            []Descendant[client.Object]  // tracks reconciled child resources + status
     InvalidConfig          bool
@@ -216,6 +231,7 @@ All child resource names are produced by the namer helpers in `pkg/utilities/hel
 | Entra ID `Secret` (inline) | `EntraIdNamer.SecretName()` | `<applicationRef>-entraid-<hash>` |
 | Entra ID `Secret` (clientRef/secretRef) | `EntraIdNamer.SecretFromRefName()` | `<securityConfigName>-entraid-<hash>` |
 | Entra ID `ServiceEntry` | `EntraIdNamer.ServiceEntryName()` | `<securityConfigName>-entraid-<hash>` |
+| ID-porten `ServiceEntry` | `IdPortenNamer.ServiceEntryName()` | `<securityConfigName>-idporten-<hash>` |
 | OPA `ConfigMap` | `OpaNamer.ConfigMapName()` | `<securityConfigName>-opa-<hash>` |
 
 The `<hash>` suffix is a stable 8-character FNV-32a hex hash of the full unsuffixed name, produced by `WithShortHashSuffix()`.

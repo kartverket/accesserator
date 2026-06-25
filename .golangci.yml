@@ -39,6 +39,13 @@ linters:
       - linters:
           - dupl
         path: pkg/utilities/config_type_.*_test\.go
+      - linters:
+          - goconst
+        path: _test\.go
+      - linters:
+          - goconst
+        path: internal/reconciler/resources.go
+        text: ServiceEntry
     paths:
       - third_party$
       - builtin$

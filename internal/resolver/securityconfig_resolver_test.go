@@ -19,6 +19,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 		testNamespace      = "default"
 		testAppName        = "test-app"
 		testSecurityConfig = "test-sc"
+		testIdPortenAud    = "my-idporten-audience"
 	)
 
 	AfterEach(func() {
@@ -46,7 +47,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 	})
 
 	Describe("ResolveSecurityConfig", func() {
-		Context("when tokenx, maskinporten and entraid are disabled", func() {
+		Context("when tokenx, maskinporten, entraid and idporten are disabled", func() {
 			It("should return scope with all configs disabled", func() {
 				sc := accesseratorv1alpha.SecurityConfig{
 					ObjectMeta: metav1.ObjectMeta{
@@ -58,6 +59,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						Tokenx:         nil,
 						Maskinporten:   nil,
 						EntraID:        nil,
+						Idporten:       nil,
 					},
 				}
 
@@ -68,6 +70,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result.TokenXConfig.Enabled).To(BeFalse())
 				Expect(result.MaskinportenConfig.Enabled).To(BeFalse())
 				Expect(result.EntraIdConfig.Enabled).To(BeFalse())
+				Expect(result.IdPortenConfig.Enabled).To(BeFalse())
 				Expect(result.SecurityConfig.Name).To(Equal(testSecurityConfig))
 			})
 		})
@@ -86,6 +89,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						},
 						Maskinporten: nil,
 						EntraID:      nil,
+						Idporten:     nil,
 					},
 				}
 
@@ -96,7 +100,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result).To(BeNil())
 			})
 
-			It("should return scope with tokenx enabled and maskinporten/entraid disabled", func() {
+			It("should return scope with tokenx enabled and maskinporten/entraid/idporten disabled", func() {
 				// Create application
 				app := &v1alpha1.Application{
 					ObjectMeta: metav1.ObjectMeta{
@@ -122,6 +126,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 						},
 						Maskinporten: nil,
 						EntraID:      nil,
+						Idporten:     nil,
 					},
 				}
 
@@ -133,6 +138,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result.TokenXConfig.ApplicationRef).To(Equal(testAppName))
 				Expect(result.MaskinportenConfig.Enabled).To(BeFalse())
 				Expect(result.EntraIdConfig.Enabled).To(BeFalse())
+				Expect(result.IdPortenConfig.Enabled).To(BeFalse())
 			})
 		})
 
@@ -157,7 +163,8 @@ var _ = Describe("SecurityConfig Resolver", func() {
 								},
 							},
 						},
-						EntraID: nil,
+						EntraID:  nil,
+						Idporten: nil,
 					},
 				}
 
@@ -167,6 +174,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result).NotTo(BeNil())
 				Expect(result.TokenXConfig.Enabled).To(BeFalse())
 				Expect(result.EntraIdConfig.Enabled).To(BeFalse())
+				Expect(result.IdPortenConfig.Enabled).To(BeFalse())
 				Expect(result.MaskinportenConfig.Enabled).To(BeTrue())
 				Expect(result.MaskinportenConfig.Type).To(Equal(state.InlineClient))
 				Expect(result.MaskinportenConfig.ClientSpec.ClientName).To(Equal("test-client"))
@@ -190,6 +198,7 @@ var _ = Describe("SecurityConfig Resolver", func() {
 								SecretName: "test-client-secret",
 							},
 						},
+						Idporten: nil,
 					},
 				}
 
@@ -199,13 +208,73 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result).NotTo(BeNil())
 				Expect(result.TokenXConfig.Enabled).To(BeFalse())
 				Expect(result.MaskinportenConfig.Enabled).To(BeFalse())
+				Expect(result.IdPortenConfig.Enabled).To(BeFalse())
 				Expect(result.EntraIdConfig.Enabled).To(BeTrue())
 				Expect(result.EntraIdConfig.Type).To(Equal(state.InlineClient))
 				Expect(result.EntraIdConfig.ClientSpec.SecretName).To(Equal("test-client-secret"))
 			})
 		})
 
-		Context("when tokenx, maskinporten and entraid are enabled", func() {
+		Context("when only idporten is enabled", func() {
+			It("should return scope with idporten enabled and a resolved audience", func() {
+				sc := accesseratorv1alpha.SecurityConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testSecurityConfig,
+						Namespace: testNamespace,
+					},
+					Spec: accesseratorv1alpha.SecurityConfigSpec{
+						ApplicationRef: testAppName,
+						Tokenx:         nil,
+						Maskinporten:   nil,
+						EntraID:        nil,
+						Idporten: &accesseratorv1alpha.IdPortenSpec{
+							Enabled: true,
+							AllowedAudience: accesseratorv1alpha.AllowedAudience{
+								Value: utilities.Ptr(testIdPortenAud),
+							},
+						},
+					},
+				}
+
+				result, err := resolver.ResolveSecurityConfig(ctx, k8sClient, sc)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
+				Expect(result.TokenXConfig.Enabled).To(BeFalse())
+				Expect(result.MaskinportenConfig.Enabled).To(BeFalse())
+				Expect(result.EntraIdConfig.Enabled).To(BeFalse())
+				Expect(result.IdPortenConfig.Enabled).To(BeTrue())
+				Expect(result.IdPortenConfig.Audience).To(Equal(testIdPortenAud))
+			})
+
+			It("should return error when the referenced audience source does not exist", func() {
+				sc := accesseratorv1alpha.SecurityConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testSecurityConfig,
+						Namespace: testNamespace,
+					},
+					Spec: accesseratorv1alpha.SecurityConfigSpec{
+						ApplicationRef: testAppName,
+						Idporten: &accesseratorv1alpha.IdPortenSpec{
+							Enabled: true,
+							AllowedAudience: accesseratorv1alpha.AllowedAudience{
+								ValueFrom: &accesseratorv1alpha.ValueFrom{
+									ConfigMapKeyRef: &accesseratorv1alpha.KeyRef{Name: "missing-configmap", Key: "AUDIENCE"},
+								},
+							},
+						},
+					},
+				}
+
+				result, err := resolver.ResolveSecurityConfig(ctx, k8sClient, sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("failed to resolve ID-porten config"))
+				Expect(result).To(BeNil())
+			})
+		})
+
+		Context("when tokenx, maskinporten, entraid and idporten are enabled", func() {
 			It("should return scope with all configs enabled", func() {
 				// Create application with access policy
 				otherAppName := "other-app"
@@ -259,6 +328,12 @@ var _ = Describe("SecurityConfig Resolver", func() {
 								SecretName: testAppName + "-secret",
 							},
 						},
+						Idporten: &accesseratorv1alpha.IdPortenSpec{
+							Enabled: true,
+							AllowedAudience: accesseratorv1alpha.AllowedAudience{
+								Value: utilities.Ptr(testIdPortenAud),
+							},
+						},
 					},
 				}
 
@@ -285,6 +360,10 @@ var _ = Describe("SecurityConfig Resolver", func() {
 				Expect(result.EntraIdConfig.Enabled).To(BeTrue())
 				Expect(result.EntraIdConfig.Type).To(Equal(state.InlineClient))
 				Expect(result.EntraIdConfig.ClientSpec.SecretName).To(Equal("test-app-secret"))
+
+				// Verify ID-porten config
+				Expect(result.IdPortenConfig.Enabled).To(BeTrue())
+				Expect(result.IdPortenConfig.Audience).To(Equal(testIdPortenAud))
 
 				// Verify SecurityConfig is preserved
 				Expect(result.SecurityConfig.Name).To(Equal(testSecurityConfig))

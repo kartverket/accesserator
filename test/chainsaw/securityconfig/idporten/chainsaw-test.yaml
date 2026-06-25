@@ -1,0 +1,38 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: idporten
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        - create:
+            file: skiperator-application.yaml
+        - create:
+            file: securityconfig-idporten-disabled.yaml
+        - error:
+            file: service-entry.yaml
+        - error:
+            file: securityconfig-with-updated-status.yaml
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                idporten:
+                  enabled: true
+                  allowedAudience:
+                    value: my-idporten-client-id
+                applicationRef: app
+        - assert:
+            file: securityconfig-with-updated-status.yaml
+        - assert:
+            file: service-entry.yaml

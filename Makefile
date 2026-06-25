@@ -67,7 +67,7 @@ CHAINSAW_VERSION ?= v0.2.15
 CONTROLLER_TOOLS_VERSION ?= v0.21.0
 KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
-GOLANGCI_LINT_VERSION ?= v2.10.1
+GOLANGCI_LINT_VERSION ?= v2.12.2
 HELM_VERSION ?= v4.0.0
 KUBEFWD_VERSION ?= 1.25.15
 JQ_VERSION ?= 1.8.1
@@ -129,7 +129,7 @@ clean: kind ## Clean up local environment by deleting kind cluster
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	"$(CONTROLLER_GEN)" rbac:roleName=accesserator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
+	"$(CONTROLLER_GEN)" object rbac:roleName=accesserator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
 
 .PHONY: docs
 docs: ## Generate API documentation from CRD bases using crdoc

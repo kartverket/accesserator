@@ -10,6 +10,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadapplication"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadsecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadserviceentry"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/idporten/idportenserviceentry"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
@@ -40,6 +41,7 @@ func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource
 		azureAdApplicationControllerResource(scope),
 		azureAdSecretControllerResource(scope),
 		azureAdServiceEntryControllerResource(scope),
+		idportenServiceEntryControllerResource(scope),
 		opaConfigMapControllerResource(scope),
 	}
 }
@@ -272,6 +274,32 @@ func azureAdServiceEntryControllerResource(scope *state.Scope) ControllerResourc
 			Func: reconciliation.ResourceReconciler[*istionetworkingv1.ServiceEntry]{
 				ResourceKind:    "ServiceEntry",
 				ResourceName:    azureAdServiceEntryObjectMeta.Name,
+				DesiredResource: utilities.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    ServiceEntryShouldUpdateFunc,
+				UpdateFields:    serviceEntryUpdateFieldsFunc,
+			},
+		},
+	}
+}
+
+/*
+idportenServiceEntryControllerResource reconciles a ServiceEntry resource which allows egress to ID-porten.
+*/
+func idportenServiceEntryControllerResource(scope *state.Scope) ControllerResourceAdapter[*istionetworkingv1.ServiceEntry] {
+	idportenServiceEntryName := utilities.NewIdPortenNamer(scope.SecurityConfig).ServiceEntryName()
+	idportenServiceEntryObjectMeta := metav1.ObjectMeta{
+		Name:      idportenServiceEntryName,
+		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    labels.SecurityConfigStandardLabels(),
+	}
+	desiredResource := idportenserviceentry.GetDesired(idportenServiceEntryObjectMeta, scope.IdPortenConfig)
+
+	return ControllerResourceAdapter[*istionetworkingv1.ServiceEntry]{
+		reconciliation.ReconcilerAdapter[*istionetworkingv1.ServiceEntry]{
+			Func: reconciliation.ResourceReconciler[*istionetworkingv1.ServiceEntry]{
+				ResourceKind:    "ServiceEntry",
+				ResourceName:    idportenServiceEntryObjectMeta.Name,
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
 				ShouldUpdate:    ServiceEntryShouldUpdateFunc,
