@@ -142,6 +142,18 @@ func (n IdPortenNamer) ServiceEntryName() string {
 	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, IdPortenNameSuffix))
 }
 
+type AnsattportenNamer struct {
+	nameBase
+}
+
+func NewAnsattportenNamer(sc v1alpha.SecurityConfig) AnsattportenNamer {
+	return AnsattportenNamer{newNameBase(sc)}
+}
+
+func (n AnsattportenNamer) ServiceEntryName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, AnsattportenNameSuffix))
+}
+
 type OpaNamer struct {
 	nameBase
 }

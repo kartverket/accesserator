@@ -43,6 +43,88 @@ spec:
           spec:
             description: spec defines the desired state of SecurityConfig
             properties:
+              ansattporten:
+                description: |-
+                  Ansattporten specifies whether to configure Ansattporten token validation for an application referred to by `applicationRef`.
+                  When enabled, an Istio ServiceEntry is created to allow egress to Ansattporten, and the Texas sidecar is configured
+                  to validate Ansattporten tokens against the audiences specified in `allowedAudience`.
+                properties:
+                  allowedAudience:
+                    description: |-
+                      AllowedAudience defines the audience (`aud`) value that Ansattporten tokens are validated against by the Texas
+                      sidecar. Either a static value or sourced from a ConfigMap or Secret.
+                    properties:
+                      value:
+                        description: Value specifies a static audience value.
+                        type: string
+                      valueFrom:
+                        description: ValueFrom specifies a reference to a kubernetes
+                          resource to retrieve the audience value from.
+                        properties:
+                          configMapKeyRef:
+                            description: ConfigMapKeyRef specifies a reference to
+                              a key in a ConfigMap.
+                            properties:
+                              key:
+                                description: Key specifies the data entry name within
+                                  the ConfigMap/Secret; must follow key naming rules.
+                                minLength: 1
+                                pattern: ^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
+                                type: string
+                              name:
+                                description: Name specifies the name of the ConfigMap/Secret;
+                                  must satisfy DNS-1123 subdomain naming.
+                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          secretKeyRef:
+                            description: SecretKeyRef specifies a reference to a key
+                              in a Secret.
+                            properties:
+                              key:
+                                description: Key specifies the data entry name within
+                                  the ConfigMap/Secret; must follow key naming rules.
+                                minLength: 1
+                                pattern: ^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
+                                type: string
+                              name:
+                                description: Name specifies the name of the ConfigMap/Secret;
+                                  must satisfy DNS-1123 subdomain naming.
+                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        type: object
+                        x-kubernetes-validations:
+                        - message: either 'configMapKeyRef' or 'secretKeyRef' must
+                            be set
+                          rule: has(self.configMapKeyRef) || has(self.secretKeyRef)
+                        - message: cannot reference both a ConfigMap and a Secret
+                          rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
+                    type: object
+                    x-kubernetes-validations:
+                    - message: either 'value' or 'valueFrom' must be set
+                      rule: has(self.value) || has(self.valueFrom)
+                    - message: one audience cannot be defined from both 'value' and
+                        'valueFrom'
+                      rule: '!(has(self.value) && has(self.valueFrom))'
+                    - message: field 'value' cannot be empty string
+                      rule: '!has(self.value) || size(self.value) > 0'
+                  enabled:
+                    description: Enabled indicates whether Ansattporten token validation
+                      should be configured for the application.
+                    type: boolean
+                required:
+                - allowedAudience
+                - enabled
+                type: object
               applicationRef:
                 description: ApplicationRef is a reference to the name of the SKIP
                   application for which this SecurityConfig applies.
@@ -570,6 +652,8 @@ spec:
           status:
             description: status defines the observed state of SecurityConfig
             properties:
+              ansattportenAudience:
+                type: string
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current

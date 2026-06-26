@@ -177,6 +177,47 @@ var _ = Describe("HandleSecretEvent", func() {
 		Expect(requests).To(ConsistOf(req("team-a", "sc-idporten")))
 	})
 
+	It("enqueues SecurityConfigs referencing the secret as an Ansattporten audience source", func() {
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "audience-secret", Namespace: "team-a"}}
+
+		scAnsattportenMatch := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-ansattporten", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				Ansattporten: &v1alpha.AnsattportenSpec{
+					Enabled: true,
+					AllowedAudience: v1alpha.AllowedAudience{
+						ValueFrom: &v1alpha.ValueFrom{
+							SecretKeyRef: &v1alpha.KeyRef{Name: "audience-secret", Key: "AUDIENCE"},
+						},
+					},
+				},
+			},
+		}
+		// References the same name but via a ConfigMap ref, so the Secret handler must not match it.
+		scAnsattportenConfigMapRefSameName := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "sc-ansattporten-cm", Namespace: "team-a"},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "app-a",
+				Ansattporten: &v1alpha.AnsattportenSpec{
+					Enabled: true,
+					AllowedAudience: v1alpha.AllowedAudience{
+						ValueFrom: &v1alpha.ValueFrom{
+							ConfigMapKeyRef: &v1alpha.KeyRef{Name: "audience-secret", Key: "AUDIENCE"},
+						},
+					},
+				},
+			},
+		}
+
+		c := buildClient(scAnsattportenMatch, scAnsattportenConfigMapRefSameName)
+		h := eventhandler.HandleSecretEvent(c)
+
+		requests := runCreateEvent(h, secret)
+
+		Expect(requests).To(ConsistOf(req("team-a", "sc-ansattporten")))
+	})
+
 	It("returns no requests for unrelated object type", func() {
 		c := buildClient()
 		h := eventhandler.HandleSecretEvent(c)

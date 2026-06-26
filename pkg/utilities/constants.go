@@ -41,6 +41,14 @@ const (
 	IdPortenTestHost         = "test.idporten.no"
 	IdPortenTestWellKnownURL = "https://test.idporten.no/.well-known/openid-configuration"
 
+	AnsattportenNameSuffix = "ansattporten"
+
+	AnsattportenProdHost         = "ansattporten.no"
+	AnsattportenProdWellKnownURL = "https://ansattporten.no/.well-known/openid-configuration"
+
+	AnsattportenTestHost         = "test.ansattporten.no"
+	AnsattportenTestWellKnownURL = "https://test.ansattporten.no/.well-known/openid-configuration"
+
 	OpaConfigMapNameSuffix = "opa"
 
 	IstioReadinessProbeRewritePathPattern = "/app-health/%s/readyz"

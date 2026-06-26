@@ -7,6 +7,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/labels"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/ansattporten/ansattportenserviceentry"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadapplication"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadsecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/entraid/azureadserviceentry"
@@ -42,6 +43,7 @@ func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource
 		azureAdSecretControllerResource(scope),
 		azureAdServiceEntryControllerResource(scope),
 		idportenServiceEntryControllerResource(scope),
+		ansattportenServiceEntryControllerResource(scope),
 		opaConfigMapControllerResource(scope),
 	}
 }
@@ -300,6 +302,32 @@ func idportenServiceEntryControllerResource(scope *state.Scope) ControllerResour
 			Func: reconciliation.ResourceReconciler[*istionetworkingv1.ServiceEntry]{
 				ResourceKind:    "ServiceEntry",
 				ResourceName:    idportenServiceEntryObjectMeta.Name,
+				DesiredResource: utilities.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    ServiceEntryShouldUpdateFunc,
+				UpdateFields:    serviceEntryUpdateFieldsFunc,
+			},
+		},
+	}
+}
+
+/*
+ansattportenServiceEntryControllerResource reconciles a ServiceEntry resource which allows egress to Ansattporten.
+*/
+func ansattportenServiceEntryControllerResource(scope *state.Scope) ControllerResourceAdapter[*istionetworkingv1.ServiceEntry] {
+	ansattportenServiceEntryName := utilities.NewAnsattportenNamer(scope.SecurityConfig).ServiceEntryName()
+	ansattportenServiceEntryObjectMeta := metav1.ObjectMeta{
+		Name:      ansattportenServiceEntryName,
+		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    labels.SecurityConfigStandardLabels(),
+	}
+	desiredResource := ansattportenserviceentry.GetDesired(ansattportenServiceEntryObjectMeta, scope.AnsattportenConfig)
+
+	return ControllerResourceAdapter[*istionetworkingv1.ServiceEntry]{
+		reconciliation.ReconcilerAdapter[*istionetworkingv1.ServiceEntry]{
+			Func: reconciliation.ResourceReconciler[*istionetworkingv1.ServiceEntry]{
+				ResourceKind:    "ServiceEntry",
+				ResourceName:    ansattportenServiceEntryObjectMeta.Name,
 				DesiredResource: utilities.Ptr(desiredResource),
 				Scope:           scope,
 				ShouldUpdate:    ServiceEntryShouldUpdateFunc,

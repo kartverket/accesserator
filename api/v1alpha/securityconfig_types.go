@@ -53,6 +53,13 @@ type SecurityConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Idporten *IdPortenSpec `json:"idporten,omitempty"`
 
+	// Ansattporten specifies whether to configure Ansattporten token validation for an application referred to by `applicationRef`.
+	// When enabled, an Istio ServiceEntry is created to allow egress to Ansattporten, and the Texas sidecar is configured
+	// to validate Ansattporten tokens against the audiences specified in `allowedAudience`.
+	//
+	// +kubebuilder:validation:Optional
+	Ansattporten *AnsattportenSpec `json:"ansattporten,omitempty"`
+
 	// Opa specifies whether to configure the open policy agent capability for an application referred to by `applicationRef`.
 	// The configuration includes which bundles compiled from rego policies, and how often OPA should check for updates to these bundles.
 	//
@@ -290,6 +297,22 @@ type IdPortenSpec struct {
 	AllowedAudience AllowedAudience `json:"allowedAudience"`
 }
 
+// AnsattportenSpec defines the configuration for Ansattporten token validation.
+//
+// +kubebuilder:object:generate=true
+type AnsattportenSpec struct {
+	// Enabled indicates whether Ansattporten token validation should be configured for the application.
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// AllowedAudience defines the audience (`aud`) value that Ansattporten tokens are validated against by the Texas
+	// sidecar. Either a static value or sourced from a ConfigMap or Secret.
+	//
+	// +kubebuilder:validation:Required
+	AllowedAudience AllowedAudience `json:"allowedAudience"`
+}
+
 // OpenPolicyAgentSpec defines the OPA sidecar configuration.
 //
 // +kubebuilder:object:generate=true
@@ -491,6 +514,7 @@ type SecurityConfigStatus struct {
 	MaskinportenSecretName string             `json:"maskinportenSecretName,omitempty"`
 	EntraIdSecretName      string             `json:"entraIdSecretName,omitempty"`
 	IdportenAudience       string             `json:"idportenAudience,omitempty"`
+	AnsattportenAudience   string             `json:"ansattportenAudience,omitempty"`
 	OpaBundleSource        *OpaBundleSource   `json:"opaBundleSource,omitempty"`
 	Ready                  bool               `json:"ready"`
 }

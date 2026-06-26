@@ -1,0 +1,13 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+spec:
+  applicationRef: app
+  ansattporten:
+    enabled: true
+    allowedAudience:
+      valueFrom:
+        configMapKeyRef:
+          name: empty-audience-configmap
+          key: AUDIENCE

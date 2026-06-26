@@ -209,6 +209,10 @@ func DetermineReconciliationState(
 		scope.SecurityConfig.Status.IdportenAudience = scope.IdPortenConfig.Audience
 	}
 
+	if scope.AnsattportenConfig.Enabled {
+		scope.SecurityConfig.Status.AnsattportenAudience = scope.AnsattportenConfig.Audience
+	}
+
 	switch {
 	case waitingForJwker:
 		return utilities.Ptr(StateWaitingForJwker), nil

@@ -33,6 +33,11 @@ func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securit
 		return nil, fmt.Errorf("failed to resolve ID-porten config: %w", idPortenConfigResolveErr)
 	}
 
+	ansattportenConfig, ansattportenConfigResolveErr := ResolveAnsattportenConfig(logger, ctx, k8sClient, securityConfig)
+	if ansattportenConfigResolveErr != nil {
+		return nil, fmt.Errorf("failed to resolve Ansattporten config: %w", ansattportenConfigResolveErr)
+	}
+
 	opaConfig, opaConfigResolveErr := ResolveOpaConfig(logger, securityConfig)
 	if opaConfigResolveErr != nil {
 		return nil, fmt.Errorf("failed to resolve OPA config: %w", opaConfigResolveErr)
@@ -44,6 +49,7 @@ func ResolveSecurityConfig(ctx context.Context, k8sClient client.Client, securit
 		MaskinportenConfig: *maskinportenConfig,
 		EntraIdConfig:      *entraIdConfig,
 		IdPortenConfig:     *idPortenConfig,
+		AnsattportenConfig: *ansattportenConfig,
 		OpaConfig:          *opaConfig,
 	}, nil
 }

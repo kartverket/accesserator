@@ -31,6 +31,8 @@ spec:
           value: "false"
         - name: IDPORTEN_ENABLED
           value: "true"
+        - name: ANSATTPORTEN_ENABLED
+          value: "false"
         - name: IDPORTEN_WELL_KNOWN_URL
           value: https://test.idporten.no/.well-known/openid-configuration
         - name: IDPORTEN_AUDIENCE

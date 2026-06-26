@@ -31,6 +31,8 @@ spec:
           value: "false"
         - name: IDPORTEN_ENABLED
           value: "false"
+        - name: ANSATTPORTEN_ENABLED
+          value: "false"
       imagePullPolicy: IfNotPresent
       name: texas
       ports:

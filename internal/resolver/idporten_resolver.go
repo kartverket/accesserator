@@ -38,7 +38,7 @@ func ResolveIdPortenConfig(
 	}
 	// The Texas ID-porten provider validates the `aud` claim against a single IDPORTEN_AUDIENCE value.
 	if len(*resolvedAudiences) != 1 {
-		return nil, fmt.Errorf("ID-porten requires exactly one allowed audience, got %d", len(*resolvedAudiences))
+		return nil, fmt.Errorf("idporten requires exactly one allowed audience, got %d", len(*resolvedAudiences))
 	}
 
 	logger.Info("ID-porten config resolved", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
