@@ -89,8 +89,8 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: run-local
-run-local: ensurelocal ensureaccesseratornotdeployed generate install webhooks sourceenv ## Run Accesserator from your host.
-	go run ./cmd/main.go -webhook-cert-path=./webhook-certs
+run-local: ensurelocal ensureaccesseratornotdeployed generate install webhooks ## Run Accesserator from your host.
+	set -a; . config/manager/base/.env; set +a; go run ./cmd/main.go -webhook-cert-path=./webhook-certs
 
 .PHONY: isrunning
 isrunning: ## Check if accesserator is running on your host machine (i.e. from IDE or with 'make run-local')
@@ -115,10 +115,6 @@ ismockcontrollernotrunning: ## Check if mock-controller is NOT running on your h
 	@echo "Checking if mock-controller is not running..."
 	@! lsof -i :8083 > /dev/null 2>&1 || (echo "❌ mock-controller is running on your host. Please stop it first." && exit 1)
 	@echo "✅ mock-controller is not running on your host. Ready to deploy."
-
-.PHONY: sourceenv
-sourceenv: ## Source environment variables from config/manager/base/.env file
-	@set -a; [ -f config/manager/base/.env ] && . config/manager/base/.env; set +a
 
 .PHONY: local
 local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 tokendings jwker deploy-mock-controller generate install ## Set up entire local development environment with external dependencies
