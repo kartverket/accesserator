@@ -33,6 +33,9 @@ type Config struct {
 	OpaUrlEnvVarName                    string   `split_words:"true" default:"OPA_URL"`
 	OpaAllowedBundleRegistryUrlPrefixes []string `split_words:"true"`
 	OpaAllowedBundleSignatureSourceOrgs []string `split_words:"true"`
+
+	SigstoreGithubTrustedRootPath string `split_words:"true"`
+	SigstoreTufCachePath          string `split_words:"true" default:"/tmp/sigstore-tuf"`
 }
 
 var appCfg Config
@@ -73,6 +76,9 @@ func Load() error {
 	}
 	if len(cfg.OpaAllowedBundleSignatureSourceOrgs) == 0 {
 		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
+	}
+	if cfg.SigstoreGithubTrustedRootPath == "" {
+		missing = append(missing, "ACCESSERATOR_SIGSTORE_GITHUB_TRUSTED_ROOT_PATH")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))

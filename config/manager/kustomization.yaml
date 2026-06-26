@@ -23,3 +23,9 @@ configMapGenerator:
   - base/.env
   name: accesserator-env
   namespace: accesserator-system
+- files:
+  - github-sigstore/trusted_root.json
+  name: github-sigstore
+  namespace: accesserator-system
+  options:
+    disableNameSuffixHash: true
