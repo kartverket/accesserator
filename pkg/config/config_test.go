@@ -141,6 +141,9 @@ func TestLoad_Defaults(t *testing.T) {
 	if c.TokenxName != defaultTokenxName {
 		t.Errorf("TokenxName = %q, want default %q", c.TokenxName, defaultTokenxName)
 	}
+	if !c.TokenxEnabled {
+		t.Errorf("TokenxEnabled = %v, want default true", c.TokenxEnabled)
+	}
 	if c.TexasImageName != defaultTexasImageName {
 		t.Errorf("TexasImageName = %q, want default %q", c.TexasImageName, defaultTexasImageName)
 	}

@@ -64,28 +64,30 @@ func (v *SecurityConfigCustomValidator) ValidateDelete(_ context.Context, securi
 
 func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) (admission.Warnings, error) {
 	logger := log.GetLogger(ctx)
-	if securityConfig.Spec.Opa == nil {
-		return nil, nil
-	}
 
-	if !config.Get().OpaEnabled {
+	if securityConfig.Spec.Tokenx != nil && !config.Get().TokenxEnabled {
+		return nil, fmt.Errorf("TokenX is not enabled on this cluster and 'spec.tokenx' can therefore not be set")
+	}
+	if securityConfig.Spec.Opa != nil && !config.Get().OpaEnabled {
 		return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
 	}
 
-	if err := validation.ValidateBundleUrls(securityConfig.Spec.Opa.BundleURLs); err != nil {
-		logger.Info(
-			"SecurityConfig blocked by validating webhook",
-			"validationError", err.Error(),
-		)
-		return nil, err
-	}
+	if securityConfig.Spec.Opa != nil {
+		if err := validation.ValidateBundleUrls(securityConfig.Spec.Opa.BundleURLs); err != nil {
+			logger.Info(
+				"SecurityConfig blocked by validating webhook",
+				"validationError", err.Error(),
+			)
+			return nil, err
+		}
 
-	if err := validateBundleSignatures(ctx, securityConfig.Spec.Opa.BundleURLs); err != nil {
-		logger.Info(
-			"SecurityConfig blocked by validating webhook",
-			"validationError", err.Error(),
-		)
-		return nil, err
+		if err := validateBundleSignatures(ctx, securityConfig.Spec.Opa.BundleURLs); err != nil {
+			logger.Info(
+				"SecurityConfig blocked by validating webhook",
+				"validationError", err.Error(),
+			)
+			return nil, err
+		}
 	}
 
 	return nil, nil

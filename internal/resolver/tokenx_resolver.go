@@ -21,6 +21,10 @@ import (
 )
 
 func ResolveTokenXConfig(logger log.Logger, ctx context.Context, k8sClient client.Client, securityConfig v1alpha.SecurityConfig) (*state.TokenXConfig, error) {
+	if securityConfig.Spec.Tokenx != nil && !config.Get().TokenxEnabled {
+		return nil, fmt.Errorf("TokenX is not enabled on this cluster and 'spec.tokenx' can therefore not be set")
+	}
+
 	tokenXEnabled := securityConfig.Spec.Tokenx != nil && securityConfig.Spec.Tokenx.Enabled
 	if !tokenXEnabled {
 		return &state.TokenXConfig{

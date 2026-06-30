@@ -12,6 +12,7 @@ type Config struct {
 
 	ClusterName string `split_words:"true"`
 
+	TokenxEnabled   bool   `split_words:"true" default:"true"`
 	TokenxName      string `split_words:"true" default:"tokendings"`
 	TokenxNamespace string `split_words:"true"`
 

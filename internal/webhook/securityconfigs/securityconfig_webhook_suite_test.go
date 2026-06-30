@@ -69,6 +69,7 @@ var _ = BeforeSuite(func() {
 	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_TAG", "a-random-tag")).To(Succeed())
 	Expect(os.Setenv("ACCESSERATOR_TEXAS_IMAGE_SHA", "a-random-sha")).To(Succeed())
 	Expect(os.Setenv("ACCESSERATOR_ENTRA_TENANT_ID", "a-random-uuid")).To(Succeed())
+	Expect(os.Setenv("ACCESSERATOR_TOKENX_ENABLED", "true")).To(Succeed())
 	Expect(os.Setenv("ACCESSERATOR_OPA_ENABLED", "true")).To(Succeed())
 	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_TAG", "a-random-tag")).To(Succeed())
 	Expect(os.Setenv("ACCESSERATOR_OPA_IMAGE_SHA", "a-random-sha")).To(Succeed())
@@ -244,6 +245,41 @@ var _ = Describe("SecurityConfig validating webhook", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, securityConfig)).To(Succeed())
+	})
+
+	It("blocks creation of a SecurityConfig with 'spec.tokenx' defined when ACCESSERATOR_TOKENX_ENABLED is false", func() {
+		Expect(os.Setenv("ACCESSERATOR_TOKENX_ENABLED", "false")).To(Succeed())
+		Expect(config.Load()).To(Succeed())
+
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "securityconfig-tokenx-disabled",
+			},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() {
+			_ = k8sClient.Delete(ctx, ns)
+			Expect(os.Setenv("ACCESSERATOR_TOKENX_ENABLED", "true")).To(Succeed())
+			Expect(config.Load()).To(Succeed())
+		})
+
+		securityConfig := &v1alpha.SecurityConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "security-config",
+				Namespace: ns.Name,
+			},
+			Spec: v1alpha.SecurityConfigSpec{
+				ApplicationRef: "myapp",
+				Tokenx: &v1alpha.TokenXSpec{
+					Enabled: true,
+				},
+			},
+		}
+
+		err := k8sClient.Create(ctx, securityConfig)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("TokenX is not enabled on this cluster and 'spec.tokenx' can therefore not be set"))
 	})
 
 	It("blocks creation of a SecurityConfig with 'spec.opa' defined when ACCESSERATOR_OPA_ENABLED is false", func() {

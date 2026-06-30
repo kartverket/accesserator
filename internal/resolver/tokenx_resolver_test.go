@@ -2,9 +2,11 @@ package resolver_test
 
 import (
 	"fmt"
+	"os"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/resolver"
+	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	"github.com/kartverket/skiperator/api/v1alpha1/podtypes"
@@ -20,6 +22,11 @@ const (
 )
 
 var _ = Describe("TokenX Resolver", func() {
+
+	BeforeEach(func() {
+		Expect(os.Setenv("ACCESSERATOR_TOKENX_ENABLED", "true")).To(Succeed())
+		Expect(config.Load()).To(Succeed())
+	})
 
 	AfterEach(func() {
 		// Clean up SecurityConfigs
@@ -285,6 +292,56 @@ var _ = Describe("TokenX Resolver", func() {
 				Expect(result.JwkerSpec.AccessPolicy.Inbound.Rules.GetRules()[0].Namespace).To(Equal("included-namespace-1"))
 				Expect(result.JwkerSpec.AccessPolicy.Inbound.Rules.GetRules()[1].Application).To(Equal("other-app"))
 				Expect(result.JwkerSpec.AccessPolicy.Inbound.Rules.GetRules()[1].Namespace).To(Equal("included-namespace-2"))
+			})
+		})
+	})
+
+	Describe("ResolveTokenXConfig with TokenX disabled at the cluster level", func() {
+		Context("when ACCESSERATOR_TOKENX_ENABLED is false", func() {
+			BeforeEach(func() {
+				Expect(os.Setenv("ACCESSERATOR_TOKENX_ENABLED", "false")).To(Succeed())
+				Expect(config.Load()).To(Succeed())
+			})
+
+			AfterEach(func() {
+				Expect(os.Setenv("ACCESSERATOR_TOKENX_ENABLED", "true")).To(Succeed())
+				Expect(config.Load()).To(Succeed())
+			})
+
+			It("returns an error when spec.tokenx is set with enabled=true", func() {
+				sc := securityConfig(testAppName, &accesseratorv1alpha.TokenXSpec{
+					Enabled: true,
+				})
+
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"TokenX is not enabled on this cluster and 'spec.tokenx' can therefore not be set",
+				))
+				Expect(result).To(BeNil())
+			})
+
+			It("returns an error when spec.tokenx is set with enabled=false", func() {
+				sc := securityConfig(testAppName, &accesseratorv1alpha.TokenXSpec{
+					Enabled: false,
+				})
+
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *sc)
+
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(
+					"TokenX is not enabled on this cluster and 'spec.tokenx' can therefore not be set",
+				))
+				Expect(result).To(BeNil())
+			})
+
+			It("returns Enabled=false when spec.tokenx is omitted", func() {
+				result, err := resolver.ResolveTokenXConfig(logger, ctx, k8sClient, *securityConfig(testAppName, nil))
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
+				Expect(result.Enabled).To(BeFalse())
 			})
 		})
 	})
