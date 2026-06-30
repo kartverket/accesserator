@@ -328,6 +328,7 @@ var _ = Describe("OPA Resolver", func() {
 				result, err := resolver.ResolveOpaConfig(logger, makeSecurityConfig(nil))
 
 				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
 				Expect(result.Enabled).To(BeFalse())
 			})
 		})
