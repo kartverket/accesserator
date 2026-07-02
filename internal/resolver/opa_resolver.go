@@ -9,160 +9,112 @@ import (
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
+	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/accesserator/pkg/validation"
-	"oras.land/oras-go/v2"
-	"oras.land/oras-go/v2/content"
-	"oras.land/oras-go/v2/content/memory"
-	"oras.land/oras-go/v2/registry/remote"
-	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
 const (
-	ociFetchTimeout = 60 * time.Second
-
-	ociLayerMediaType = "application/vnd.oci.image.layer.v1.tar+gzip"
+	OpaBundleFetchLayerTimeout = 60 * time.Second
+	OpaBundleLayerMediaType    = "application/vnd.oci.image.layer.v1.tar+gzip"
 )
 
-// BundleFetcher fetches OPA bundles from an OCI registry. It composes
-// validation.AttestationFetcher (Resolve + FetchAttestation, used during
-// signature verification) with FetchLayer for pulling the actual bundle
-// content. Splitting these lets callers verify the manifest digest before
-// pulling any untrusted layer bytes.
-type BundleFetcher interface {
+// OpaBundleFetcher is the set of OCI lookups the OPA resolver needs.
+// It extends validation.AttestationFetcher with the OPA bundle layer-pull operation.
+type OpaBundleFetcher interface {
 	validation.AttestationFetcher
-	// FetchLayer pulls the bundle layer from the manifest identified by
-	// manifestDigest. The lookup is by digest, so callers can be sure they pull
-	// exactly what they verified.
-	FetchLayer(ctx context.Context, credStore credentials.Store, reference string, manifestDigest string) ([]byte, error)
+	FetchOpaBundleLayer(ctx context.Context, credStore credentials.Store, ociRepoAndDigest utilities.OciRepositoryAndDigest) ([]byte, error)
 }
 
-type ociBundleFetcher struct {
-	validation.AttestationFetcher
+type DefaultOpaBundleFetcher struct {
+	validation.DefaultAttestationFetcher
 }
 
-func (ociBundleFetcher) FetchLayer(ctx context.Context, credStore credentials.Store, reference string, manifestDigest string) ([]byte, error) {
-	return pullBundleLayer(ctx, credStore, reference, manifestDigest)
+func (DefaultOpaBundleFetcher) FetchOpaBundleLayer(
+	ctx context.Context,
+	credStore credentials.Store,
+	ociRepoAndDigest utilities.OciRepositoryAndDigest,
+) ([]byte, error) {
+	return utilities.FetchLayerMatchingMediaType(ctx, ociRepoAndDigest, OpaBundleLayerMediaType)
 }
 
-var defaultBundleFetcher BundleFetcher = ociBundleFetcher{
-	AttestationFetcher: validation.DefaultAttestationFetcher,
-}
-
-// ResolveOpaConfig resolves the OPA configuration from the SecurityConfig.
-// It fetches bundle files from OCI registries and returns them as byte slices.
+// ResolveOpaConfig resolves the OPA configuration from the SecurityConfig
+// using a production fetcher backed by the OCI registry.
 func ResolveOpaConfig(logger log.Logger, securityConfig v1alpha.SecurityConfig) (*state.OpaConfig, error) {
+	return ResolveOpaConfigWithFetcher(logger, DefaultOpaBundleFetcher{}, securityConfig)
+}
+
+func ResolveOpaConfigWithFetcher(
+	logger log.Logger,
+	fetcher OpaBundleFetcher,
+	securityConfig v1alpha.SecurityConfig,
+) (*state.OpaConfig, error) {
 	if securityConfig.Spec.Opa != nil && !config.Get().OpaEnabled {
 		return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
 	}
-	return ResolveOpaConfigWithFetcher(logger, defaultBundleFetcher, securityConfig)
-}
-
-// ResolveOpaConfigWithFetcher resolves the manifest digest for each bundle,
-// verifies the cosign signature against that digest (if requested),
-// and only then pulls the layer content.
-func ResolveOpaConfigWithFetcher(logger log.Logger, fetcher BundleFetcher, securityConfig v1alpha.SecurityConfig) (*state.OpaConfig, error) {
 	if securityConfig.Spec.Opa == nil || !securityConfig.Spec.Opa.Enabled {
 		return &state.OpaConfig{
 			Enabled: false,
 		}, nil
 	}
-	logger.Info("OPA enabled, resolving OPA config", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
-	if err := validation.ValidateBundleUrls(securityConfig.Spec.Opa.BundleURLs); err != nil {
-		return nil, fmt.Errorf("invalid OPA bundle URLs: %w", err)
+	logger.Info(
+		"OPA enabled, resolving OPA config",
+		"name", securityConfig.Name, "namespace", securityConfig.Namespace)
+
+	bundles := securityConfig.Spec.Opa.BundleURLs
+	if len(securityConfig.Spec.Opa.BundleURLs) == 0 {
+		return nil, fmt.Errorf(
+			"no OPA bundle URLs found in SecurityConfig %s/%s",
+			securityConfig.Namespace,
+			securityConfig.Name,
+		)
 	}
 
-	// Setup authentication using default credentials (docker config)
 	credStore, err := credentials.NewStoreFromDocker(credentials.StoreOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create credential store: %w", err)
+		return nil, fmt.Errorf("failed to setup credential store for auth towards OCI registry: %w", err)
 	}
 
-	bundleBinaryData := make(map[string][]byte)
-	for _, bundleSource := range securityConfig.Spec.Opa.BundleURLs {
-		bundleContent, bundleFetchErr := resolveAndFetchBundle(logger, fetcher, credStore, bundleSource)
-		if bundleFetchErr != nil {
-			return nil, bundleFetchErr
-		}
-		bundleBinaryData[string(bundleSource.Name)] = bundleContent
-	}
-
-	logger.Info("OPA config resolved", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
-	return &state.OpaConfig{
-		Enabled:          true,
-		BundleBinaryData: bundleBinaryData,
-	}, nil
-}
-
-func resolveAndFetchBundle(
-	logger log.Logger,
-	fetcher BundleFetcher,
-	credStore credentials.Store,
-	bundleSource v1alpha.BundleSource,
-) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), ociFetchTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), OpaBundleFetchLayerTimeout)
 	defer cancel()
 
-	logger.Debug("Resolving OCI bundle", "url", bundleSource.URL)
-	manifestDigest, err := fetcher.Resolve(ctx, credStore, bundleSource.URL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve OCI bundle from %s: %w", bundleSource.URL, err)
+	logger.Debug("Resolving OPA bundles from OCI registry",
+		"name", securityConfig.Name,
+		"namespace", securityConfig.Namespace,
+	)
+	binaryData := make(map[string][]byte, len(bundles))
+	for _, bundle := range bundles {
+		data, resolveBundleErr := resolveOpaBundle(ctx, logger, fetcher, credStore, bundle)
+		if resolveBundleErr != nil {
+			return nil, resolveBundleErr
+		}
+		binaryData[string(bundle.Name)] = data
 	}
 
-	if bundleSource.Verification != nil {
-		if bundleSource.Verification.Source.Repository == "" {
-			return nil, fmt.Errorf("bundle URL %s specifies verification, but repository is empty", bundleSource.URL)
-		}
-		logger.Debug("Verifying OCI bundle signature", "url", bundleSource.URL)
-		if verifyErr := validation.ValidateBundleSourceSignature(ctx, fetcher, credStore, bundleSource); verifyErr != nil {
-			return nil, fmt.Errorf("failed to verify OCI bundle from %s: %w", bundleSource.URL, verifyErr)
-		}
-	}
-
-	logger.Debug("Fetching OCI bundle layer", "url", bundleSource.URL)
-	layerContent, err := fetcher.FetchLayer(ctx, credStore, bundleSource.URL, manifestDigest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch OCI bundle from %s: %w", bundleSource.URL, err)
-	}
-	logger.Debug("Fetched OCI bundle layer", "url", bundleSource.URL)
-	return layerContent, nil
+	logger.Info(
+		"OPA config resolved",
+		"name", securityConfig.Name, "namespace", securityConfig.Namespace)
+	return &state.OpaConfig{Enabled: true, BundleBinaryData: binaryData}, nil
 }
 
-// pullBundleLayer pulls the artifact identified by manifestDigest and returns
-// the first tar+gzip layer's content. The lookup is by digest so this is
-// safe to call after verification: callers know they're pulling the exact
-// manifest they trusted.
-func pullBundleLayer(ctx context.Context, credStore credentials.Store, reference string, manifestDigest string) ([]byte, error) {
-	repo, err := remote.NewRepository(reference)
+func resolveOpaBundle(
+	ctx context.Context,
+	logger log.Logger,
+	fetcher OpaBundleFetcher,
+	credStore credentials.Store,
+	bundle v1alpha.BundleSource,
+) ([]byte, error) {
+	logger.Debug("Resolving OPA bundle digest", "bundleURL", bundle.URL)
+	ociRepoAndDigest, err := fetcher.ResolveOciRepositoryAndDigest(ctx, credStore, bundle.URL)
 	if err != nil {
-		return nil, fmt.Errorf("parse OCI reference %s: %w", reference, err)
-	}
-	repo.Client = &auth.Client{
-		Cache:      auth.NewCache(),
-		Credential: credentials.Credential(credStore),
+		return nil, fmt.Errorf("failed to resolve OCI bundle digest for %s: %w", bundle.URL, err)
 	}
 
-	memStore := memory.New()
-	manifestDesc, err := oras.Copy(ctx, repo, manifestDigest, memStore, "", oras.DefaultCopyOptions)
+	logger.Debug("Fetching OPA bundle layer", "bundleURL", bundle.URL, "digest", ociRepoAndDigest.Digest)
+	layer, err := fetcher.FetchOpaBundleLayer(ctx, credStore, *ociRepoAndDigest)
 	if err != nil {
-		return nil, fmt.Errorf("pull OCI artifact %s@%s: %w", reference, manifestDigest, err)
+		return nil, fmt.Errorf("failed to fetch OCI bundle layer for %s: %w", bundle.URL, err)
 	}
-
-	successors, err := content.Successors(ctx, memStore, manifestDesc)
-	if err != nil {
-		return nil, fmt.Errorf("get bundle layers: %w", err)
-	}
-
-	for _, desc := range successors {
-		if desc.MediaType == ociLayerMediaType {
-			layerContent, fetchErr := content.FetchAll(ctx, memStore, desc)
-			if fetchErr != nil {
-				return nil, fmt.Errorf("fetch bundle layer: %w", fetchErr)
-			}
-			return layerContent, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no bundle content found in OCI artifact %s", reference)
+	return layer, nil
 }
