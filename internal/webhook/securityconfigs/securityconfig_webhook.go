@@ -63,23 +63,30 @@ func (v *SecurityConfigCustomValidator) ValidateDelete(_ context.Context, securi
 
 func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) (admission.Warnings, error) {
 	logger := log.GetLogger(ctx)
-	if securityConfig.Spec.Opa == nil {
-		return nil, nil
+
+	if securityConfig.Spec.Tokenx != nil && !config.Get().TokenxEnabled {
+		return nil, fmt.Errorf("TokenX is not enabled on this cluster and 'spec.tokenx' can therefore not be set")
+	}
+	if securityConfig.Spec.Opa != nil {
+		if !config.Get().OpaEnabled {
+			return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
+		}
+		if validateOpaErr := validateOpa(logger, ctx, securityConfig); validateOpaErr != nil {
+			return nil, validateOpaErr
+		}
 	}
 
-	if !config.Get().OpaEnabled {
-		return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
-	}
+	return nil, nil
+}
 
-	// TODO: Rebase with main and let this function handle feature toggles and then call validateOpaConf etc.
-
+func validateOpa(logger log.Logger, ctx context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) error {
 	logger.Debug("Validating SecurityConfig OPA bundle URL prefixes", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 	if err := validation.ValidateBundleUrlPrefixes(securityConfig.Spec.Opa.BundleURLs); err != nil {
 		logger.Warning(
 			"SecurityConfig blocked by validating webhook",
 			"name", securityConfig.Name, "namespace", securityConfig.Namespace, "validationError", err.Error(),
 		)
-		return nil, err
+		return err
 	}
 	logger.Debug("SecurityConfig OPA bundle URL prefixes validated successfully",
 		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
@@ -93,13 +100,12 @@ func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1a
 			"SecurityConfig blocked by validating webhook",
 			"validationError", err.Error(),
 		)
-		return nil, err
+		return err
 	}
 	logger.Debug("SecurityConfig OPA bundle URLs verified successfully against source",
 		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
 	)
-
-	return nil, nil
+	return nil
 }
 
 // verifyBundleSignatures verifies the SLSA provenance attestation for every
