@@ -57,6 +57,13 @@ kubectl apply -f examples/example.yaml
 
 ## Running tests
 
+> [!IMPORTANT]  
+> Some of the Chainsaw tests fetches OCI artifacts from GHCR. In order for this to succeed when running accesserator on your host machine, you need to login with docker to be able to fetch OPA bundles from ghcr.io.
+> This can be done with `docker login ghcr.io`. In order for this to succeed when running accesserator in the local cluster, you need to create a secret with `make ghcr-secret`.
+
+> [!IMPORTANT]  
+> The chainsaw test `opa_bundle_verification_private_package` fetches a private GitHub package from GHCR. In order for this test to work you need access to pull this package from GHCR.
+
 We use [envtest](https://book.kubebuilder.io/reference/envtest) and [Ginko](https://onsi.github.io/ginkgo/) for our unit and integration tests, as well as [chainsaw](https://kyverno.github.io/chainsaw/0.2.3/) for end-to-end testing.
 
 To run the Ginko tests locally, run the following command in the terminal:
