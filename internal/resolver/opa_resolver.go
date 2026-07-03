@@ -35,7 +35,6 @@ type DefaultOpaBundleFetcher struct {
 
 func (DefaultOpaBundleFetcher) FetchOpaBundleLayer(
 	ctx context.Context,
-	credStore credentials.Store,
 	ociRepoAndDigest utilities.OciRepositoryAndDigest,
 ) ([]byte, error) {
 	return utilities.FetchLayerMatchingMediaType(ctx, ociRepoAndDigest, OpaBundleLayerMediaType)
