@@ -28,8 +28,6 @@ spec:
               value: "230MiB"
             - name: DOCKER_CONFIG
               value: /tmp/github-auth
-            - name: ACCESSERATOR_SIGSTORE_GITHUB_TRUSTED_ROOT_PATH
-              value: /tmp/github-sigstore/trusted_root.json
           envFrom:
             - configMapRef:
                 name: accesserator-env
@@ -80,11 +78,8 @@ spec:
             - name: docker-config
               mountPath: /tmp/github-auth
               readOnly: true
-            - name: trusted-root
-              mountPath: /tmp/github-sigstore
-              readOnly: true
             - name: sigstore-tuf
-              mountPath: /tmp/tuf
+              mountPath: /tmp/sigstore-tuf
       imagePullSecrets:
         - name: github-auth
       priorityClassName: skip-critical
@@ -104,8 +99,5 @@ spec:
             items:
               - key: .dockerconfigjson
                 path: config.json
-        - name: trusted-root
-          configMap:
-            name: github-sigstore
         - name: sigstore-tuf
           emptyDir: {}
