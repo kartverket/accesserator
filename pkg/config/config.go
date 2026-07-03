@@ -28,7 +28,7 @@ type Config struct {
 
 	EntraTenantId string `split_words:"true"`
 
-	OpaEnabled                          bool     `split_words:"true" default:"false"`
+	OpaEnabled                          bool     `split_words:"true" default:"true"`
 	OpaImageName                        string   `split_words:"true" default:"openpolicyagent/opa"`
 	OpaImageTag                         string   `split_words:"true"`
 	OpaImageSha                         string   `split_words:"true"`
