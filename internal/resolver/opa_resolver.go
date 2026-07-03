@@ -23,7 +23,10 @@ const (
 // It extends validation.AttestationFetcher with the OPA bundle layer-pull operation.
 type OpaBundleFetcher interface {
 	validation.AttestationFetcher
-	FetchOpaBundleLayer(ctx context.Context, credStore credentials.Store, ociRepoAndDigest utilities.OciRepositoryAndDigest) ([]byte, error)
+
+	// FetchOpaBundleLayer fetches the OPA bundle layer from the OCI registry at the given repository and digest.
+	// It only fetches the layer matching on mediaType to avoid unnecessary fetching of OCI wrapping layers.
+	FetchOpaBundleLayer(ctx context.Context, ociRepoAndDigest utilities.OciRepositoryAndDigest) ([]byte, error)
 }
 
 type DefaultOpaBundleFetcher struct {
@@ -38,8 +41,8 @@ func (DefaultOpaBundleFetcher) FetchOpaBundleLayer(
 	return utilities.FetchLayerMatchingMediaType(ctx, ociRepoAndDigest, OpaBundleLayerMediaType)
 }
 
-// ResolveOpaConfig resolves the OPA configuration from the SecurityConfig
-// using a production fetcher backed by the OCI registry.
+// ResolveOpaConfig resolves the OPA configuration from the SecurityConfig. It returns an OpaConfig struct containing
+// the resolved configuration, or an error if the resolution fails.
 func ResolveOpaConfig(logger log.Logger, securityConfig v1alpha.SecurityConfig) (*state.OpaConfig, error) {
 	return ResolveOpaConfigWithFetcher(logger, DefaultOpaBundleFetcher{}, securityConfig)
 }
@@ -98,6 +101,9 @@ func ResolveOpaConfigWithFetcher(
 	return &state.OpaConfig{Enabled: true, BundleBinaryData: binaryData}, nil
 }
 
+// resolveOpaBundle resolves the OPA bundle from the OCI registry and returns the binary data of the bundle layer.
+// It first resolves the OCI repository and digest for the given bundle URL, then fetches the OPA bundle layer matching
+// the specified media type. If any step fails, it returns an error.
 func resolveOpaBundle(
 	ctx context.Context,
 	logger log.Logger,
