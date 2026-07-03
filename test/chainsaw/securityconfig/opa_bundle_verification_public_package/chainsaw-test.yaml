@@ -1,7 +1,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: opa-bundle-verification
+  name: opa-bundle-verification-public-package
 spec:
   skip: false
   concurrent: true
@@ -22,10 +22,10 @@ spec:
             file: securityconfig-with-repository-incorrect.yaml
             expect:
               - check:
-                  (contains($error, 'source identity mismatch')): true
-                  (contains($error, 'GitHub repository mismatch')): true
-                  (contains($error, 'https://github.com/kartverket/accesserator')): true
-                  (contains($error, 'https://github.com/kartverket/not-accesserator')): true
+                  (contains($error, 'OPA bundle verification failed')): true
+                  (contains($error, 'Repository')): true
+                  (contains($error, 'kartverket/accesserator')): true
+                  (contains($error, 'kartverket/not-accesserator')): true
 
         - apply:
             file: securityconfig-with-repository-correct.yaml
@@ -36,10 +36,10 @@ spec:
             file: securityconfig-with-workflow-incorrect.yaml
             expect:
               - check:
-                  (contains($error, 'source identity mismatch')): true
-                  (contains($error, 'workflow file mismatch')): true
-                  (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/build-and-push-opa-bundle.yml')): true
-                  (contains($error, 'https://github.com/kartverket/accesserator/.github/workflows/not-correct.yml')): true
+                  (contains($error, 'OPA bundle verification failed')): true
+                  (contains($error, 'Workflow')): true
+                  (contains($error, '.github/workflows/build-and-push-opa-bundle.yml')): true
+                  (contains($error, '.github/workflows/not-correct.yml')): true
 
         - apply:
             file: securityconfig-with-workflow-correct.yaml
@@ -50,8 +50,8 @@ spec:
             file: securityconfig-with-ref-incorrect.yaml
             expect:
               - check:
-                  (contains($error, 'source identity mismatch')): true
-                  (contains($error, 'git ref mismatch')): true
+                  (contains($error, 'OPA bundle verification failed')): true
+                  (contains($error, 'Ref')): true
                   (contains($error, 'refs/pull/73/merge')): true
                   (contains($error, 'refs/pull/incorrect/merge')): true
 

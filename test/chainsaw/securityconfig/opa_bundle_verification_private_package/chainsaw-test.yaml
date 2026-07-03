@@ -1,0 +1,61 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: opa-bundle-verification-private-package
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+        istio.io/rev: default
+  steps:
+    - try:
+        - create:
+            file: securityconfig-without-verification.yaml
+        - assert:
+            file: securityconfig-ready.yaml
+
+        - apply:
+            file: securityconfig-with-repository-incorrect.yaml
+            expect:
+              - check:
+                  (contains($error, 'OPA bundle verification failed')): true
+                  (contains($error, 'Repository')): true
+                  (contains($error, 'kartverket/tokenx-token-generator-backend')): true
+                  (contains($error, 'kartverket/not-tokenx-token-generator-backend')): true
+
+        - apply:
+            file: securityconfig-with-repository-correct.yaml
+        - assert:
+            file: securityconfig-ready.yaml
+
+        - apply:
+            file: securityconfig-with-workflow-incorrect.yaml
+            expect:
+              - check:
+                  (contains($error, 'OPA bundle verification failed')): true
+                  (contains($error, 'Workflow')): true
+                  (contains($error, '.github/workflows/build-and-push-opa-bundles.yml')): true
+                  (contains($error, '.github/workflows/not-correct-workflow.yml')): true
+
+        - apply:
+            file: securityconfig-with-workflow-correct.yaml
+        - assert:
+            file: securityconfig-ready.yaml
+
+        - apply:
+            file: securityconfig-with-ref-incorrect.yaml
+            expect:
+              - check:
+                  (contains($error, 'OPA bundle verification failed')): true
+                  (contains($error, 'Ref')): true
+                  (contains($error, 'refs/tags/v3.0.4')): true
+                  (contains($error, 'refs/tags/incorrect-tag')): true
+
+        - apply:
+            file: securityconfig-with-ref-correct.yaml
+        - assert:
+            file: securityconfig-ready.yaml
