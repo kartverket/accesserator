@@ -44,10 +44,10 @@ var appCfg Config
 
 func Load() error {
 	// Setup credential store for auth towards OCI registry
-	var err error
-	CredStore, err = credentials.NewStoreFromDocker(credentials.StoreOptions{})
-	if err != nil {
-		return fmt.Errorf("failed setting up credential store for auth towards OCI registry: %w", err)
+	var setupCredStoreErr error
+	CredStore, setupCredStoreErr = credentials.NewStoreFromDocker(credentials.StoreOptions{})
+	if setupCredStoreErr != nil {
+		return fmt.Errorf("failed setting up credential store for auth towards OCI registry: %w", setupCredStoreErr)
 	}
 
 	cfg := Config{}
