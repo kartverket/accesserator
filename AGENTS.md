@@ -342,19 +342,24 @@ The operator reads its configuration from environment variables at startup, via 
 |---|---|---|
 | `ACCESSERATOR_RUNS_IN_PRODUCTION` | Yes | Whether to use production endpoints (e.g. `maskinporten.no` vs `test.maskinporten.no`) |
 | `ACCESSERATOR_CLUSTER_NAME` | Yes | Name of the Kubernetes cluster (used in Jwker inbound rules) |
-| `ACCESSERATOR_TOKENX_NAMESPACE` | Yes | Namespace where Tokendings runs |
-| `ACCESSERATOR_TEXAS_IMAGE_TAG` | Yes | Image tag for the Texas sidecar |
-| `ACCESSERATOR_TEXAS_IMAGE_SHA` | Yes | Image digest (sha256) for the Texas sidecar |
-| `ACCESSERATOR_ENTRA_TENANT_ID` | Yes | Azure AD tenant ID for Entra ID endpoint construction |
-| `ACCESSERATOR_OPA_IMAGE_TAG` | Yes | Image tag for the OPA sidecar |
-| `ACCESSERATOR_OPA_IMAGE_SHA` | Yes | Image digest for the OPA sidecar |
-| `ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES` | Yes | Comma-separated list of allowed OCI registry URL prefixes for OPA bundles |
-| `ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS` | Yes | Comma-separated list of allowed GitHub orgs for OPA bundle signature verification |
-| `ACCESSERATOR_OPA_ENABLED` | No | Whether OPA feature is enabled on this cluster (default: `false`) |
 | `ACCESSERATOR_TOKENX_ENABLED` | No | Whether TokenX feature is enabled on this cluster (default: `true`) |
 | `ACCESSERATOR_TOKENX_NAME` | No | Name of the Tokendings service (default: `tokendings`) |
+| `ACCESSERATOR_TOKENX_NAMESPACE` | If TokenX enabled | Namespace where Tokendings runs |
 | `ACCESSERATOR_TEXAS_IMAGE_NAME` | No | Image name for Texas (default: `ghcr.io/nais/texas`) |
+| `ACCESSERATOR_TEXAS_IMAGE_TAG` | Yes | Image tag for the Texas sidecar |
+| `ACCESSERATOR_TEXAS_IMAGE_SHA` | Yes | Image digest (sha256) for the Texas sidecar |
+| `ACCESSERATOR_TEXAS_PORT` | No | Port exposed by the Texas sidecar for token API calls (default: `3000`) |
+| `ACCESSERATOR_TEXAS_PROBE_PORT` | No | Port exposed by the Texas sidecar for readiness/liveness probes (default: `3001`) |
+| `ACCESSERATOR_TEXAS_URL_ENV_VAR_NAME` | No | Name of the env var injected into application containers pointing to the Texas sidecar URL (default: `TEXAS_URL`) |
+| `ACCESSERATOR_ENTRA_TENANT_ID` | Yes | Azure AD tenant ID for Entra ID endpoint construction |
+| `ACCESSERATOR_OPA_ENABLED` | No | Whether OPA feature is enabled on this cluster (default: `true`) |
 | `ACCESSERATOR_OPA_IMAGE_NAME` | No | Image name for OPA (default: `openpolicyagent/opa`) |
+| `ACCESSERATOR_OPA_IMAGE_TAG` | If OPA enabled | Image tag for the OPA sidecar |
+| `ACCESSERATOR_OPA_IMAGE_SHA` | If OPA enabled | Image digest for the OPA sidecar |
+| `ACCESSERATOR_OPA_PORT` | No | Port exposed by the OPA sidecar (default: `3010`) |
+| `ACCESSERATOR_OPA_URL_ENV_VAR_NAME` | No | Name of the env var injected into application containers pointing to the OPA sidecar URL (default: `OPA_URL`) |
+| `ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES` | If OPA enabled | Comma-separated list of allowed OCI registry URL prefixes for OPA bundles |
+| `ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS` | If OPA enabled | Comma-separated list of allowed GitHub orgs for OPA bundle signature verification |
 
 ## Local Development
 

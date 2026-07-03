@@ -18,7 +18,7 @@ const (
 	defaultTexasPort                           = int32(3000)
 	defaultTexasUrlEnvVarName                  = "TEXAS_URL"
 	defaultEntraTenantId                       = "7f74c8a2-43ce-46b2-b0e8-b6306cba73a3"
-	defaultOpaEnabled                          = "false"
+	defaultOpaEnabled                          = "true"
 	defaultOpaImageName                        = "openpolicyagent/opa"
 	defaultOpaImageTag                         = "latest"
 	defaultOpaImageSha                         = "def456"
@@ -290,6 +290,107 @@ func TestLoad_AllRequiredMissing(t *testing.T) {
 		if !contains(got, key) {
 			t.Errorf("error = %q, want it to mention %s", got, key)
 		}
+	}
+}
+
+func TestLoad_OpaDisabled_DoesNotRequireOpaFields(t *testing.T) {
+	setAllEnvVarsExcept(
+		t,
+		"ACCESSERATOR_OPA_ENABLED",
+		"ACCESSERATOR_OPA_IMAGE_TAG",
+		"ACCESSERATOR_OPA_IMAGE_SHA",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS",
+	)
+	t.Setenv("ACCESSERATOR_OPA_ENABLED", "false")
+
+	if err := config.Load(); err != nil {
+		t.Fatalf("expected no error when OPA disabled, got: %v", err)
+	}
+
+	c := config.Get()
+	if c.OpaEnabled {
+		t.Errorf("OpaEnabled = %v, want false", c.OpaEnabled)
+	}
+	if c.OpaImageTag != "" {
+		t.Errorf("OpaImageTag = %q, want empty", c.OpaImageTag)
+	}
+	if c.OpaImageSha != "" {
+		t.Errorf("OpaImageSha = %q, want empty", c.OpaImageSha)
+	}
+	if len(c.OpaAllowedBundleRegistryUrlPrefixes) != 0 {
+		t.Errorf("OpaAllowedBundleRegistryUrlPrefixes = %v, want empty", c.OpaAllowedBundleRegistryUrlPrefixes)
+	}
+	if len(c.OpaAllowedBundleSignatureSourceOrgs) != 0 {
+		t.Errorf("OpaAllowedBundleSignatureSourceOrgs = %v, want empty", c.OpaAllowedBundleSignatureSourceOrgs)
+	}
+}
+
+func TestLoad_OpaEnabled_RequiresOpaFields(t *testing.T) {
+	setAllEnvVarsExcept(
+		t,
+		"ACCESSERATOR_OPA_IMAGE_TAG",
+		"ACCESSERATOR_OPA_IMAGE_SHA",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS",
+	)
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error when OPA enabled but OPA fields missing, got nil")
+	}
+	got := err.Error()
+	for _, key := range []string{
+		"ACCESSERATOR_OPA_IMAGE_TAG",
+		"ACCESSERATOR_OPA_IMAGE_SHA",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES",
+		"ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS",
+	} {
+		if !contains(got, key) {
+			t.Errorf("error = %q, want it to mention %s", got, key)
+		}
+	}
+}
+
+func TestLoad_TokenxDisabled_DoesNotRequireTokenxNamespace(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_TOKENX_NAMESPACE")
+	t.Setenv("ACCESSERATOR_TOKENX_ENABLED", "false")
+
+	if err := config.Load(); err != nil {
+		t.Fatalf("expected no error when TokenX disabled, got: %v", err)
+	}
+
+	c := config.Get()
+	if c.TokenxEnabled {
+		t.Errorf("TokenxEnabled = %v, want false", c.TokenxEnabled)
+	}
+	if c.TokenxNamespace != "" {
+		t.Errorf("TokenxNamespace = %q, want empty", c.TokenxNamespace)
+	}
+}
+
+func TestLoad_TokenxEnabled_RequiresTokenxNamespace(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_TOKENX_NAMESPACE")
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error when TokenX enabled but TOKENX_NAMESPACE missing, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_TOKENX_NAMESPACE") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_TOKENX_NAMESPACE", got)
+	}
+}
+
+func TestLoad_OpaEnabled_DefaultsToTrue(t *testing.T) {
+	setAllEnvVarsExcept(t, "ACCESSERATOR_OPA_ENABLED")
+
+	if err := config.Load(); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	c := config.Get()
+	if !c.OpaEnabled {
+		t.Errorf("OpaEnabled = %v, want default true", c.OpaEnabled)
 	}
 }
 
