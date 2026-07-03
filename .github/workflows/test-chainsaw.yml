@@ -17,11 +17,6 @@ jobs:
       - name: Clone the code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: probe token access
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker manifest inspect ghcr.io/kartverket/tokenx-token-generator-backend/opa-policies@sha256:21afafe09aba8a68a7d002e2ec8e36de0d09b0b96f87e81b434341945657cad2
-
       - name: Setup Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
@@ -47,6 +42,7 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
           kubectl rollout restart deploy/accesserator -n accesserator-system
           kubectl rollout status deploy/accesserator -n accesserator-system
+
       - name: Run Chainsaw tests
         run: |
           make chainsaw-test-all
