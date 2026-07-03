@@ -29,17 +29,22 @@ const (
 // AttestationFetcher abstracts the OCI lookups required to verify an OPA
 // bundle's Sigstore SLSA provenance attestation.
 type AttestationFetcher interface {
+	// ResolveOciRepositoryAndDigest resolves the OCI repository and digest for the given OCI reference.
 	ResolveOciRepositoryAndDigest(
 		ctx context.Context,
 		credStore credentials.Store,
 		ociReference string,
 	) (*utilities.OciRepositoryAndDigest, error)
 
+	// GetSigstoreProvenanceReferrers fetches the Sigstore SLSA provenance attestation referrers for the given OCI
+	// repository and digest.
 	GetSigstoreProvenanceReferrers(
 		ctx context.Context,
 		ociRepoAndDigest utilities.OciRepositoryAndDigest,
 	) ([]ocispec.Descriptor, error)
 
+	// GetSigstoreBundleMatchingVerificationSource fetches the first Sigstore bundle matching the given verification
+	// source from the provided Sigstore referrers.
 	GetSigstoreBundleMatchingVerificationSource(
 		ctx context.Context,
 		ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
@@ -88,10 +93,9 @@ func (DefaultAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
 	)
 }
 
-// ValidateBundleUrls validates that each bundle URL has an allowed registry
+// ValidateBundleUrlPrefixes validates that each bundle URL has an allowed registry
 // prefix as configured via ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES.
-// It performs no network I/O and is safe to call from an admission webhook.
-func ValidateBundleUrls(bundleURLs []v1alpha.BundleSource) error {
+func ValidateBundleUrlPrefixes(bundleURLs []v1alpha.BundleSource) error {
 	if len(bundleURLs) == 0 {
 		return fmt.Errorf("bundle URLs cannot be nil or empty")
 	}
@@ -116,9 +120,8 @@ func hasAllowedPrefix(url string, prefixes []string) bool {
 	return slices.ContainsFunc(prefixes, func(prefix string) bool { return strings.HasPrefix(url, prefix) })
 }
 
-// VerifyBundleSource resolves the manifest digest for bundleSource. Returns an error if either the
-// cosign signature atttached to the SLSA provenance attestation fails verification or the provided bundle
-// verification source does not match the builder source attached to the attestation.
+// VerifyBundleSource verifies that the given OPA bundle source has a valid Sigstore SLSA provenance attestation that
+// matches the configured verification source.
 func VerifyBundleSource(
 	ctx context.Context,
 	fetcher AttestationFetcher,
@@ -127,8 +130,8 @@ func VerifyBundleSource(
 ) error {
 	logger := log.GetLogger(ctx)
 
-	if bundleSource.Verification == nil || bundleSource.Verification.Source.Repository == "" {
-		return fmt.Errorf("bundle source cannot be nil and must have a repository")
+	if bundleSource.Verification.Source.Repository == "" {
+		return fmt.Errorf("bundle source must have a repository")
 	}
 
 	ociRepoAndDigest, err := fetcher.ResolveOciRepositoryAndDigest(ctx, credStore, bundleSource.URL)
@@ -170,16 +173,16 @@ func VerifyBundleSource(
 	)
 
 	logger.Debug(
-		"Decoding Sigstore bundle digest",
+		"Stripping alg prefix from Sigstore bundle digest",
 		"bundleURL", bundleSource.URL,
 	)
-	artifactSHA256, err := utilities.GetManifestDigestWithoutAlgPrefix(ociRepoAndDigest.Digest)
+	artifactSHA256, err := utilities.StripAlgPrefix(ociRepoAndDigest.Digest)
 	if err != nil {
-		logger.Error(err, "failed to decode artifact SHA256", "bundleURL", bundleSource.URL)
-		return fmt.Errorf("failed to decode artifact SHA256 for digest %s", ociRepoAndDigest.Digest)
+		logger.Error(err, "failed to strip alg prefix artifact SHA256", "bundleURL", bundleSource.URL)
+		return fmt.Errorf("failed to strip alg prefix artifact SHA256 for digest %s", ociRepoAndDigest.Digest)
 	}
 	logger.Debug(
-		"Sigstore bundle digest decoded successfully",
+		"Sigstore bundle digest stripped of alg prefix successfully",
 		"bundleURL", bundleSource.URL,
 	)
 

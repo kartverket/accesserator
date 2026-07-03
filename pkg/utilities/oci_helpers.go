@@ -79,8 +79,8 @@ func FetchLayerMatchingMediaType(
 	)
 }
 
-// GetManifestDigestWithoutAlgPrefix turns "sha256:<hex>" into the raw 32-byte hash.
-func GetManifestDigestWithoutAlgPrefix(manifestDigest string) ([]byte, error) {
+// StripAlgPrefix turns "sha256:<hex>" into the raw 32-byte hash.
+func StripAlgPrefix(manifestDigest string) ([]byte, error) {
 	algo, hexPart, ok := strings.Cut(manifestDigest, ":")
 	if !ok || algo != "sha256" {
 		return nil, fmt.Errorf("unsupported manifest digest %q (only sha256 supported)", manifestDigest)
@@ -118,6 +118,10 @@ func fetchManifest(ctx context.Context, ociRepoAndDigest OciRepositoryAndDigest)
 	return &manifest, nil
 }
 
+// GetOciReferrersMatchingMediaTypeAndPredicate	fetches the referrers of the given OCI repository and digest, filters
+// them by the specified media type, and applies the provided predicate function to further filter the results.
+// It returns a slice of matching referrers or an error if no matching referrers are found or if there is an issue
+// fetching the referrers.
 func GetOciReferrersMatchingMediaTypeAndPredicate(
 	ctx context.Context,
 	ociRepoAndDigest OciRepositoryAndDigest,
