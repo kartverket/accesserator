@@ -59,3 +59,9 @@ spec:
             file: securityconfig-with-ref-correct.yaml
         - assert:
             file: securityconfig-ready.yaml
+      catch:
+        - podLogs:
+            namespace: accesserator-system
+            selector: app=accesserator
+            container: accesserator
+            tail: 100
