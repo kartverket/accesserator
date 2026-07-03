@@ -110,18 +110,12 @@ func verifyBundleSignatures(logger log.Logger, ctx context.Context, bundles []ac
 		return nil
 	}
 
-	credStore, err := credentials.NewStoreFromDocker(credentials.StoreOptions{})
-	if err != nil {
-		logger.Error(err, "Failed to create credential store for signature validation")
-		return errors.New("failed to create credential store for accessing OCI registries for signature validation")
-	}
-
 	fetcher := validation.DefaultAttestationFetcher{}
 	for _, bundle := range bundles {
 		if bundle.Verification == nil {
 			continue
 		}
-		if verifyErr := verifyBundle(ctx, fetcher, credStore, bundle); verifyErr != nil {
+		if verifyErr := verifyBundle(ctx, fetcher, config.CredStore, bundle); verifyErr != nil {
 			return verifyErr
 		}
 	}

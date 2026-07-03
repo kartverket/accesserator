@@ -74,11 +74,6 @@ func ResolveOpaConfigWithFetcher(
 		)
 	}
 
-	credStore, err := credentials.NewStoreFromDocker(credentials.StoreOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup credential store for auth towards OCI registry: %w", err)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), OpaBundleFetchLayerTimeout)
 	defer cancel()
 
@@ -88,7 +83,7 @@ func ResolveOpaConfigWithFetcher(
 	)
 	binaryData := make(map[string][]byte, len(bundles))
 	for _, bundle := range bundles {
-		data, resolveBundleErr := resolveOpaBundle(ctx, logger, fetcher, credStore, bundle)
+		data, resolveBundleErr := resolveOpaBundle(ctx, logger, fetcher, config.CredStore, bundle)
 		if resolveBundleErr != nil {
 			return nil, resolveBundleErr
 		}
@@ -118,7 +113,7 @@ func resolveOpaBundle(
 	}
 
 	logger.Debug("Fetching OPA bundle layer", "bundleURL", bundle.URL, "digest", ociRepoAndDigest.Digest)
-	layer, err := fetcher.FetchOpaBundleLayer(ctx, credStore, *ociRepoAndDigest)
+	layer, err := fetcher.FetchOpaBundleLayer(ctx, *ociRepoAndDigest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OCI bundle layer for %s: %w", bundle.URL, err)
 	}
