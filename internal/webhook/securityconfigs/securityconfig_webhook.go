@@ -2,7 +2,6 @@ package securityconfigs
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 // signatureValidationTimeout caps how long an admission request will wait for
 // signature checks (resolve manifest + fetch attestation + Rekor lookup).
 // Kept well under the default webhook timeout of 10s.
-const signatureValidationTimeout = 8 * time.Second
+const opaBundleVerificationTimeout = 15 * time.Second
 
 // nolint:unused
 var securityconfiglog = logf.Log.WithName("securityconfig-webhook")
@@ -72,19 +71,21 @@ func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1a
 		return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
 	}
 
-	logger.Info("Validating SecurityConfig OPA bundle URLs", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
-	if err := validation.ValidateBundleUrls(securityConfig.Spec.Opa.BundleURLs); err != nil {
+	// TODO: Rebase with main and let this function handle feature toggles and then call validateOpaConf etc.
+
+	logger.Debug("Validating SecurityConfig OPA bundle URL prefixes", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
+	if err := validation.ValidateBundleUrlPrefixes(securityConfig.Spec.Opa.BundleURLs); err != nil {
 		logger.Warning(
 			"SecurityConfig blocked by validating webhook",
 			"name", securityConfig.Name, "namespace", securityConfig.Namespace, "validationError", err.Error(),
 		)
 		return nil, err
 	}
-	logger.Info("SecurityConfig OPA bundle URLs validated successfully",
+	logger.Debug("SecurityConfig OPA bundle URL prefixes validated successfully",
 		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
 	)
 
-	logger.Info("Verifying SecurityConfig OPA bundle URLs against source",
+	logger.Debug("Verifying SecurityConfig OPA bundle URLs against source",
 		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
 	)
 	if err := verifyBundleSignatures(logger, ctx, securityConfig.Spec.Opa.BundleURLs); err != nil {
@@ -94,7 +95,7 @@ func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1a
 		)
 		return nil, err
 	}
-	logger.Info("SecurityConfig OPA bundle URLs verified successfully against source",
+	logger.Debug("SecurityConfig OPA bundle URLs verified successfully against source",
 		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
 	)
 
@@ -102,8 +103,7 @@ func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1a
 }
 
 // verifyBundleSignatures verifies the SLSA provenance attestation for every
-// bundle that opts into verification. Skips the credential-store setup
-// entirely when nothing in the spec asks for verification.
+// bundle that opts into verification.
 func verifyBundleSignatures(logger log.Logger, ctx context.Context, bundles []accesseratorv1alpha.BundleSource) error {
 	if !anyHasVerification(bundles) {
 		logger.Debug("None of the bundles have verification configured, skipping signature verification")
@@ -128,14 +128,14 @@ func verifyBundle(
 	credStore credentials.Store,
 	bundle accesseratorv1alpha.BundleSource,
 ) error {
-	verifyCtx, cancel := context.WithTimeout(ctx, signatureValidationTimeout)
+	verifyCtx, cancel := context.WithTimeout(ctx, opaBundleVerificationTimeout)
 	defer cancel()
 	return validation.VerifyBundleSource(verifyCtx, fetcher, credStore, bundle)
 }
 
 func anyHasVerification(bundles []accesseratorv1alpha.BundleSource) bool {
-	for _, b := range bundles {
-		if b.Verification != nil {
+	for _, bundle := range bundles {
+		if bundle.Verification != nil {
 			return true
 		}
 	}
