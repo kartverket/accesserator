@@ -47,14 +47,14 @@ type InTotoStatement struct {
 // root (GitHub's or public-good) based on the presence of TLog entries in the bundle.
 func GetBundleVerifier(sigstoreBundle *sigstorebundle.Bundle) (*verify.Verifier, error) {
 	if sigstoreBundle == nil || sigstoreBundle.Bundle == nil ||
-		sigstoreBundle.Bundle.VerificationMaterial == nil {
+		sigstoreBundle.VerificationMaterial == nil {
 		return nil, fmt.Errorf("invalid sigstore bundle: missing verification material")
 	}
 
 	opts := make([]verify.VerifierOption, 0, 3)
 	var trustedRoot root.TrustedMaterial
 	var getTrustedRootErr error
-	isSignedByPublicSigtoreInstance := len(sigstoreBundle.Bundle.VerificationMaterial.TlogEntries) > 0
+	isSignedByPublicSigtoreInstance := len(sigstoreBundle.VerificationMaterial.TlogEntries) > 0
 
 	if isSignedByPublicSigtoreInstance {
 		opts = append(opts, verify.WithSignedCertificateTimestamps(1))
