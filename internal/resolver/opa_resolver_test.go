@@ -3,61 +3,89 @@ package resolver_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
+	"strings"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/accesserator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
-// mockBundleFetcher satisfies resolver.BundleFetcher (which embeds
+// mockBundleFetcher satisfies resolver.OpaBundleFetcher (which embeds
 // validation.AttestationFetcher). Fields tune what each call returns; call
 // counters and last-seen arguments are recorded for assertions.
+//
+// Bundle-source verification lives in the validating webhook, so the resolver
+// only ever exercises ResolveOciRepositoryAndDigest and FetchOpaBundleLayer.
+// The AttestationFetcher methods are implemented solely to satisfy the
+// interface.
 type mockBundleFetcher struct {
-	manifestDigest  string
-	layerData       []byte
-	attestationData []byte
+	repoAndDigest *utilities.OciRepositoryAndDigest
+	layerData     []byte
 
 	resolveErr error
 	fetchErr   error
-	attestErr  error
 
 	resolveCalls int
 	fetchCalls   int
-	attestCalls  int
 
 	lastCredStore credentials.Store
 	lastReference string
 }
 
-func (m *mockBundleFetcher) Resolve(_ context.Context, credStore credentials.Store, reference string) (string, error) {
+func (m *mockBundleFetcher) ResolveOciRepositoryAndDigest(
+	_ context.Context,
+	credStore credentials.Store,
+	reference string,
+) (*utilities.OciRepositoryAndDigest, error) {
 	m.resolveCalls++
 	m.lastCredStore = credStore
 	m.lastReference = reference
-	if m.manifestDigest == "" {
-		m.manifestDigest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	if m.resolveErr != nil {
+		return nil, m.resolveErr
 	}
-	return m.manifestDigest, m.resolveErr
+	if m.repoAndDigest == nil {
+		m.repoAndDigest = &utilities.OciRepositoryAndDigest{
+			Digest: "sha256:" + strings.Repeat("0", 64),
+		}
+	}
+	return m.repoAndDigest, nil
 }
 
-func (m *mockBundleFetcher) FetchLayer(_ context.Context, _ credentials.Store, _ string, _ string) ([]byte, error) {
+func (m *mockBundleFetcher) FetchOpaBundleLayer(
+	_ context.Context,
+	_ utilities.OciRepositoryAndDigest,
+) ([]byte, error) {
 	m.fetchCalls++
 	return m.layerData, m.fetchErr
 }
 
-func (m *mockBundleFetcher) FetchAttestation(_ context.Context, _ credentials.Store, _ string, _ string) ([]byte, error) {
-	m.attestCalls++
-	return m.attestationData, m.attestErr
+func (m *mockBundleFetcher) GetSigstoreProvenanceReferrers(
+	_ context.Context,
+	_ utilities.OciRepositoryAndDigest,
+) ([]ocispec.Descriptor, error) {
+	return nil, nil
+}
+
+func (m *mockBundleFetcher) GetSigstoreBundleMatchingVerificationSource(
+	_ context.Context,
+	_ utilities.OciRepositoryAndDigest,
+	_ []ocispec.Descriptor,
+	_ accesseratorv1alpha.GitHubRepositorySource,
+) (*sigstorebundle.Bundle, error) {
+	return nil, nil
 }
 
 // Compile-time check that mockBundleFetcher satisfies the interfaces.
 var (
-	_ resolver.BundleFetcher        = (*mockBundleFetcher)(nil)
+	_ resolver.OpaBundleFetcher     = (*mockBundleFetcher)(nil)
 	_ validation.AttestationFetcher = (*mockBundleFetcher)(nil)
 )
 
@@ -172,19 +200,17 @@ var _ = Describe("OPA Resolver", func() {
 				Expect(fetcher.fetchCalls).To(Equal(3))
 			})
 
-			It("rejects a bundle URL that doesn't match the allowed prefix", func() {
+			It("returns an error when spec.opa.enabled is true but no bundle URLs are set", func() {
 				fetcher := &mockBundleFetcher{}
 				sc := makeSecurityConfig(&accesseratorv1alpha.OpenPolicyAgentSpec{
-					Enabled: true,
-					BundleURLs: []accesseratorv1alpha.BundleSource{
-						{Name: "bundle", URL: "https://forbidden/repo:tag"},
-					},
+					Enabled:    true,
+					BundleURLs: nil,
 				})
 
 				result, err := resolver.ResolveOpaConfigWithFetcher(logger, fetcher, sc)
 
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("invalid OPA bundle URLs"))
+				Expect(err.Error()).To(ContainSubstring("no OPA bundle URLs found"))
 				Expect(result).To(BeNil())
 				Expect(fetcher.resolveCalls).To(BeZero())
 			})
@@ -202,12 +228,13 @@ var _ = Describe("OPA Resolver", func() {
 
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("resolve-failed"))
+				Expect(err.Error()).To(ContainSubstring("failed to resolve OCI bundle digest"))
 				Expect(err.Error()).To(ContainSubstring(allowedPrefix + "repo:tag"))
 				Expect(result).To(BeNil())
 				Expect(fetcher.fetchCalls).To(BeZero())
 			})
 
-			It("propagates an error from FetchLayer", func() {
+			It("propagates an error from FetchOpaBundleLayer", func() {
 				fetcher := &mockBundleFetcher{fetchErr: errors.New("fetch-failed")}
 				sc := makeSecurityConfig(&accesseratorv1alpha.OpenPolicyAgentSpec{
 					Enabled: true,
@@ -220,6 +247,7 @@ var _ = Describe("OPA Resolver", func() {
 
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("fetch-failed"))
+				Expect(err.Error()).To(ContainSubstring("failed to fetch OCI bundle layer"))
 				Expect(result).To(BeNil())
 			})
 
@@ -237,60 +265,6 @@ var _ = Describe("OPA Resolver", func() {
 
 				Expect(err).To(HaveOccurred())
 				Expect(fetcher.resolveCalls).To(Equal(1))
-			})
-		})
-
-		Context("when verification is set on a bundle", func() {
-			// We can't end-to-end test a successful verification in a unit
-			// test (it would need a real Sigstore bundle + reachable TUF +
-			// reachable Rekor). These tests cover that the verification step
-			// is attempted and that failures bubble up correctly.
-
-			validSourceConfig := func() *accesseratorv1alpha.OpenPolicyAgentSpec {
-				return &accesseratorv1alpha.OpenPolicyAgentSpec{
-					Enabled: true,
-					BundleURLs: []accesseratorv1alpha.BundleSource{{
-						Name: "bundle",
-						URL:  allowedPrefix + "repo:tag",
-						Verification: &accesseratorv1alpha.BundleSourceVerification{
-							Source: accesseratorv1alpha.GitHubRepositorySource{
-								Repository: "kartverket/accesserator",
-							},
-						},
-					}},
-				}
-			}
-
-			It("calls FetchAttestation before pulling the layer", func() {
-				fetcher := &mockBundleFetcher{
-					attestErr: errors.New("attestation-fetch-failed"),
-				}
-
-				sc := makeSecurityConfig(validSourceConfig())
-				_, err := resolver.ResolveOpaConfigWithFetcher(logger, fetcher, sc)
-
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(Equal(
-					fmt.Sprintf(
-						"failed to verify OCI bundle from %s: "+
-							"failed to fetch cosign bundle for %s",
-						sc.Spec.Opa.BundleURLs[0].URL,
-						sc.Spec.Opa.BundleURLs[0].URL,
-					),
-				))
-				Expect(fetcher.attestCalls).To(Equal(1))
-				Expect(fetcher.fetchCalls).To(BeZero())
-			})
-
-			It("propagates the failure when the attestation bytes aren't a valid sigstore bundle", func() {
-				fetcher := &mockBundleFetcher{
-					attestationData: []byte("not-a-sigstore-bundle"),
-				}
-
-				_, err := resolver.ResolveOpaConfigWithFetcher(logger, fetcher, makeSecurityConfig(validSourceConfig()))
-
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("failed to verify OCI bundle"))
 				Expect(fetcher.fetchCalls).To(BeZero())
 			})
 		})

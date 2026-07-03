@@ -79,7 +79,7 @@ spec:
               mountPath: /tmp/github-auth
               readOnly: true
             - name: sigstore-tuf
-              mountPath: /tmp/tuf
+              mountPath: /tmp/sigstore-tuf
       imagePullSecrets:
         - name: github-auth
       priorityClassName: skip-critical

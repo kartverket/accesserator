@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
+	"oras.land/oras-go/v2/registry/remote/credentials"
 )
+
+var CredStore *credentials.DynamicStore
 
 type Config struct {
 	RunsInProduction *bool `split_words:"true"`
@@ -33,11 +36,20 @@ type Config struct {
 	OpaUrlEnvVarName                    string   `split_words:"true" default:"OPA_URL"`
 	OpaAllowedBundleRegistryUrlPrefixes []string `split_words:"true"`
 	OpaAllowedBundleSignatureSourceOrgs []string `split_words:"true"`
+
+	SigstoreTufCachePath string `split_words:"true" default:"/tmp/sigstore-tuf"`
 }
 
 var appCfg Config
 
 func Load() error {
+	// Setup credential store for auth towards OCI registry
+	var setupCredStoreErr error
+	CredStore, setupCredStoreErr = credentials.NewStoreFromDocker(credentials.StoreOptions{})
+	if setupCredStoreErr != nil {
+		return fmt.Errorf("failed setting up credential store for auth towards OCI registry: %w", setupCredStoreErr)
+	}
+
 	cfg := Config{}
 	if err := envconfig.Process("accesserator", &cfg); err != nil {
 		return err

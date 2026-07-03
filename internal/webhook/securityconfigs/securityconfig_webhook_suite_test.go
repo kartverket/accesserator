@@ -354,7 +354,7 @@ var _ = Describe("SecurityConfig validating webhook", func() {
 		Expect(err.Error()).To(Equal(
 			fmt.Sprintf(
 				"admission webhook \"vsecurityconfig-v1alpha.kb.io\" denied the request: "+
-					"failed to resolve OCI bundle digest for %s", sc.Spec.Opa.BundleURLs[0].URL,
+					"failed to resolve digest for %s", sc.Spec.Opa.BundleURLs[0].URL,
 			),
 		))
 	})

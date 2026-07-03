@@ -2,10 +2,10 @@ package securityconfigs
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
+	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/validation"
@@ -13,14 +13,13 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
 // signatureValidationTimeout caps how long an admission request will wait for
 // signature checks (resolve manifest + fetch attestation + Rekor lookup).
 // Kept well under the default webhook timeout of 10s.
-const signatureValidationTimeout = 8 * time.Second
+const opaBundleVerificationTimeout = 15 * time.Second
 
 // nolint:unused
 var securityconfiglog = logf.Log.WithName("securityconfig-webhook")
@@ -68,62 +67,83 @@ func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1a
 	if securityConfig.Spec.Tokenx != nil && !config.Get().TokenxEnabled {
 		return nil, fmt.Errorf("TokenX is not enabled on this cluster and 'spec.tokenx' can therefore not be set")
 	}
-	if securityConfig.Spec.Opa != nil && !config.Get().OpaEnabled {
-		return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
-	}
-
 	if securityConfig.Spec.Opa != nil {
-		if err := validation.ValidateBundleUrls(securityConfig.Spec.Opa.BundleURLs); err != nil {
-			logger.Info(
-				"SecurityConfig blocked by validating webhook",
-				"validationError", err.Error(),
-			)
-			return nil, err
+		if !config.Get().OpaEnabled {
+			return nil, fmt.Errorf("OPA is not enabled on this cluster and 'spec.opa' can therefore not be set")
 		}
-
-		if err := validateBundleSignatures(ctx, securityConfig.Spec.Opa.BundleURLs); err != nil {
-			logger.Info(
-				"SecurityConfig blocked by validating webhook",
-				"validationError", err.Error(),
-			)
-			return nil, err
+		if validateOpaErr := validateOpa(logger, ctx, securityConfig); validateOpaErr != nil {
+			return nil, validateOpaErr
 		}
 	}
 
 	return nil, nil
 }
 
-func validateBundleSignatures(ctx context.Context, bundles []accesseratorv1alpha.BundleSource) error {
-	logger := log.GetLogger(ctx)
-
-	// Skip the credential store setup if nothing in the spec asks for verification.
-	hasVerification := false
-	for _, b := range bundles {
-		if b.Verification != nil {
-			hasVerification = true
-			break
-		}
+func validateOpa(logger log.Logger, ctx context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) error {
+	logger.Debug("Validating SecurityConfig OPA bundle URL prefixes", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
+	if err := validation.ValidateBundleUrlPrefixes(securityConfig.Spec.Opa.BundleURLs); err != nil {
+		logger.Warning(
+			"SecurityConfig blocked by validating webhook",
+			"name", securityConfig.Name, "namespace", securityConfig.Namespace, "validationError", err.Error(),
+		)
+		return err
 	}
-	if !hasVerification {
+	logger.Debug("SecurityConfig OPA bundle URL prefixes validated successfully",
+		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
+	)
+
+	logger.Debug("Verifying SecurityConfig OPA bundle URLs against source",
+		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
+	)
+	if err := verifyBundleSignatures(logger, ctx, securityConfig.Spec.Opa.BundleURLs); err != nil {
+		logger.Warning(
+			"SecurityConfig blocked by validating webhook",
+			"validationError", err.Error(),
+		)
+		return err
+	}
+	logger.Debug("SecurityConfig OPA bundle URLs verified successfully against source",
+		"name", securityConfig.Name, "namespace", securityConfig.Namespace,
+	)
+	return nil
+}
+
+// verifyBundleSignatures verifies the SLSA provenance attestation for every
+// bundle that opts into verification.
+func verifyBundleSignatures(logger log.Logger, ctx context.Context, bundles []accesseratorv1alpha.BundleSource) error {
+	if !anyHasVerification(bundles) {
+		logger.Debug("None of the bundles have verification configured, skipping signature verification")
 		return nil
 	}
 
-	credStore, err := credentials.NewStoreFromDocker(credentials.StoreOptions{})
-	if err != nil {
-		logger.Error(err, "Failed to create credential store for signature validation")
-		return errors.New("failed to create credential store for signature validation")
-	}
-
-	for _, bundleSource := range bundles {
-		if bundleSource.Verification == nil {
+	fetcher := validation.DefaultAttestationFetcher{}
+	for _, bundle := range bundles {
+		if bundle.Verification == nil {
 			continue
 		}
-		signatureCtx, cancel := context.WithTimeout(ctx, signatureValidationTimeout)
-		validateSignatureErr := validation.ValidateBundleSourceSignature(signatureCtx, validation.DefaultAttestationFetcher, credStore, bundleSource)
-		cancel()
-		if validateSignatureErr != nil {
-			return validateSignatureErr
+		if verifyErr := verifyBundle(ctx, fetcher, config.CredStore, bundle); verifyErr != nil {
+			return verifyErr
 		}
 	}
 	return nil
+}
+
+func verifyBundle(
+	ctx context.Context,
+	fetcher validation.AttestationFetcher,
+	credStore credentials.Store,
+	bundle accesseratorv1alpha.BundleSource,
+) error {
+	verifyCtx, cancel := context.WithTimeout(ctx, opaBundleVerificationTimeout)
+	defer cancel()
+	return validation.VerifyBundleSource(verifyCtx, fetcher, credStore, bundle)
+}
+
+func anyHasVerification(bundles []accesseratorv1alpha.BundleSource) bool {
+	for _, bundle := range bundles {
+		if bundle.Verification != nil {
+			return true
+		}
+	}
+	return false
 }

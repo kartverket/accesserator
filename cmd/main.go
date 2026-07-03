@@ -25,6 +25,7 @@ import (
 	"github.com/kartverket/accesserator/internal/webhook/pods"
 	"github.com/kartverket/accesserator/internal/webhook/securityconfigs"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -221,6 +222,22 @@ func main() {
 		}
 		if err := securityconfigs.SetupSecurityConfigWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "SecurityConfig")
+			os.Exit(1)
+		}
+
+		// Initialize public good and GitHub Sigstore trsuetd material used to verify SLSA provenance attestations.
+		_, initPublicGoodTrustedRootErr := utilities.PublicTrustedRoot()
+		if initPublicGoodTrustedRootErr != nil {
+			setupLog.Error(
+				initPublicGoodTrustedRootErr,
+				"unable to initialize public good trusted root for Sigstore bundle verification",
+			)
+			os.Exit(1)
+		}
+
+		_, initGitHubTrustedRootErr := utilities.GitHubTrustedRoot()
+		if initGitHubTrustedRootErr != nil {
+			setupLog.Error(initGitHubTrustedRootErr, "unable to initialize GitHub trusted root for Sigstore bundle verification")
 			os.Exit(1)
 		}
 	}

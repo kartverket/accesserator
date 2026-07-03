@@ -1,0 +1,14 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+spec:
+  opa:
+    enabled: true
+    bundleUrls:
+      - name: policy-bundle
+        url: ghcr.io/kartverket/tokenx-token-generator-backend/opa-policies@sha256:21afafe09aba8a68a7d002e2ec8e36de0d09b0b96f87e81b434341945657cad2
+        verification:
+          source:
+            repository: kartverket/not-tokenx-token-generator-backend
+  applicationRef: app

@@ -1,3 +1,4 @@
 resources:
   - bases/webhook-certificate.yaml
   - bases/manifests.yaml
+  - bases/webhook-issuer.yaml
