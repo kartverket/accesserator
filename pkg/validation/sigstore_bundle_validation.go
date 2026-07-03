@@ -28,19 +28,12 @@ var ErrSourceMismatch = errors.New("source mismatch")
 
 // ValidateSigstoreBundleSignature verifies that the bundle is signed via
 // GitHub Actions' keyless flow by a workflow in one of the allowed
-// organizations, and that the signature binds to artifactSHA256.
+// organizations, and that the bundle's artifact digest matches the provided SHA256 digest.
 func ValidateSigstoreBundleSignature(
 	logger log.Logger,
 	sigstoreBundle *sigstorebundle.Bundle,
 	artifactSHA256 []byte,
 ) error {
-	if len(config.Get().OpaAllowedBundleSignatureSourceOrgs) == 0 {
-		return fmt.Errorf(
-			"at least one OpaAllowedBundleSignatureSourceOrg is required, " +
-				"configure it via ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS",
-		)
-	}
-
 	sanRegex, err := BuildGitHubSANRegex(config.Get().OpaAllowedBundleSignatureSourceOrgs)
 	if err != nil {
 		logger.Error(err, "Failed to build GitHub SAN regex")
@@ -58,9 +51,9 @@ func ValidateSigstoreBundleSignature(
 		return fmt.Errorf("failed to CertificateIdentity from SAN regex %s", sanRegex)
 	}
 
-	verifier, getverifierErr := utilities.GetBundleVerifier(sigstoreBundle)
-	if getverifierErr != nil {
-		logger.Error(getverifierErr, "Failed to get bundle verifier")
+	verifier, getVerifierErr := utilities.GetBundleVerifier(sigstoreBundle)
+	if getVerifierErr != nil {
+		logger.Error(getVerifierErr, "Failed to get bundle verifier")
 		return fmt.Errorf("failed to get bundle verifier")
 	}
 
@@ -95,6 +88,7 @@ func BuildGitHubSANRegex(orgs []string) (string, error) {
 	), nil
 }
 
+// pullSigstoreBundleBytes pulls the bytes of a Sigstore bundle from the given OCI repository and referrer descriptor.
 func pullSigstoreBundleBytes(
 	ctx context.Context,
 	repo *remote.Repository,
@@ -175,7 +169,7 @@ func GetSigstoreBundleMatchingVerification(
 
 	}
 
-	if len(mismatchedSources) == 0 {
+	if len(errList) > 0 {
 		return nil, errors.Join(errList...)
 	}
 
