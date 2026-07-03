@@ -12,6 +12,7 @@ spec:
     - ghcr.io
     - pkg-containers.githubusercontent.com
     - tuf-repo-cdn.sigstore.dev
+    - tuf-repo.github.com
     - github.com
   ports:
     - name: https
