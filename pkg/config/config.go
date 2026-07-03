@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
+	"oras.land/oras-go/v2/registry/remote/credentials"
 )
+
+var CredStore *credentials.DynamicStore
 
 type Config struct {
 	RunsInProduction *bool `split_words:"true"`
@@ -34,13 +37,19 @@ type Config struct {
 	OpaAllowedBundleRegistryUrlPrefixes []string `split_words:"true"`
 	OpaAllowedBundleSignatureSourceOrgs []string `split_words:"true"`
 
-	SigstoreGithubTrustedRootPath string `split_words:"true"`
-	SigstoreTufCachePath          string `split_words:"true" default:"/tmp/sigstore-tuf"`
+	SigstoreTufCachePath string `split_words:"true" default:"/tmp/sigstore-tuf"`
 }
 
 var appCfg Config
 
 func Load() error {
+	// Setup credential store for auth towards OCI registry
+	var err error
+	CredStore, err = credentials.NewStoreFromDocker(credentials.StoreOptions{})
+	if err != nil {
+		return fmt.Errorf("failed setting up credential store for auth towards OCI registry: %w", err)
+	}
+
 	cfg := Config{}
 	if err := envconfig.Process("accesserator", &cfg); err != nil {
 		return err
@@ -76,9 +85,6 @@ func Load() error {
 	}
 	if len(cfg.OpaAllowedBundleSignatureSourceOrgs) == 0 {
 		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
-	}
-	if cfg.SigstoreGithubTrustedRootPath == "" {
-		missing = append(missing, "ACCESSERATOR_SIGSTORE_GITHUB_TRUSTED_ROOT_PATH")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
