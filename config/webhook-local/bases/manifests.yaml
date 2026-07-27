@@ -100,3 +100,4 @@ webhooks:
         resources:
           - securityconfigs
     sideEffects: None
+    timeoutSeconds: 30

@@ -7,7 +7,7 @@ spec:
   timeouts:
     delete: 60s
     assert: 60s
-    apply: 20s
+    apply: 60s
     cleanup: 60s
     error: 60s
     exec: 90s
