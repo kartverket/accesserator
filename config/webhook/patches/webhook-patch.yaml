@@ -66,3 +66,4 @@ webhooks:
       service:
         name: webhook-service
         namespace: accesserator-system
+    timeoutSeconds: 30
