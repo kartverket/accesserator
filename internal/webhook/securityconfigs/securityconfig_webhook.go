@@ -16,10 +16,7 @@ import (
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
-// signatureValidationTimeout caps how long an admission request will wait for
-// signature checks (resolve manifest + fetch attestation + Rekor lookup).
-// Kept well under the default webhook timeout of 10s.
-const opaBundleVerificationTimeout = 15 * time.Second
+const opaBundleVerificationTimeout = 30 * time.Second
 
 // nolint:unused
 var securityconfiglog = logf.Log.WithName("securityconfig-webhook")
