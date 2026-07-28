@@ -26,16 +26,23 @@ func ResolveOciRepositoryAndDigest(
 	credStore credentials.Store,
 	ociReference string,
 ) (*OciRepositoryAndDigest, error) {
-	var ociRepoAndDigest OciRepositoryAndDigest
 	repo, err := remote.NewRepository(ociReference)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing OCI reference %q: %w", ociReference, err)
 	}
+
 	repo.Client = &auth.Client{
 		Cache:      auth.NewCache(),
 		Credential: credentials.Credential(credStore),
 	}
-	ociRepoAndDigest.Repository = repo
+
+	ociRepoAndDigest := OciRepositoryAndDigest{Repository: repo}
+
+	if strings.HasPrefix(repo.Reference.Reference, "sha256:") {
+		ociRepoAndDigest.Digest = repo.Reference.Reference
+		return &ociRepoAndDigest, nil
+	}
+
 	desc, err := repo.Resolve(ctx, repo.Reference.Reference)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve OCI reference %q: %w", ociReference, err)
