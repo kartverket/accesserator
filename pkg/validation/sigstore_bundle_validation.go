@@ -94,19 +94,15 @@ func pullSigstoreBundleBytes(
 	repo *remote.Repository,
 	referrer ocispec.Descriptor,
 ) ([]byte, error) {
-	store := memory.New()
-	if _, err := oras.Copy(ctx, repo, referrer.Digest.String(), store, "", oras.DefaultCopyOptions); err != nil {
-		return nil, fmt.Errorf("failed to pull Sigstore referrer %s: %w", referrer.Digest, err)
-	}
-	successors, err := content.Successors(ctx, store, referrer)
+	successors, err := content.Successors(ctx, repo, referrer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list successors of Sigstore referrer %s: %w", referrer.Digest, err)
+		return nil, fmt.Errorf("failed to pull Sigstore referrer %s: %w", referrer.Digest, err)
 	}
 	for _, successor := range successors {
 		if successor.MediaType != SigstoreBundleMediaType {
 			continue
 		}
-		bytes, fetchSuccessorErr := content.FetchAll(ctx, store, successor)
+		bytes, fetchSuccessorErr := content.FetchAll(ctx, repo, successor)
 		if fetchSuccessorErr != nil {
 			return nil, fmt.Errorf("failed to fetch Sigstore bundle %s: %w", successor.Digest, fetchSuccessorErr)
 		}
