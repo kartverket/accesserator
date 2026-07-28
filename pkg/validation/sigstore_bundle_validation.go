@@ -16,11 +16,14 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/verify"
-	"oras.land/oras-go/v2"
+	"golang.org/x/sync/errgroup"
 	"oras.land/oras-go/v2/content"
-	"oras.land/oras-go/v2/content/memory"
 	"oras.land/oras-go/v2/registry/remote"
 )
+
+// maxConcurrentReferrerPulls is the maximum number of concurrent referrer pulls to perform when fetching Sigstore
+// bundles from an OCI repository.
+const maxConcurrentReferrerPulls = 10
 
 // ErrSourceMismatch is returned when an attestation's verification source does not match
 // the specified verification source.
@@ -94,19 +97,15 @@ func pullSigstoreBundleBytes(
 	repo *remote.Repository,
 	referrer ocispec.Descriptor,
 ) ([]byte, error) {
-	store := memory.New()
-	if _, err := oras.Copy(ctx, repo, referrer.Digest.String(), store, "", oras.DefaultCopyOptions); err != nil {
-		return nil, fmt.Errorf("failed to pull Sigstore referrer %s: %w", referrer.Digest, err)
-	}
-	successors, err := content.Successors(ctx, store, referrer)
+	successors, err := content.Successors(ctx, repo, referrer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list successors of Sigstore referrer %s: %w", referrer.Digest, err)
+		return nil, fmt.Errorf("failed to pull Sigstore referrer %s: %w", referrer.Digest, err)
 	}
 	for _, successor := range successors {
 		if successor.MediaType != SigstoreBundleMediaType {
 			continue
 		}
-		bytes, fetchSuccessorErr := content.FetchAll(ctx, store, successor)
+		bytes, fetchSuccessorErr := content.FetchAll(ctx, repo, successor)
 		if fetchSuccessorErr != nil {
 			return nil, fmt.Errorf("failed to fetch Sigstore bundle %s: %w", successor.Digest, fetchSuccessorErr)
 		}
@@ -117,56 +116,65 @@ func pullSigstoreBundleBytes(
 	return nil, fmt.Errorf("no Sigstore bundle layer in referrer %s", referrer.Digest)
 }
 
+func fetchReferrerBundleAndSource(
+	ctx context.Context,
+	repo *remote.Repository,
+	referrer ocispec.Descriptor,
+) (*sigstorebundle.Bundle, *v1alpha.GitHubRepositorySource, error) {
+	bundleBytes, err := pullSigstoreBundleBytes(ctx, repo, referrer)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch Sigstore bundle bytes: %w", err)
+	}
+	bundle := &sigstorebundle.Bundle{}
+	if err := json.Unmarshal(bundleBytes, bundle); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode Sigstore bundle bytes: %w", err)
+	}
+	source, err := utilities.GetRepositorySourceFromSigstoreBundle(bundle)
+	if err != nil {
+		return nil, nil, fmt.Errorf(
+			"failed to fetch github repository source from Sigstore bundle fetched via refererrer %s: %w",
+			referrer.Digest, err,
+		)
+	}
+	return bundle, source, nil
+}
+
 func GetSigstoreBundleMatchingVerification(
 	ctx context.Context,
 	ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 	sigstoreReferrers []ocispec.Descriptor,
 	verificationSource v1alpha.GitHubRepositorySource,
 ) (*sigstorebundle.Bundle, error) {
+	type referrerPullResult struct {
+		bundle *sigstorebundle.Bundle
+		source *v1alpha.GitHubRepositorySource
+		err    error
+	}
+
+	// Pull referrer bundles concurrently.
+	results := make([]referrerPullResult, len(sigstoreReferrers))
+	var group errgroup.Group
+	group.SetLimit(maxConcurrentReferrerPulls)
+	for i, referrer := range sigstoreReferrers {
+		group.Go(func() error {
+			bundle, source, err := fetchReferrerBundleAndSource(ctx, ociRepositoryAndDigest.Repository, referrer)
+			results[i] = referrerPullResult{bundle: bundle, source: source, err: err}
+			return nil
+		})
+	}
+	_ = group.Wait()
+
 	var mismatchedSources []v1alpha.GitHubRepositorySource
 	var errList []error
-	for _, sigstoreReferrer := range sigstoreReferrers {
-		sigstoreBundleBytes, fetchSigstoreBundleErr := pullSigstoreBundleBytes(
-			ctx,
-			ociRepositoryAndDigest.Repository,
-			sigstoreReferrer,
-		)
-		if fetchSigstoreBundleErr != nil {
-			errList = append(errList, fmt.Errorf("failed to fetch Sigstore bundle bytes: %w", fetchSigstoreBundleErr))
-			continue
+	for _, result := range results {
+		switch {
+		case result.err != nil:
+			errList = append(errList, result.err)
+		case SatisfiesVerificationSource(*result.source, verificationSource):
+			return result.bundle, nil
+		default:
+			mismatchedSources = append(mismatchedSources, *result.source)
 		}
-
-		sigstoreBundle := &sigstorebundle.Bundle{}
-		if err := json.Unmarshal(sigstoreBundleBytes, sigstoreBundle); err != nil {
-			errList = append(errList, fmt.Errorf("failed to decode Sigstore bundle bytes: %w", err))
-			continue
-		}
-
-		githubRepositorySourceFromSigstoreBundle, err := utilities.GetRepositorySourceFromSigstoreBundle(sigstoreBundle)
-		if err != nil {
-			errList = append(
-				errList,
-				fmt.Errorf(
-					"failed to fetch github repository source from Sigstore bundle fetched via refererrer %s: %w",
-					sigstoreReferrer.Digest,
-					err,
-				),
-			)
-			continue
-		}
-
-		if SatisfiesVerificationSource(
-			*githubRepositorySourceFromSigstoreBundle,
-			verificationSource,
-		) {
-			return sigstoreBundle, nil
-		}
-
-		mismatchedSources = append(
-			mismatchedSources,
-			*githubRepositorySourceFromSigstoreBundle,
-		)
-
 	}
 
 	if len(errList) > 0 {
