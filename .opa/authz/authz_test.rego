@@ -5,7 +5,7 @@ import rego.v1
 import data.authz
 
 test_allow_with_correct_password if {
-	authz.allow with input as {"password": "accesserator"}
+	authz.allow with input as {"password": "discovery works"}
 }
 
 test_deny_with_wrong_password if {
