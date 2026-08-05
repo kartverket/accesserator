@@ -751,7 +751,7 @@ create-namespace: kubectl
 		echo "$$output"; \
 		exit 1; \
 	fi
-	$(KUBECTL) label namespaces $(namespace) istio.io/rev=default
+	$(KUBECTL) label namespaces $(namespace) istio.io/rev=default --overwrite --context "$(KUBECONTEXT)"
 
 wait-for-skiperator-pod: kubectl
 	$(if $(strip $(app)),,$(error app is not set))
