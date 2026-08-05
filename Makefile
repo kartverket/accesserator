@@ -197,7 +197,7 @@ deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomi
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
-	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n accesserator-system -l app=accesserator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying accesserator." && exit 1)
+	"$(KUBECTL)" wait pod --for=condition=ready --timeout=60s -n accesserator-system -l app=accesserator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying accesserator." && exit 1)
 	@echo -e "✅  accesserator installed in namespace 'accesserator-system'!"
 
 .PHONY: deploy-mock-controller
