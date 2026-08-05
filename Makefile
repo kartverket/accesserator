@@ -492,7 +492,7 @@ webhook-test-manifests: kustomize ## Build webhook manifests for envtest into we
 	@"$(KUSTOMIZE)" build config/webhook > webhook-tests/webhook-manifests.yaml
 
 .PHONY: ghcr-secret
-ghcr-secret: ensureaccesseratordeployed
+ghcr-secret: accesserator-namespace
 	@read -p "GitHub username: " USERNAME; \
 	read -s -p "GitHub PAT: " TOKEN; \
 	echo ""; \
@@ -502,8 +502,13 @@ ghcr-secret: ensureaccesseratordeployed
 		--docker-password=$$TOKEN \
 		--namespace=accesserator-system \
 		--dry-run=client -o yaml | kubectl apply -f -
-	kubectl rollout restart deploy/accesserator -n accesserator-system
-	kubectl rollout status deploy/accesserator -n accesserator-system
+	@if $(MAKE) ensureaccesseratordeployed >/dev/null 2>&1; then \
+		echo "✅ accesserator is deployed; restarting deployment"; \
+		kubectl rollout restart deploy/accesserator -n accesserator-system; \
+		kubectl rollout status deploy/accesserator -n accesserator-system; \
+	else \
+		echo "ℹ️ accesserator is not deployed; skipping rollout restart"; \
+	fi
 
 .PHONY: ensure-ghcr-secret
 ensure-ghcr-secret:
