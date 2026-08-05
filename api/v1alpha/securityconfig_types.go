@@ -596,3 +596,11 @@ func (s *SecurityConfigStatus) SetPhaseReady(msg string) {
 	s.Ready = true
 	s.Message = msg
 }
+
+func GetURLs(bundleSources []BundleSource) []string {
+	urls := make([]string, 0, len(bundleSources))
+	for _, bundleSource := range bundleSources {
+		urls = append(urls, bundleSource.URL)
+	}
+	return urls
+}
