@@ -34,7 +34,7 @@ type Config struct {
 
 	EntraTenantId string `split_words:"true"`
 
-	OpaEnabled                          bool             `split_words:"true" default:"false"`
+	OpaEnabled                          bool             `split_words:"true" default:"true"`
 	OpaImageName                        string           `split_words:"true" default:"openpolicyagent/opa"`
 	OpaImageTag                         string           `split_words:"true"`
 	OpaImageSha                         string           `split_words:"true"`
@@ -73,15 +73,12 @@ func Load() error {
 		}
 	}
 
-	missing := make([]string, 0, 10)
+	missing := make([]string, 0, 11)
 	if cfg.RunsInProduction == nil {
 		missing = append(missing, "ACCESSERATOR_RUNS_IN_PRODUCTION")
 	}
 	if cfg.ClusterName == "" {
 		missing = append(missing, "ACCESSERATOR_CLUSTER_NAME")
-	}
-	if cfg.TokenxNamespace == "" {
-		missing = append(missing, "ACCESSERATOR_TOKENX_NAMESPACE")
 	}
 	if cfg.TexasImageTag == "" {
 		missing = append(missing, "ACCESSERATOR_TEXAS_IMAGE_TAG")
@@ -92,17 +89,27 @@ func Load() error {
 	if cfg.EntraTenantId == "" {
 		missing = append(missing, "ACCESSERATOR_ENTRA_TENANT_ID")
 	}
-	if cfg.OpaImageTag == "" {
-		missing = append(missing, "ACCESSERATOR_OPA_IMAGE_TAG")
+	if cfg.TokenxEnabled {
+		if cfg.TokenxName == "" {
+			missing = append(missing, "ACCESSERATOR_TOKENX_NAME")
+		}
+		if cfg.TokenxNamespace == "" {
+			missing = append(missing, "ACCESSERATOR_TOKENX_NAMESPACE")
+		}
 	}
-	if cfg.OpaImageSha == "" {
-		missing = append(missing, "ACCESSERATOR_OPA_IMAGE_SHA")
-	}
-	if len(cfg.OpaAllowedBundleRegistryUrlPrefixes) == 0 {
-		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES")
-	}
-	if len(cfg.OpaAllowedBundleSignatureSourceOrgs) == 0 {
-		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
+	if cfg.OpaEnabled {
+		if cfg.OpaImageTag == "" {
+			missing = append(missing, "ACCESSERATOR_OPA_IMAGE_TAG")
+		}
+		if cfg.OpaImageSha == "" {
+			missing = append(missing, "ACCESSERATOR_OPA_IMAGE_SHA")
+		}
+		if len(cfg.OpaAllowedBundleRegistryUrlPrefixes) == 0 {
+			missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES")
+		}
+		if len(cfg.OpaAllowedBundleSignatureSourceOrgs) == 0 {
+			missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
+		}
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
