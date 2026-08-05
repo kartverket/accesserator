@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
+  "mode": "full",
   "timezone": "Europe/Oslo",
   "schedule": ["before 08:00 on monday"],
   "enabledManagers": ["kustomize", "dockerfile", "custom.regex"],
