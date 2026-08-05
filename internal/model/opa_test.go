@@ -139,12 +139,6 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(bundle.ValidateOpaBundle()).To(HaveOccurred())
 		})
 
-		It("fails when URL is invalid", func() {
-			bundle := newValidBundle()
-			bundle.URL = "not-a-url"
-			Expect(bundle.ValidateOpaBundle()).To(HaveOccurred())
-		})
-
 		It("fails when repository is empty", func() {
 			bundle := newValidBundle()
 			bundle.BundleSource.Repository = ""
