@@ -93,6 +93,22 @@ func (DefaultAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
 	)
 }
 
+func ValidateCollisionWithConfiguredSelfAuthBundle(bundles []accesseratorv1alpha.BundleSource) error {
+	if config.Get().OpaSelfAuthorizationBundle == nil {
+		return nil
+	}
+	for _, bundle := range bundles {
+		if string(bundle.Name) == config.Get().OpaSelfAuthorizationBundle.Name {
+			return fmt.Errorf(
+				"OPA bundle with name: %s has name collision with pre-configured OPA bundle with same name. "+
+					"Rename your bundle to avoid this error",
+				bundle.Name,
+			)
+		}
+	}
+	return nil
+}
+
 // ValidateBundleUrlPrefixes validates that each bundle URL has an allowed registry
 // prefix as configured via ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES.
 func ValidateBundleUrlPrefixes(bundleURLs []v1alpha.BundleSource) error {

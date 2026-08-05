@@ -14,10 +14,7 @@ import (
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
-const (
-	OpaBundleFetchLayerTimeout = 60 * time.Second
-	OpaBundleLayerMediaType    = "application/vnd.oci.image.layer.v1.tar+gzip"
-)
+const OpaBundleFetchLayerTimeout = 60 * time.Second
 
 // OpaBundleFetcher is the set of OCI lookups the OPA resolver needs.
 // It extends validation.AttestationFetcher with the OPA bundle layer-pull operation.
@@ -37,7 +34,7 @@ func (DefaultOpaBundleFetcher) FetchOpaBundleLayer(
 	ctx context.Context,
 	ociRepoAndDigest utilities.OciRepositoryAndDigest,
 ) ([]byte, error) {
-	return utilities.FetchLayerMatchingMediaType(ctx, ociRepoAndDigest, OpaBundleLayerMediaType)
+	return utilities.FetchLayerMatchingMediaType(ctx, ociRepoAndDigest, utilities.OpaBundleLayerMediaType)
 }
 
 // ResolveOpaConfig resolves the OPA configuration from the SecurityConfig. It returns an OpaConfig struct containing
@@ -80,13 +77,14 @@ func ResolveOpaConfigWithFetcher(
 		"name", securityConfig.Name,
 		"namespace", securityConfig.Namespace,
 	)
-	binaryData := make(map[string][]byte, len(bundles))
+	bundles := model.ToOpaBundles(securityConfig.Spec.Opa.BundleURLs)
+	binaryData := maps.Clone(config.OpaSelfAuthorizationBundleBinaryData)
 	for _, bundle := range bundles {
 		data, resolveBundleErr := resolveOpaBundle(ctx, logger, fetcher, config.CredStore, bundle)
 		if resolveBundleErr != nil {
 			return nil, resolveBundleErr
 		}
-		binaryData[string(bundle.Name)] = data
+		binaryData[bundle.Name] = data
 	}
 
 	logger.Info(

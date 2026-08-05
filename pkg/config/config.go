@@ -2,13 +2,19 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kelseyhightower/envconfig"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
-var CredStore *credentials.DynamicStore
+var (
+	CredStore *credentials.DynamicStore
+
+	OpaSelfAuthorizationBundleBinaryData map[string][]byte
+)
 
 type Config struct {
 	RunsInProduction *bool `split_words:"true"`
@@ -28,14 +34,15 @@ type Config struct {
 
 	EntraTenantId string `split_words:"true"`
 
-	OpaEnabled                          bool     `split_words:"true" default:"true"`
-	OpaImageName                        string   `split_words:"true" default:"openpolicyagent/opa"`
-	OpaImageTag                         string   `split_words:"true"`
-	OpaImageSha                         string   `split_words:"true"`
-	OpaPort                             int32    `split_words:"true" default:"3010"`
-	OpaUrlEnvVarName                    string   `split_words:"true" default:"OPA_URL"`
-	OpaAllowedBundleRegistryUrlPrefixes []string `split_words:"true"`
-	OpaAllowedBundleSignatureSourceOrgs []string `split_words:"true"`
+	OpaEnabled                          bool             `split_words:"true" default:"false"`
+	OpaImageName                        string           `split_words:"true" default:"openpolicyagent/opa"`
+	OpaImageTag                         string           `split_words:"true"`
+	OpaImageSha                         string           `split_words:"true"`
+	OpaPort                             int32            `split_words:"true" default:"3010"`
+	OpaUrlEnvVarName                    string           `split_words:"true" default:"OPA_URL"`
+	OpaAllowedBundleRegistryUrlPrefixes []string         `split_words:"true"`
+	OpaAllowedBundleSignatureSourceOrgs []string         `split_words:"true"`
+	OpaSelfAuthorizationBundle          *model.OpaBundle `split_words:"true"`
 
 	SigstoreTufCachePath string `split_words:"true" default:"/tmp/sigstore-tuf"`
 }
@@ -50,17 +57,31 @@ func Load() error {
 		return fmt.Errorf("failed setting up credential store for auth towards OCI registry: %w", setupCredStoreErr)
 	}
 
+	OpaSelfAuthorizationBundleBinaryData = make(map[string][]byte, 1)
+
 	cfg := Config{}
 	if err := envconfig.Process("accesserator", &cfg); err != nil {
 		return err
 	}
 
-	missing := make([]string, 0, 4)
+	raw, ok := os.LookupEnv("ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE")
+	if !ok || strings.TrimSpace(raw) == "" {
+		cfg.OpaSelfAuthorizationBundle = nil
+	} else {
+		if err := cfg.OpaSelfAuthorizationBundle.ValidateOpaBundle(); err != nil {
+			return fmt.Errorf("invalid ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE: %w", err)
+		}
+	}
+
+	missing := make([]string, 0, 10)
 	if cfg.RunsInProduction == nil {
 		missing = append(missing, "ACCESSERATOR_RUNS_IN_PRODUCTION")
 	}
 	if cfg.ClusterName == "" {
 		missing = append(missing, "ACCESSERATOR_CLUSTER_NAME")
+	}
+	if cfg.TokenxNamespace == "" {
+		missing = append(missing, "ACCESSERATOR_TOKENX_NAMESPACE")
 	}
 	if cfg.TexasImageTag == "" {
 		missing = append(missing, "ACCESSERATOR_TEXAS_IMAGE_TAG")
@@ -71,36 +92,17 @@ func Load() error {
 	if cfg.EntraTenantId == "" {
 		missing = append(missing, "ACCESSERATOR_ENTRA_TENANT_ID")
 	}
-	if cfg.TokenxEnabled {
-		if cfg.TokenxName == "" {
-			missing = append(missing, "ACCESSERATOR_TOKENX_NAME")
-		}
-		if cfg.TokenxNamespace == "" {
-			missing = append(missing, "ACCESSERATOR_TOKENX_NAMESPACE")
-		}
+	if cfg.OpaImageTag == "" {
+		missing = append(missing, "ACCESSERATOR_OPA_IMAGE_TAG")
 	}
-	if cfg.OpaEnabled {
-		if cfg.OpaImageName == "" {
-			missing = append(missing, "ACCESSERATOR_OPA_IMAGE_NAME")
-		}
-		if cfg.OpaImageTag == "" {
-			missing = append(missing, "ACCESSERATOR_OPA_IMAGE_TAG")
-		}
-		if cfg.OpaImageSha == "" {
-			missing = append(missing, "ACCESSERATOR_OPA_IMAGE_SHA")
-		}
-		if cfg.OpaPort == 0 {
-			missing = append(missing, "ACCESSERATOR_OPA_PORT")
-		}
-		if cfg.OpaUrlEnvVarName == "" {
-			missing = append(missing, "ACCESSERATOR_OPA_URL_ENV_VAR_NAME")
-		}
-		if len(cfg.OpaAllowedBundleRegistryUrlPrefixes) == 0 {
-			missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES")
-		}
-		if len(cfg.OpaAllowedBundleSignatureSourceOrgs) == 0 {
-			missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
-		}
+	if cfg.OpaImageSha == "" {
+		missing = append(missing, "ACCESSERATOR_OPA_IMAGE_SHA")
+	}
+	if len(cfg.OpaAllowedBundleRegistryUrlPrefixes) == 0 {
+		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES")
+	}
+	if len(cfg.OpaAllowedBundleSignatureSourceOrgs) == 0 {
+		missing = append(missing, "ACCESSERATOR_OPA_ALLOWED_BUNDLE_SIGNATURE_SOURCE_ORGS")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))

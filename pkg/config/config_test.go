@@ -159,6 +159,38 @@ func TestLoad_Defaults(t *testing.T) {
 	if c.OpaUrlEnvVarName != defaultOpaUrlEnvVarName {
 		t.Errorf("OpaUrlEnvVarName = %q, want default %q", c.OpaUrlEnvVarName, defaultOpaUrlEnvVarName)
 	}
+	if c.OpaSelfAuthorizationBundle != nil {
+		t.Errorf("OpaSelfAuthorizationBundle = %v, want nil", c.OpaSelfAuthorizationBundle)
+	}
+}
+
+func TestLoad_OpaSelfAuthorizationBundle_DefaultNil(t *testing.T) {
+	setAllEnvVars(t)
+
+	if err := config.Load(); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	c := config.Get()
+	if c.OpaSelfAuthorizationBundle != nil {
+		t.Errorf("OpaSelfAuthorizationBundle = %v, want nil", c.OpaSelfAuthorizationBundle)
+	}
+}
+
+func TestLoad_OpaSelfAuthorizationBundle_InvalidRawValue(t *testing.T) {
+	setAllEnvVars(t)
+	t.Setenv(
+		"ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE",
+		`{"name":"self-authorization","url":"oci://ghcr.io/kartverket/accesserator/self-authorization:latest"}`,
+	)
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE without decoder, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE", got)
+	}
 }
 
 func TestLoad_MissingRunsInProduction(t *testing.T) {

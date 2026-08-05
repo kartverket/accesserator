@@ -2,6 +2,7 @@ package pods_test
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/webhook/pods"
@@ -132,6 +133,27 @@ var _ = Describe("opa.go unit tests", func() {
 				MountPath: pods.OpaBundleMountPath,
 				ReadOnly:  true,
 			}))
+		})
+
+		It("builds an OPA init container with authorization arg when self authorization bundle is configured", func() {
+			Expect(os.Setenv("ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE", "{\"name\": \"self-auth\", \"url\": \"http://bundle-source/self-auth\", \"verification\": {\"repository\": \"kartverket/accesserator\", \"workflow\": \".github/workflows/build-bundle.yml\", \"ref\": \"refs/tags//v1\"}}")).To(Succeed())
+			Expect(config.Load()).To(Succeed())
+			securityConfig := newSecurityConfig(true)
+
+			c := pods.GetOpaContainer(securityConfig)
+			Expect(c.Args).To(Equal([]string{
+				"run",
+				"--server",
+				fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaPort),
+				"--bundle",
+				fmt.Sprintf("%s/%s", pods.OpaBundleMountPath, "bundle-a"),
+				"--bundle",
+				fmt.Sprintf("%s/%s", pods.OpaBundleMountPath, "bundle-b"),
+				"--watch",
+				"--authorization=basic",
+			}))
+			Expect(os.Unsetenv("ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE")).To(Succeed())
+			Expect(config.Load()).To(Succeed())
 		})
 	})
 
