@@ -1,6 +1,7 @@
 package utilities_test
 
 import (
+	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -90,19 +91,22 @@ var _ = Describe("GetBundleVerifier", func() {
 
 	Context("guard clauses", func() {
 		It("returns an error for a nil bundle", func() {
-			_, err := utilities.GetBundleVerifier(nil)
+			_, err := utilities.GetBundleVerifier(nil, config.Get().SigstoreTufCachePath)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(missingMaterialErr))
 		})
 
 		It("returns an error when the embedded protobuf bundle is nil", func() {
-			_, err := utilities.GetBundleVerifier(&sigstorebundle.Bundle{})
+			_, err := utilities.GetBundleVerifier(&sigstorebundle.Bundle{}, config.Get().SigstoreTufCachePath)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(missingMaterialErr))
 		})
 
 		It("returns an error when the bundle has no verification material", func() {
-			_, err := utilities.GetBundleVerifier(&sigstorebundle.Bundle{Bundle: &protobundle.Bundle{}})
+			_, err := utilities.GetBundleVerifier(
+				&sigstorebundle.Bundle{Bundle: &protobundle.Bundle{}},
+				config.Get().SigstoreTufCachePath,
+			)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(missingMaterialErr))
 		})
@@ -110,7 +114,7 @@ var _ = Describe("GetBundleVerifier", func() {
 
 	Context("building a verifier from trusted material (hitting network)", func() {
 		It("builds a verifier via GitHub's trusted root when there are no transparency-log entries", func() {
-			verifier, err := utilities.GetBundleVerifier(bundleWithVerificationMaterial())
+			verifier, err := utilities.GetBundleVerifier(bundleWithVerificationMaterial(), config.Get().SigstoreTufCachePath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(verifier).NotTo(BeNil())
 		})
@@ -118,6 +122,7 @@ var _ = Describe("GetBundleVerifier", func() {
 		It("builds a verifier via the public-good trusted root when transparency-log entries are present", func() {
 			verifier, err := utilities.GetBundleVerifier(
 				bundleWithVerificationMaterial(&protorekor.TransparencyLogEntry{}),
+				config.Get().SigstoreTufCachePath,
 			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(verifier).NotTo(BeNil())
@@ -127,15 +132,15 @@ var _ = Describe("GetBundleVerifier", func() {
 
 var _ = Describe("GitHubTrustedRoot (hitting network)", func() {
 	It("returns trusted material fetched from GitHub's TUF repository", func() {
-		trustedMaterial, err := utilities.GitHubTrustedRoot()
+		trustedMaterial, err := utilities.GitHubTrustedRoot(config.Get().SigstoreTufCachePath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(trustedMaterial).NotTo(BeNil())
 	})
 
 	It("memoizes the trusted material across calls", func() {
-		first, err := utilities.GitHubTrustedRoot()
+		first, err := utilities.GitHubTrustedRoot(config.Get().SigstoreTufCachePath)
 		Expect(err).NotTo(HaveOccurred())
-		second, err := utilities.GitHubTrustedRoot()
+		second, err := utilities.GitHubTrustedRoot(config.Get().SigstoreTufCachePath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(second).To(BeIdenticalTo(first))
 	})
@@ -143,15 +148,15 @@ var _ = Describe("GitHubTrustedRoot (hitting network)", func() {
 
 var _ = Describe("PublicGoodTrustedRoot (hitting network)", func() {
 	It("returns trusted material fetched from the public-good TUF mirror", func() {
-		trustedMaterial, err := utilities.PublicTrustedRoot()
+		trustedMaterial, err := utilities.PublicTrustedRoot(config.Get().SigstoreTufCachePath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(trustedMaterial).NotTo(BeNil())
 	})
 
 	It("memoizes the trusted material across calls", func() {
-		first, err := utilities.PublicTrustedRoot()
+		first, err := utilities.PublicTrustedRoot(config.Get().SigstoreTufCachePath)
 		Expect(err).NotTo(HaveOccurred())
-		second, err := utilities.PublicTrustedRoot()
+		second, err := utilities.PublicTrustedRoot(config.Get().SigstoreTufCachePath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(second).To(BeIdenticalTo(first))
 	})

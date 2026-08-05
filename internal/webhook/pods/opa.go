@@ -35,6 +35,9 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 			)
 		}
 		opaContainerArgs = append(opaContainerArgs, "--watch")
+		if config.Get().OpaSelfAuthorizationBundle != nil {
+			opaContainerArgs = append(opaContainerArgs, "--authorization=basic")
+		}
 	}
 
 	opaContainer := utilities.CommonInitContainer

@@ -37,7 +37,7 @@ spec:
             httpGet:
               path: /healthz
               port: probes
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
           name: accesserator
           ports:
             - containerPort: 8181
@@ -50,7 +50,7 @@ spec:
             httpGet:
               path: /readyz
               port: probes
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
           resources:
             limits:
               memory: 256Mi

@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -54,7 +54,7 @@ func ValidateSigstoreBundleSignature(
 		return fmt.Errorf("failed to CertificateIdentity from SAN regex %s", sanRegex)
 	}
 
-	verifier, getVerifierErr := utilities.GetBundleVerifier(sigstoreBundle)
+	verifier, getVerifierErr := utilities.GetBundleVerifier(sigstoreBundle, config.Get().SigstoreTufCachePath)
 	if getVerifierErr != nil {
 		logger.Error(getVerifierErr, "Failed to get bundle verifier")
 		return fmt.Errorf("failed to get bundle verifier")
@@ -120,14 +120,14 @@ func fetchReferrerBundleAndSource(
 	ctx context.Context,
 	repo *remote.Repository,
 	referrer ocispec.Descriptor,
-) (*sigstorebundle.Bundle, *v1alpha.GitHubRepositorySource, error) {
+) (*sigstorebundle.Bundle, *model.OpaBundleSource, error) {
 	bundleBytes, err := pullSigstoreBundleBytes(ctx, repo, referrer)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch Sigstore bundle bytes: %w", err)
 	}
 	bundle := &sigstorebundle.Bundle{}
-	if err := json.Unmarshal(bundleBytes, bundle); err != nil {
-		return nil, nil, fmt.Errorf("failed to decode Sigstore bundle bytes: %w", err)
+	if jsonMarshalErr := json.Unmarshal(bundleBytes, bundle); jsonMarshalErr != nil {
+		return nil, nil, fmt.Errorf("failed to decode Sigstore bundle bytes: %w", jsonMarshalErr)
 	}
 	source, err := utilities.GetRepositorySourceFromSigstoreBundle(bundle)
 	if err != nil {
@@ -143,11 +143,11 @@ func GetSigstoreBundleMatchingVerification(
 	ctx context.Context,
 	ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 	sigstoreReferrers []ocispec.Descriptor,
-	verificationSource v1alpha.GitHubRepositorySource,
+	verificationSource model.OpaBundleSource,
 ) (*sigstorebundle.Bundle, error) {
 	type referrerPullResult struct {
 		bundle *sigstorebundle.Bundle
-		source *v1alpha.GitHubRepositorySource
+		source *model.OpaBundleSource
 		err    error
 	}
 
@@ -164,7 +164,7 @@ func GetSigstoreBundleMatchingVerification(
 	}
 	_ = group.Wait()
 
-	var mismatchedSources []v1alpha.GitHubRepositorySource
+	var mismatchedSources []model.OpaBundleSource
 	var errList []error
 	for _, result := range results {
 		switch {
@@ -189,13 +189,13 @@ func GetSigstoreBundleMatchingVerification(
 	)
 }
 
-func SatisfiesVerificationSource(actual, expected v1alpha.GitHubRepositorySource) bool {
+func SatisfiesVerificationSource(actual, expected model.OpaBundleSource) bool {
 	return (actual.Repository == expected.Repository) &&
 		(expected.Ref == "" || actual.Ref == expected.Ref) &&
 		(expected.Workflow == "" || actual.Workflow == expected.Workflow)
 }
 
-func sourceRepositoryToString(sourceRepository, verificationSource v1alpha.GitHubRepositorySource) string {
+func sourceRepositoryToString(sourceRepository, verificationSource model.OpaBundleSource) string {
 	stringRepresentation := fmt.Sprintf("Repository: %s", sourceRepository.Repository)
 
 	if verificationSource.Workflow != "" {
@@ -210,8 +210,8 @@ func sourceRepositoryToString(sourceRepository, verificationSource v1alpha.GitHu
 }
 
 func sourceRepositoriesToString(
-	sourceRepositories []v1alpha.GitHubRepositorySource,
-	verificationSource v1alpha.GitHubRepositorySource,
+	sourceRepositories []model.OpaBundleSource,
+	verificationSource model.OpaBundleSource,
 ) string {
 	if len(sourceRepositories) == 0 {
 		return "    - <none>"

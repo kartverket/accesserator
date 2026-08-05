@@ -28,9 +28,9 @@ jobs:
           curl -L https://github.com/txn2/kubefwd/releases/download/v1.25.12/kubefwd_Linux_x86_64.tar.gz | tar xz
           sudo mv kubefwd /usr/local/bin/
 
-      - name: Setup Kind cluster and deploy accesserator
+      - name: Setup Kind cluster and ingress to mock-oauth2-server
         run: |
-          make local deploy mock-oauth2-ingress
+          make local mock-oauth2-ingress
           
       - name: Create ghcr secret
         run: |
@@ -40,8 +40,10 @@ jobs:
             --docker-password=${{ secrets.GITHUB_TOKEN }} \
             --namespace=accesserator-system \
             --dry-run=client -o yaml | kubectl apply -f -
-          kubectl rollout restart deploy/accesserator -n accesserator-system
-          kubectl rollout status deploy/accesserator -n accesserator-system
+
+      - name: Deploy accesserator
+        run: |
+          make deploy
 
       - name: Run Chainsaw tests
         run: |

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -49,7 +49,7 @@ type AttestationFetcher interface {
 		ctx context.Context,
 		ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 		sigstoreReferrers []ocispec.Descriptor,
-		verificationSource v1alpha.GitHubRepositorySource,
+		verificationSource model.OpaBundleSource,
 	) (*sigstorebundle.Bundle, error)
 }
 
@@ -83,7 +83,7 @@ func (DefaultAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
 	ctx context.Context,
 	ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 	sigstoreReferrers []ocispec.Descriptor,
-	verificationSource v1alpha.GitHubRepositorySource,
+	verificationSource model.OpaBundleSource,
 ) (*sigstorebundle.Bundle, error) {
 	return GetSigstoreBundleMatchingVerification(
 		ctx,
@@ -93,18 +93,34 @@ func (DefaultAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
 	)
 }
 
+func ValidateCollisionWithConfiguredSelfAuthBundle(bundles []model.OpaBundle) error {
+	if config.Get().OpaSelfAuthorizationBundle == nil {
+		return nil
+	}
+	for _, bundle := range bundles {
+		if bundle.Name == config.Get().OpaSelfAuthorizationBundle.Name {
+			return fmt.Errorf(
+				"OPA bundle with name: %s has name collision with pre-configured OPA bundle with same name. "+
+					"Rename your bundle to avoid this error",
+				bundle.Name,
+			)
+		}
+	}
+	return nil
+}
+
 // ValidateBundleUrlPrefixes validates that each bundle URL has an allowed registry
 // prefix as configured via ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES.
-func ValidateBundleUrlPrefixes(bundleURLs []v1alpha.BundleSource) error {
-	if len(bundleURLs) == 0 {
+func ValidateBundleUrlPrefixes(opaBundles []model.OpaBundle) error {
+	if len(opaBundles) == 0 {
 		return fmt.Errorf("bundle URLs cannot be nil or empty")
 	}
 	allowedPrefixes := config.Get().OpaAllowedBundleRegistryUrlPrefixes
 
 	var invalid []string
-	for _, bundle := range bundleURLs {
-		if !hasAllowedPrefix(bundle.URL, allowedPrefixes) {
-			invalid = append(invalid, bundle.URL)
+	for _, opaBundle := range opaBundles {
+		if !hasAllowedPrefix(opaBundle.URL, allowedPrefixes) {
+			invalid = append(invalid, opaBundle.URL)
 		}
 	}
 	if len(invalid) == 0 {
@@ -126,11 +142,11 @@ func VerifyBundleSource(
 	ctx context.Context,
 	fetcher AttestationFetcher,
 	credStore credentials.Store,
-	bundleSource v1alpha.BundleSource,
+	bundleSource model.OpaBundle,
 ) error {
 	logger := log.GetLogger(ctx)
 
-	if bundleSource.Verification.Source.Repository == "" {
+	if bundleSource.BundleSource.Repository == "" {
 		return fmt.Errorf("bundle source must have a repository")
 	}
 
@@ -154,7 +170,7 @@ func VerifyBundleSource(
 		ctx,
 		*ociRepoAndDigest,
 		sigstoreProvenanceReferrers,
-		bundleSource.Verification.Source,
+		bundleSource.BundleSource,
 	)
 	if err != nil {
 		if errors.Is(err, ErrSourceMismatch) {

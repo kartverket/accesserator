@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/accesserator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
@@ -172,34 +172,34 @@ var _ = Describe("BuildGitHubSANRegex", func() {
 })
 
 var _ = Describe("SatisfiesVerificationSource", func() {
-	full := v1alpha.GitHubRepositorySource{
+	full := model.OpaBundleSource{
 		Repository: "kartverket/accesserator",
 		Workflow:   ".github/workflows/build.yml",
 		Ref:        "refs/heads/main",
 	}
 
 	It("matches when only the repository is expected and it is equal", func() {
-		expected := v1alpha.GitHubRepositorySource{Repository: "kartverket/accesserator"}
+		expected := model.OpaBundleSource{Repository: "kartverket/accesserator"}
 		Expect(validation.SatisfiesVerificationSource(full, expected)).To(BeTrue())
 	})
 
 	It("does not match when the repository differs", func() {
-		expected := v1alpha.GitHubRepositorySource{Repository: "kartverket/other"}
+		expected := model.OpaBundleSource{Repository: "kartverket/other"}
 		Expect(validation.SatisfiesVerificationSource(full, expected)).To(BeFalse())
 	})
 
 	It("ignores workflow and ref when they are not specified in the expected source", func() {
-		actual := v1alpha.GitHubRepositorySource{
+		actual := model.OpaBundleSource{
 			Repository: "kartverket/accesserator",
 			Workflow:   ".github/workflows/anything.yml",
 			Ref:        "refs/tags/v9",
 		}
-		expected := v1alpha.GitHubRepositorySource{Repository: "kartverket/accesserator"}
+		expected := model.OpaBundleSource{Repository: "kartverket/accesserator"}
 		Expect(validation.SatisfiesVerificationSource(actual, expected)).To(BeTrue())
 	})
 
 	It("requires the ref to match when the expected source specifies one", func() {
-		expected := v1alpha.GitHubRepositorySource{
+		expected := model.OpaBundleSource{
 			Repository: "kartverket/accesserator",
 			Ref:        "refs/heads/main",
 		}
@@ -210,7 +210,7 @@ var _ = Describe("SatisfiesVerificationSource", func() {
 	})
 
 	It("requires the workflow to match when the expected source specifies one", func() {
-		expected := v1alpha.GitHubRepositorySource{
+		expected := model.OpaBundleSource{
 			Repository: "kartverket/accesserator",
 			Workflow:   ".github/workflows/build.yml",
 		}
@@ -307,7 +307,7 @@ var _ = Describe("DefaultAttestationFetcher.GetSigstoreProvenanceReferrers", fun
 })
 
 var _ = Describe("GetSigstoreBundleMatchingVerification", func() {
-	verificationSource := v1alpha.GitHubRepositorySource{Repository: "kartverket/accesserator"}
+	verificationSource := model.OpaBundleSource{Repository: "kartverket/accesserator"}
 
 	It("returns a source-mismatch error and no bundle when there are no referrers", func() {
 		repoAndDig := utilities.OciRepositoryAndDigest{

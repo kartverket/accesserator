@@ -208,3 +208,43 @@ spec:
               
               echo "❌ Timed out waiting for OPA to return {\"result\":true} for password 'after update'"
               exit 1
+
+        - script:
+            content: |
+              OPA_URL=$(kubectl exec -n chainsaw-opa deploy/app -c app -- printenv OPA_URL)
+              if [ -z "$OPA_URL" ]; then
+                echo "❌ OPA_URL is not set"
+                exit 1
+              fi
+
+              EXPECTED_BODY='{"code":"unauthorized","message":"request rejected by administrative policy"}'
+              EXPECTED_COMPACT=$(echo "$EXPECTED_BODY" | jq -c .)
+  
+              for endpoint in /v1/policies /v1/config /v1/data; do
+                RESPONSE=$(kubectl exec -n chainsaw-opa deploy/app -c app -- \
+                  curl -s -w "\n%{http_code}" -X GET "$OPA_URL$endpoint")
+
+                BODY=$(echo "$RESPONSE" | sed '$d')
+                STATUS_CODE=$(echo "$RESPONSE" | tail -n 1)
+
+                if [ "$STATUS_CODE" != "401" ]; then
+                  echo "❌ Expected HTTP 401 for $endpoint, got: $STATUS_CODE"
+                  echo "Response body: $BODY"
+                  exit 1
+                fi
+
+                BODY_COMPACT=$(echo "$BODY" | jq -c . 2>/dev/null || true)
+                if [ -z "$BODY_COMPACT" ]; then
+                  echo "❌ Response for $endpoint is not valid JSON"
+                  echo "Body: $BODY"
+                  exit 1
+                fi
+
+                if [ "$BODY_COMPACT" != "$EXPECTED_COMPACT" ]; then
+                  echo "❌ Unexpected body for $endpoint"
+                  echo "Expected: $EXPECTED_COMPACT"
+                  echo "Got:      $BODY_COMPACT"
+                  exit 1
+                fi
+                echo "✅ $endpoint returned expected 401 unauthorized response"
+              done

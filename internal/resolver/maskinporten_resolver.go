@@ -29,7 +29,7 @@ func ResolveMaskinportenConfig(logger log.Logger, ctx context.Context, k8sClient
 	}
 	logger.Info("Maskinporten enabled, resolving Maskinporten config", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
-	maskinportenConfigType, err := utilities.DetermineConfigType(securityConfig.Spec.Maskinporten)
+	maskinportenConfigType, err := utilities.DetermineConfigType[v1alpha.MaskinportenClientSpec](securityConfig.Spec.Maskinporten)
 	logger.Info("Determined Maskinporten config type", "name", securityConfig.Name, "namespace", securityConfig.Namespace, "configType", maskinportenConfigType)
 
 	if err != nil {

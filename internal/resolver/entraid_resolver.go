@@ -29,7 +29,7 @@ func ResolveEntraIdConfig(logger log.Logger, ctx context.Context, k8sClient clie
 	}
 	logger.Info("Entra ID enabled, resolving Entra ID config", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
-	entraIdConfigType, err := utilities.DetermineConfigType(securityConfig.Spec.EntraID)
+	entraIdConfigType, err := utilities.DetermineConfigType[v1alpha.AzureAdApplicationSpec](securityConfig.Spec.EntraID)
 	logger.Info("Determined Entra ID config type", "name", securityConfig.Name, "namespace", securityConfig.Namespace, "configType", entraIdConfigType)
 
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/validation"
@@ -78,7 +79,15 @@ func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1a
 
 func validateOpa(logger log.Logger, ctx context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) error {
 	logger.Debug("Validating SecurityConfig OPA bundle URL prefixes", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
-	if err := validation.ValidateBundleUrlPrefixes(securityConfig.Spec.Opa.BundleURLs); err != nil {
+	opaBundles := model.ToOpaBundles(securityConfig.Spec.Opa.BundleURLs)
+	if err := validation.ValidateCollisionWithConfiguredSelfAuthBundle(opaBundles); err != nil {
+		logger.Warning(
+			"SecurityConfig blocked by validating webhook",
+			"name", securityConfig.Name, "namespace", securityConfig.Namespace, "validationError", err.Error(),
+		)
+		return err
+	}
+	if err := validation.ValidateBundleUrlPrefixes(opaBundles); err != nil {
 		logger.Warning(
 			"SecurityConfig blocked by validating webhook",
 			"name", securityConfig.Name, "namespace", securityConfig.Namespace, "validationError", err.Error(),
@@ -133,7 +142,7 @@ func verifyBundle(
 ) error {
 	verifyCtx, cancel := context.WithTimeout(ctx, opaBundleVerificationTimeout)
 	defer cancel()
-	return validation.VerifyBundleSource(verifyCtx, fetcher, credStore, bundle)
+	return validation.VerifyBundleSource(verifyCtx, fetcher, credStore, model.ToOpaBundle(bundle))
 }
 
 func anyHasVerification(bundles []accesseratorv1alpha.BundleSource) bool {

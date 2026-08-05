@@ -197,7 +197,7 @@ deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomi
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
-	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n accesserator-system -l app=accesserator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying accesserator." && exit 1)
+	"$(KUBECTL)" wait pod --for=condition=ready --timeout=60s -n accesserator-system -l app=accesserator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying accesserator." && exit 1)
 	@echo -e "✅  accesserator installed in namespace 'accesserator-system'!"
 
 .PHONY: deploy-mock-controller
@@ -492,7 +492,7 @@ webhook-test-manifests: kustomize ## Build webhook manifests for envtest into we
 	@"$(KUSTOMIZE)" build config/webhook > webhook-tests/webhook-manifests.yaml
 
 .PHONY: ghcr-secret
-ghcr-secret: ensureaccesseratordeployed
+ghcr-secret: accesserator-namespace
 	@read -p "GitHub username: " USERNAME; \
 	read -s -p "GitHub PAT: " TOKEN; \
 	echo ""; \
@@ -502,8 +502,13 @@ ghcr-secret: ensureaccesseratordeployed
 		--docker-password=$$TOKEN \
 		--namespace=accesserator-system \
 		--dry-run=client -o yaml | kubectl apply -f -
-	kubectl rollout restart deploy/accesserator -n accesserator-system
-	kubectl rollout status deploy/accesserator -n accesserator-system
+	@if $(MAKE) ensureaccesseratordeployed >/dev/null 2>&1; then \
+		echo "✅ accesserator is deployed; restarting deployment"; \
+		kubectl rollout restart deploy/accesserator -n accesserator-system; \
+		kubectl rollout status deploy/accesserator -n accesserator-system; \
+	else \
+		echo "ℹ️ accesserator is not deployed; skipping rollout restart"; \
+	fi
 
 .PHONY: ensure-ghcr-secret
 ensure-ghcr-secret:
@@ -735,18 +740,13 @@ ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running 
 create-namespace: kubectl
 	$(if $(strip $(namespace)),,$(error namespace is not set))
 	@echo "🤞 Creating namespace: $(namespace)"
-	@output=$$($(KUBECTL) create namespace "$(namespace)" --context "$(KUBECONTEXT)" 2>&1); \
-	status=$$?; \
-	if [ $$status -eq 0 ]; then \
-		echo "✅ Namespace '$(namespace)' created successfully"; \
-	elif echo "$$output" | grep -qiE "already exists|AlreadyExists"; then \
+	@if $(KUBECTL) get namespace "$(namespace)" --context "$(KUBECONTEXT)" >/dev/null 2>&1; then \
 		echo "✅ Namespace '$(namespace)' already exists, continuing..."; \
 	else \
-		echo "❌ Error creating '$(namespace)' namespace:"; \
-		echo "$$output"; \
-		exit 1; \
+		$(KUBECTL) create namespace "$(namespace)" --context "$(KUBECONTEXT)"; \
+		echo "✅ Namespace '$(namespace)' created successfully"; \
 	fi
-	$(KUBECTL) label namespaces $(namespace) istio.io/rev=default
+	@$(KUBECTL) label namespace "$(namespace)" istio.io/rev=default --overwrite --context "$(KUBECONTEXT)"
 
 wait-for-skiperator-pod: kubectl
 	$(if $(strip $(app)),,$(error app is not set))

@@ -17,15 +17,19 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/internal/webhook/pods"
 	"github.com/kartverket/accesserator/internal/webhook/securityconfigs"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
+	"github.com/kartverket/accesserator/pkg/validation"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -48,6 +52,8 @@ import (
 	"github.com/kartverket/accesserator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
+
+const ValidateAndLoadAdditionalOpaBundleTimeout = time.Second * 30
 
 var (
 	scheme   = runtime.NewScheme()
@@ -206,55 +212,117 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.SecurityConfigReconciler{
+	// Initialize public good and GitHub Sigstore trsuetd material used to verify SLSA provenance attestations.
+	_, initPublicGoodTrustedRootErr := utilities.PublicTrustedRoot(config.Get().SigstoreTufCachePath)
+	if initPublicGoodTrustedRootErr != nil {
+		setupLog.Error(
+			initPublicGoodTrustedRootErr,
+			"unable to initialize public good trusted root for Sigstore bundle verification",
+		)
+		os.Exit(1)
+	}
+
+	_, initGitHubTrustedRootErr := utilities.GitHubTrustedRoot(config.Get().SigstoreTufCachePath)
+	if initGitHubTrustedRootErr != nil {
+		setupLog.Error(initGitHubTrustedRootErr, "unable to initialize GitHub trusted root for Sigstore bundle verification")
+		os.Exit(1)
+	}
+
+	// Validate and load additional OPA bundles configured via environment variables.
+	if config.Get().OpaSelfAuthorizationBundle != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), ValidateAndLoadAdditionalOpaBundleTimeout)
+		if additionalOpaBundlesErr := validateAndLoadSelfAuthorizationBundle(
+			ctx,
+			*config.Get().OpaSelfAuthorizationBundle,
+		); additionalOpaBundlesErr != nil {
+			setupLog.Error(additionalOpaBundlesErr, "unable to initialize self authorization OPA bundles")
+			os.Exit(1)
+		}
+		cancel()
+	}
+
+	if mgrErr := (&controller.SecurityConfigReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorder("securityconfig-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SecurityConfig")
+	}).SetupWithManager(mgr); mgrErr != nil {
+		setupLog.Error(mgrErr, "unable to create controller", "controller", "SecurityConfig")
 		os.Exit(1)
 	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := pods.SetupPodWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
+		if webhookErr := pods.SetupPodWebhookWithManager(mgr); webhookErr != nil {
+			setupLog.Error(webhookErr, "unable to create webhook", "webhook", "Pod")
 			os.Exit(1)
 		}
-		if err := securityconfigs.SetupSecurityConfigWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "SecurityConfig")
-			os.Exit(1)
-		}
-
-		// Initialize public good and GitHub Sigstore trsuetd material used to verify SLSA provenance attestations.
-		_, initPublicGoodTrustedRootErr := utilities.PublicTrustedRoot()
-		if initPublicGoodTrustedRootErr != nil {
-			setupLog.Error(
-				initPublicGoodTrustedRootErr,
-				"unable to initialize public good trusted root for Sigstore bundle verification",
-			)
-			os.Exit(1)
-		}
-
-		_, initGitHubTrustedRootErr := utilities.GitHubTrustedRoot()
-		if initGitHubTrustedRootErr != nil {
-			setupLog.Error(initGitHubTrustedRootErr, "unable to initialize GitHub trusted root for Sigstore bundle verification")
+		if webhookErr := securityconfigs.SetupSecurityConfigWebhookWithManager(mgr); webhookErr != nil {
+			setupLog.Error(webhookErr, "unable to create webhook", "webhook", "SecurityConfig")
 			os.Exit(1)
 		}
 	}
 	// +kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+	if healthErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthErr != nil {
+		setupLog.Error(healthErr, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+	if readyErr := mgr.AddReadyzCheck("readyz", healthz.Ping); readyErr != nil {
+		setupLog.Error(readyErr, "unable to set up ready check")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+	if startErr := mgr.Start(ctrl.SetupSignalHandler()); startErr != nil {
+		setupLog.Error(startErr, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func validateAndLoadSelfAuthorizationBundle(
+	ctx context.Context,
+	selfAuthorizationBundle model.OpaBundle,
+) error {
+	if opaBundleValidateErr := validation.ValidateBundleUrlPrefixes(
+		[]model.OpaBundle{selfAuthorizationBundle},
+	); opaBundleValidateErr != nil {
+		return opaBundleValidateErr
+	}
+	if opaBundleVerifyErr := validation.VerifyBundleSource(
+		ctx,
+		validation.DefaultAttestationFetcher{},
+		config.CredStore,
+		selfAuthorizationBundle,
+	); opaBundleVerifyErr != nil {
+		return fmt.Errorf(
+			"failed to verify source for configured self authorization OPA bundle %s: %w",
+			selfAuthorizationBundle.URL,
+			opaBundleVerifyErr,
+		)
+	}
+	ociRepoAndDigest, resolveErr := utilities.ResolveOciRepositoryAndDigest(
+		ctx,
+		config.CredStore,
+		selfAuthorizationBundle.URL,
+	)
+	if resolveErr != nil {
+		return fmt.Errorf(
+			"failed to resolve repository and digest for OPA bundle %s: %w",
+			selfAuthorizationBundle.URL,
+			resolveErr,
+		)
+	}
+	opaBundleAsBinaryData, fetchOpaBundleErr := utilities.FetchLayerMatchingMediaType(
+		ctx,
+		*ociRepoAndDigest,
+		utilities.OpaBundleLayerMediaType,
+	)
+	if fetchOpaBundleErr != nil {
+		return fmt.Errorf(
+			"failed to fetch OPA bundle layer for %s: %w",
+			selfAuthorizationBundle.URL,
+			fetchOpaBundleErr,
+		)
+	}
+	config.OpaSelfAuthorizationBundleBinaryData[selfAuthorizationBundle.Name] = opaBundleAsBinaryData
+	return nil
 }
