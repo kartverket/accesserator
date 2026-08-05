@@ -283,7 +283,7 @@ func validateAndLoadSelfAuthorizationBundle(
 	selfAuthorizationBundle model.OpaBundle,
 ) error {
 	if opaBundleValidateErr := validation.ValidateBundleUrlPrefixes(
-		[]string{selfAuthorizationBundle.URL},
+		[]model.OpaBundle{selfAuthorizationBundle},
 	); opaBundleValidateErr != nil {
 		return opaBundleValidateErr
 	}

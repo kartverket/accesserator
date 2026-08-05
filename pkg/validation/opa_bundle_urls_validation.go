@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
@@ -94,12 +93,12 @@ func (DefaultAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
 	)
 }
 
-func ValidateCollisionWithConfiguredSelfAuthBundle(bundles []accesseratorv1alpha.BundleSource) error {
+func ValidateCollisionWithConfiguredSelfAuthBundle(bundles []model.OpaBundle) error {
 	if config.Get().OpaSelfAuthorizationBundle == nil {
 		return nil
 	}
 	for _, bundle := range bundles {
-		if string(bundle.Name) == config.Get().OpaSelfAuthorizationBundle.Name {
+		if bundle.Name == config.Get().OpaSelfAuthorizationBundle.Name {
 			return fmt.Errorf(
 				"OPA bundle with name: %s has name collision with pre-configured OPA bundle with same name. "+
 					"Rename your bundle to avoid this error",
@@ -112,16 +111,16 @@ func ValidateCollisionWithConfiguredSelfAuthBundle(bundles []accesseratorv1alpha
 
 // ValidateBundleUrlPrefixes validates that each bundle URL has an allowed registry
 // prefix as configured via ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES.
-func ValidateBundleUrlPrefixes(bundleURLs []string) error {
-	if len(bundleURLs) == 0 {
+func ValidateBundleUrlPrefixes(opaBundles []model.OpaBundle) error {
+	if len(opaBundles) == 0 {
 		return fmt.Errorf("bundle URLs cannot be nil or empty")
 	}
 	allowedPrefixes := config.Get().OpaAllowedBundleRegistryUrlPrefixes
 
 	var invalid []string
-	for _, bundleURL := range bundleURLs {
-		if !hasAllowedPrefix(bundleURL, allowedPrefixes) {
-			invalid = append(invalid, bundleURL)
+	for _, opaBundle := range opaBundles {
+		if !hasAllowedPrefix(opaBundle.URL, allowedPrefixes) {
+			invalid = append(invalid, opaBundle.URL)
 		}
 	}
 	if len(invalid) == 0 {

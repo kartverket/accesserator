@@ -79,14 +79,15 @@ func validateSecurityConfig(ctx context.Context, securityConfig *accesseratorv1a
 
 func validateOpa(logger log.Logger, ctx context.Context, securityConfig *accesseratorv1alpha.SecurityConfig) error {
 	logger.Debug("Validating SecurityConfig OPA bundle URL prefixes", "name", securityConfig.Name, "namespace", securityConfig.Namespace)
-	if err := validation.ValidateCollisionWithConfiguredSelfAuthBundle(securityConfig.Spec.Opa.BundleURLs); err != nil {
+	opaBundles := model.ToOpaBundles(securityConfig.Spec.Opa.BundleURLs)
+	if err := validation.ValidateCollisionWithConfiguredSelfAuthBundle(opaBundles); err != nil {
 		logger.Warning(
 			"SecurityConfig blocked by validating webhook",
 			"name", securityConfig.Name, "namespace", securityConfig.Namespace, "validationError", err.Error(),
 		)
 		return err
 	}
-	if err := validation.ValidateBundleUrlPrefixes(accesseratorv1alpha.GetURLs(securityConfig.Spec.Opa.BundleURLs)); err != nil {
+	if err := validation.ValidateBundleUrlPrefixes(opaBundles); err != nil {
 		logger.Warning(
 			"SecurityConfig blocked by validating webhook",
 			"name", securityConfig.Name, "namespace", securityConfig.Namespace, "validationError", err.Error(),

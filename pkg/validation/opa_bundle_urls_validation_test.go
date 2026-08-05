@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -88,36 +87,36 @@ var _ = Describe("ValidateBundleUrls", func() {
 	})
 
 	It("returns an error when bundleURLs is empty", func() {
-		err := validation.ValidateBundleUrlPrefixes(v1alpha.GetURLs([]v1alpha.BundleSource{}))
+		err := validation.ValidateBundleUrlPrefixes([]model.OpaBundle{})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("cannot be nil or empty"))
 	})
 
 	It("returns nil when every URL matches an allowed prefix", func() {
-		bundles := []v1alpha.BundleSource{
+		bundles := []model.OpaBundle{
 			{Name: "a", URL: allowedPrefix + "foo:tag"},
 			{Name: "b", URL: allowedPrefix + "bar:tag"},
 		}
-		Expect(validation.ValidateBundleUrlPrefixes(v1alpha.GetURLs(bundles))).To(Succeed())
+		Expect(validation.ValidateBundleUrlPrefixes(bundles)).To(Succeed())
 	})
 
 	It("returns an error naming the disallowed URL", func() {
-		bundles := []v1alpha.BundleSource{
+		bundles := []model.OpaBundle{
 			{Name: "a", URL: "https://forbidden/repo:tag"},
 		}
-		err := validation.ValidateBundleUrlPrefixes(v1alpha.GetURLs(bundles))
+		err := validation.ValidateBundleUrlPrefixes(bundles)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("https://forbidden/repo:tag"))
 		Expect(err.Error()).To(ContainSubstring("must start with one of"))
 	})
 
 	It("collects every disallowed URL in the error message", func() {
-		bundles := []v1alpha.BundleSource{
+		bundles := []model.OpaBundle{
 			{Name: "a", URL: "https://forbidden/repo-a:tag"},
 			{Name: "b", URL: allowedPrefix + "ok:tag"},
 			{Name: "c", URL: "https://other-bad/repo-c:tag"},
 		}
-		err := validation.ValidateBundleUrlPrefixes(v1alpha.GetURLs(bundles))
+		err := validation.ValidateBundleUrlPrefixes(bundles)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("https://forbidden/repo-a:tag"))
 		Expect(err.Error()).To(ContainSubstring("https://other-bad/repo-c:tag"))
@@ -135,10 +134,10 @@ var _ = Describe("ValidateBundleUrls", func() {
 			Expect(config.Load()).To(Succeed())
 		})
 
-		bundles := []v1alpha.BundleSource{
+		bundles := []model.OpaBundle{
 			{Name: "a", URL: "https://also-allowed/repo:tag"},
 		}
-		Expect(validation.ValidateBundleUrlPrefixes(v1alpha.GetURLs(bundles))).To(Succeed())
+		Expect(validation.ValidateBundleUrlPrefixes(bundles)).To(Succeed())
 	})
 })
 
@@ -160,7 +159,7 @@ var _ = Describe("ValidateCollisionWithAdditionalBundleNames", func() {
 	})
 
 	It("returns nil when no additional self-authorization bundle is configured", func() {
-		bundles := []v1alpha.BundleSource{{Name: "bundle-a", URL: "https://allowed/repo-a:tag"}}
+		bundles := []model.OpaBundle{{Name: "bundle-a", URL: "https://allowed/repo-a:tag"}}
 
 		err := validation.ValidateCollisionWithConfiguredSelfAuthBundle(bundles)
 
@@ -171,7 +170,7 @@ var _ = Describe("ValidateCollisionWithAdditionalBundleNames", func() {
 		Expect(os.Setenv("ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE", selfAuthorizationBundleJSON)).To(Succeed())
 		Expect(config.Load()).To(Succeed())
 
-		bundles := []v1alpha.BundleSource{{Name: "bundle-a", URL: "https://allowed/repo-a:tag"}}
+		bundles := []model.OpaBundle{{Name: "bundle-a", URL: "https://allowed/repo-a:tag"}}
 
 		err := validation.ValidateCollisionWithConfiguredSelfAuthBundle(bundles)
 
@@ -182,7 +181,7 @@ var _ = Describe("ValidateCollisionWithAdditionalBundleNames", func() {
 		Expect(os.Setenv("ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE", selfAuthorizationBundleJSON)).To(Succeed())
 		Expect(config.Load()).To(Succeed())
 
-		bundles := []v1alpha.BundleSource{{
+		bundles := []model.OpaBundle{{
 			Name: "opa-common-self-auth",
 			URL:  "https://allowed/repo-a:tag",
 		}}
