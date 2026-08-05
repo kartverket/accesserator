@@ -3,9 +3,11 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
@@ -61,7 +63,6 @@ func ResolveOpaConfigWithFetcher(
 		"OPA enabled, resolving OPA config",
 		"name", securityConfig.Name, "namespace", securityConfig.Namespace)
 
-	bundles := securityConfig.Spec.Opa.BundleURLs
 	if len(securityConfig.Spec.Opa.BundleURLs) == 0 {
 		return nil, fmt.Errorf(
 			"no OPA bundle URLs found in SecurityConfig %s/%s",
@@ -101,7 +102,7 @@ func resolveOpaBundle(
 	logger log.Logger,
 	fetcher OpaBundleFetcher,
 	credStore credentials.Store,
-	bundle v1alpha.BundleSource,
+	bundle model.OpaBundle,
 ) ([]byte, error) {
 	logger.Debug("Resolving OPA bundle digest", "bundleURL", bundle.URL)
 	ociRepoAndDigest, err := fetcher.ResolveOciRepositoryAndDigest(ctx, credStore, bundle.URL)

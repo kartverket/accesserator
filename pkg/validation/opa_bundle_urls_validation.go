@@ -7,7 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/kartverket/accesserator/api/v1alpha"
+	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -49,7 +50,7 @@ type AttestationFetcher interface {
 		ctx context.Context,
 		ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 		sigstoreReferrers []ocispec.Descriptor,
-		verificationSource v1alpha.GitHubRepositorySource,
+		verificationSource model.OpaBundleSource,
 	) (*sigstorebundle.Bundle, error)
 }
 
@@ -83,7 +84,7 @@ func (DefaultAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
 	ctx context.Context,
 	ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 	sigstoreReferrers []ocispec.Descriptor,
-	verificationSource v1alpha.GitHubRepositorySource,
+	verificationSource model.OpaBundleSource,
 ) (*sigstorebundle.Bundle, error) {
 	return GetSigstoreBundleMatchingVerification(
 		ctx,
@@ -111,16 +112,16 @@ func ValidateCollisionWithConfiguredSelfAuthBundle(bundles []accesseratorv1alpha
 
 // ValidateBundleUrlPrefixes validates that each bundle URL has an allowed registry
 // prefix as configured via ACCESSERATOR_OPA_ALLOWED_BUNDLE_REGISTRY_URL_PREFIXES.
-func ValidateBundleUrlPrefixes(bundleURLs []v1alpha.BundleSource) error {
+func ValidateBundleUrlPrefixes(bundleURLs []string) error {
 	if len(bundleURLs) == 0 {
 		return fmt.Errorf("bundle URLs cannot be nil or empty")
 	}
 	allowedPrefixes := config.Get().OpaAllowedBundleRegistryUrlPrefixes
 
 	var invalid []string
-	for _, bundle := range bundleURLs {
-		if !hasAllowedPrefix(bundle.URL, allowedPrefixes) {
-			invalid = append(invalid, bundle.URL)
+	for _, bundleURL := range bundleURLs {
+		if !hasAllowedPrefix(bundleURL, allowedPrefixes) {
+			invalid = append(invalid, bundleURL)
 		}
 	}
 	if len(invalid) == 0 {
@@ -142,11 +143,11 @@ func VerifyBundleSource(
 	ctx context.Context,
 	fetcher AttestationFetcher,
 	credStore credentials.Store,
-	bundleSource v1alpha.BundleSource,
+	bundleSource model.OpaBundle,
 ) error {
 	logger := log.GetLogger(ctx)
 
-	if bundleSource.Verification.Source.Repository == "" {
+	if bundleSource.BundleSource.Repository == "" {
 		return fmt.Errorf("bundle source must have a repository")
 	}
 
@@ -170,7 +171,7 @@ func VerifyBundleSource(
 		ctx,
 		*ociRepoAndDigest,
 		sigstoreProvenanceReferrers,
-		bundleSource.Verification.Source,
+		bundleSource.BundleSource,
 	)
 	if err != nil {
 		if errors.Is(err, ErrSourceMismatch) {

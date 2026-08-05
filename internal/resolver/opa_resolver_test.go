@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -78,7 +79,7 @@ func (m *mockBundleFetcher) GetSigstoreBundleMatchingVerificationSource(
 	_ context.Context,
 	_ utilities.OciRepositoryAndDigest,
 	_ []ocispec.Descriptor,
-	_ accesseratorv1alpha.GitHubRepositorySource,
+	_ model.OpaBundleSource,
 ) (*sigstorebundle.Bundle, error) {
 	return nil, nil
 }
