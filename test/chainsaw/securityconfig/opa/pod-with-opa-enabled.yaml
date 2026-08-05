@@ -24,7 +24,7 @@ spec:
         - --server
         - --addr=0.0.0.0:3010
         - --bundle
-        - /bundles/opa-common-self-auth-e3c1ab
+        - /bundles/opa-common-self-auth
         - --bundle
         - /bundles/test-bundle
         - --watch
