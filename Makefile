@@ -740,18 +740,13 @@ ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running 
 create-namespace: kubectl
 	$(if $(strip $(namespace)),,$(error namespace is not set))
 	@echo "🤞 Creating namespace: $(namespace)"
-	@output=$$($(KUBECTL) create namespace "$(namespace)" --context "$(KUBECONTEXT)" 2>&1); \
-	status=$$?; \
-	if [ $$status -eq 0 ]; then \
-		echo "✅ Namespace '$(namespace)' created successfully"; \
-	elif echo "$$output" | grep -qiE "already exists|AlreadyExists"; then \
+	@if $(KUBECTL) get namespace "$(namespace)" --context "$(KUBECONTEXT)" >/dev/null 2>&1; then \
 		echo "✅ Namespace '$(namespace)' already exists, continuing..."; \
 	else \
-		echo "❌ Error creating '$(namespace)' namespace:"; \
-		echo "$$output"; \
-		exit 1; \
+		$(KUBECTL) create namespace "$(namespace)" --context "$(KUBECONTEXT)"; \
+		echo "✅ Namespace '$(namespace)' created successfully"; \
 	fi
-	$(KUBECTL) label namespaces $(namespace) istio.io/rev=default --overwrite --context "$(KUBECONTEXT)"
+	@$(KUBECTL) label namespace "$(namespace)" istio.io/rev=default --overwrite --context "$(KUBECONTEXT)"
 
 wait-for-skiperator-pod: kubectl
 	$(if $(strip $(app)),,$(error app is not set))
