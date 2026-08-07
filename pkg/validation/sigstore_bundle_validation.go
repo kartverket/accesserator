@@ -35,8 +35,6 @@ var (
 	ErrNoMatchingSigstoreBundleFound = errors.New(
 		"no Sigstore bundles with valid certificate matching verification source",
 	)
-	ErrWorkflowFileMismatch          = errors.New("workflow file mismatch")
-	ErrNoMatchingCertificateIdentity *verify.ErrNoMatchingCertificateIdentity
 )
 
 // VerifySigstoreBundleCertificate verifies the Fulcio certificate attached to the provided Sigstore bundle
