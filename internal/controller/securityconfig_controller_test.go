@@ -1062,31 +1062,6 @@ var _ = Describe("SecurityConfig Controller", func() {
 	})
 })
 
-var _ = Describe("SecurityConfigController Validation", func() {
-	Context("When reconciling a resource", func() {
-		const (
-			securityConfigName = "test-resource"
-			namespaceName      = "default"
-		)
-
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      securityConfigName,
-			Namespace: namespaceName,
-		}
-
-		AfterEach(func() {
-			resource := &accesseratorv1alpha.SecurityConfig{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance SecurityConfig")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-	})
-})
-
 var _ = Describe("SecurityConfig status conditions and phase", func() {
 	const (
 		securityConfigName = "conditions-test-resource"
