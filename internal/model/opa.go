@@ -78,3 +78,7 @@ func (bundle OpaBundle) ValidateOpaBundle() error {
 
 	return nil
 }
+
+func (o OpaBundleSource) ToGitHubRepositoryURI() string {
+	return fmt.Sprintf("https://github.com/%s", o.Repository)
+}

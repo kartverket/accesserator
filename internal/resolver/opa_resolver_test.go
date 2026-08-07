@@ -15,7 +15,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
@@ -68,20 +67,20 @@ func (m *mockBundleFetcher) FetchOpaBundleLayer(
 	return m.layerData, m.fetchErr
 }
 
-func (m *mockBundleFetcher) GetSigstoreProvenanceReferrers(
+func (m *mockBundleFetcher) GetSLSAProvenanceReferrers(
 	_ context.Context,
 	_ utilities.OciRepositoryAndDigest,
 ) ([]ocispec.Descriptor, error) {
 	return nil, nil
 }
 
-func (m *mockBundleFetcher) GetSigstoreBundleMatchingVerificationSource(
+func (m *mockBundleFetcher) ValidateSigstoreBundlesMatchesExpectedSource(
 	_ context.Context,
 	_ utilities.OciRepositoryAndDigest,
 	_ []ocispec.Descriptor,
 	_ model.OpaBundleSource,
-) (*sigstorebundle.Bundle, error) {
-	return nil, nil
+) error {
+	return nil
 }
 
 // Compile-time check that mockBundleFetcher satisfies the interfaces.

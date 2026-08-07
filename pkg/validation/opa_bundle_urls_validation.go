@@ -12,7 +12,6 @@ import (
 	"github.com/kartverket/accesserator/pkg/log"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
@@ -36,21 +35,22 @@ type AttestationFetcher interface {
 		ociReference string,
 	) (*utilities.OciRepositoryAndDigest, error)
 
-	// GetSigstoreProvenanceReferrers fetches the Sigstore SLSA provenance attestation referrers for the given OCI
+	// GetSLSAProvenanceReferrers fetches the SLSA provenance attestation referrers for the given OCI
 	// repository and digest.
-	GetSigstoreProvenanceReferrers(
+	GetSLSAProvenanceReferrers(
 		ctx context.Context,
 		ociRepoAndDigest utilities.OciRepositoryAndDigest,
 	) ([]ocispec.Descriptor, error)
 
-	// GetSigstoreBundleMatchingVerificationSource fetches the first Sigstore bundle matching the given verification
-	// source from the provided Sigstore referrers.
-	GetSigstoreBundleMatchingVerificationSource(
+	// ValidateSigstoreBundlesMatchesExpectedSource returns an error if the list of OCI referrers does not refer to
+	// any valid Sigstore bundles whose signer certificate is not signed keyless by GitHub or matches the expected
+	// OPA build source.
+	ValidateSigstoreBundlesMatchesExpectedSource(
 		ctx context.Context,
 		ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 		sigstoreReferrers []ocispec.Descriptor,
 		verificationSource model.OpaBundleSource,
-	) (*sigstorebundle.Bundle, error)
+	) error
 }
 
 type DefaultAttestationFetcher struct{}
@@ -63,7 +63,7 @@ func (DefaultAttestationFetcher) ResolveOciRepositoryAndDigest(
 	return utilities.ResolveOciRepositoryAndDigest(ctx, credStore, ociReference)
 }
 
-func (DefaultAttestationFetcher) GetSigstoreProvenanceReferrers(
+func (DefaultAttestationFetcher) GetSLSAProvenanceReferrers(
 	ctx context.Context,
 	ociRepoAndDigest utilities.OciRepositoryAndDigest,
 ) ([]ocispec.Descriptor, error) {
@@ -79,13 +79,13 @@ func (DefaultAttestationFetcher) GetSigstoreProvenanceReferrers(
 	)
 }
 
-func (DefaultAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
+func (DefaultAttestationFetcher) ValidateSigstoreBundlesMatchesExpectedSource(
 	ctx context.Context,
 	ociRepositoryAndDigest utilities.OciRepositoryAndDigest,
 	sigstoreReferrers []ocispec.Descriptor,
 	verificationSource model.OpaBundleSource,
-) (*sigstorebundle.Bundle, error) {
-	return GetSigstoreBundleMatchingVerification(
+) error {
+	return ValidateSigstoreBundlesMatchesExpectedSource(
 		ctx,
 		ociRepositoryAndDigest,
 		sigstoreReferrers,
@@ -160,69 +160,37 @@ func VerifyBundleSource(
 		return fmt.Errorf("failed to resolve digest for %s", bundleSource.URL)
 	}
 
-	sigstoreProvenanceReferrers, err := fetcher.GetSigstoreProvenanceReferrers(ctx, *ociRepoAndDigest)
+	sigstoreProvenanceReferrers, err := fetcher.GetSLSAProvenanceReferrers(ctx, *ociRepoAndDigest)
 	if err != nil {
-		logger.Error(err, "failed to fetch Sigstore provenance referrers", "bundleURL", bundleSource.URL)
-		return fmt.Errorf("failed to fetch Sigstore provenance referrers for %s", bundleSource.URL)
+		logger.Error(err, "failed to fetch SLSA referrers", "bundleURL", bundleSource.URL)
+		return fmt.Errorf("failed to fetch SLSA referrers for %s", bundleSource.URL)
 	}
 
-	sigstoreBundleMatchingVerification, err := fetcher.GetSigstoreBundleMatchingVerificationSource(
+	logger.Debug(
+		"validating OPA bundle build source",
+		"bundleURL", bundleSource.URL,
+		"verification", bundleSource.BundleSource,
+	)
+	if validateErr := fetcher.ValidateSigstoreBundlesMatchesExpectedSource(
 		ctx,
 		*ociRepoAndDigest,
 		sigstoreProvenanceReferrers,
 		bundleSource.BundleSource,
-	)
-	if err != nil {
-		if errors.Is(err, ErrSourceMismatch) {
+	); validateErr != nil {
+		if errors.Is(validateErr, ErrSourceMismatch) ||
+			errors.Is(validateErr, ErrNoMatchingSigstoreBundleFound) {
 			logger.Warning(
-				fmt.Sprintf("OPA bundle verification failed: %s", err.Error()),
+				fmt.Sprintf("OPA bundle verification failed: %s", validateErr.Error()),
 				"bundleURL", bundleSource.URL,
 			)
-			return err
+			return fmt.Errorf(
+				"OPA bundle verification failed for %s: %w",
+				bundleSource.URL,
+				validateErr,
+			)
 		}
-		logger.Error(err, "failed to fetch Sigstore bundle matching verification", "bundleURL", bundleSource.URL)
-		return errors.New("failed to fetch Sigstore bundle matching verification")
+		logger.Error(err, "OPA bundle verification failed", "bundleURL", bundleSource.URL)
+		return fmt.Errorf("OPA bundle verification failed for %s", bundleSource.URL)
 	}
-	logger.Debug(
-		"Found sigstore bundle matching OPA bundle verification source",
-		"bundleURL", bundleSource.URL,
-	)
-
-	logger.Debug(
-		"Stripping alg prefix from Sigstore bundle digest",
-		"bundleURL", bundleSource.URL,
-	)
-	artifactSHA256, err := utilities.StripAlgPrefix(ociRepoAndDigest.Digest)
-	if err != nil {
-		logger.Error(err, "failed to strip alg prefix artifact SHA256", "bundleURL", bundleSource.URL)
-		return fmt.Errorf("failed to strip alg prefix artifact SHA256 for digest %s", ociRepoAndDigest.Digest)
-	}
-	logger.Debug(
-		"Sigstore bundle digest stripped of alg prefix successfully",
-		"bundleURL", bundleSource.URL,
-	)
-
-	logger.Debug(
-		"Validating Sigstore bundle signature",
-		"bundleURL", bundleSource.URL,
-		"sigstoreBundleDigest", "sha256:"+string(artifactSHA256),
-	)
-	if validateSigstoreBundleSignatureErr := ValidateSigstoreBundleSignature(
-		logger,
-		sigstoreBundleMatchingVerification,
-		artifactSHA256,
-	); validateSigstoreBundleSignatureErr != nil {
-		logger.Error(
-			validateSigstoreBundleSignatureErr,
-			"sigstore bundle failed signature verification",
-			"opaOciRepositoryDigest", ociRepoAndDigest.Digest,
-		)
-		return errors.New("failed to verify sigstore bundle signature")
-	}
-	logger.Debug(
-		"Sigstore bundle signature validated successfully",
-		"bundleURL", bundleSource.URL,
-		"sigstoreBundleDigest", "sha256:"+string(artifactSHA256),
-	)
 	return nil
 }

@@ -1,74 +1,94 @@
 package utilities_test
 
 import (
+	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
-	protodsse "github.com/sigstore/protobuf-specs/gen/pb-go/dsse"
 	protorekor "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 )
 
-// bundleWithDsseEnvelope builds a Sigstore bundle carrying a DSSE envelope
-// whose payload is the given in-toto statement bytes.
-func bundleWithDsseEnvelope(payload []byte) *sigstorebundle.Bundle {
-	return &sigstorebundle.Bundle{
-		Bundle: &protobundle.Bundle{
-			Content: &protobundle.Bundle_DsseEnvelope{
-				DsseEnvelope: &protodsse.Envelope{
-					Payload:     payload,
-					PayloadType: "application/vnd.in-toto+json",
-				},
+var _ = Describe("GetRepositorySourceFromVerifiedSigstoreBundleCertificate", func() {
+	It("returns an empty OpaBundleSource for a zero-value certificate summary", func() {
+		Expect(utilities.GetRepositorySourceFromVerifiedSigstoreBundleCertificate(
+			certificate.Summary{},
+		)).To(Equal(model.OpaBundleSource{}))
+	})
+
+	It("extracts repository, workflow and ref from the certificate extensions", func() {
+		summary := certificate.Summary{
+			Extensions: certificate.Extensions{
+				SourceRepositoryURI: "https://github.com/kartverket/accesserator",
+				SourceRepositoryRef: "refs/heads/main",
+				BuildConfigURI: "https://github.com/kartverket/accesserator" +
+					"/.github/workflows/build.yml@refs/heads/main",
 			},
-		},
-	}
-}
+		}
 
-var _ = Describe("GetRepositorySourceFromSigstoreBundle", func() {
-	It("returns an error when the bundle is nil", func() {
-		_, err := utilities.GetRepositorySourceFromSigstoreBundle(nil)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("no DsseEnvelope in Sigstore bundle"))
+		source := utilities.GetRepositorySourceFromVerifiedSigstoreBundleCertificate(summary)
+
+		Expect(source).To(Equal(model.OpaBundleSource{
+			Repository: "kartverket/accesserator",
+			Workflow:   ".github/workflows/build.yml",
+			Ref:        "refs/heads/main",
+		}))
 	})
 
-	It("returns an error when the bundle has no DSSE envelope", func() {
-		_, err := utilities.GetRepositorySourceFromSigstoreBundle(&sigstorebundle.Bundle{
-			Bundle: &protobundle.Bundle{},
-		})
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("no DsseEnvelope in Sigstore bundle"))
-	})
+	It("leaves Workflow empty when BuildConfigURI has no '@<ref>' suffix", func() {
+		summary := certificate.Summary{
+			Extensions: certificate.Extensions{
+				SourceRepositoryURI: "https://github.com/kartverket/accesserator",
+				SourceRepositoryRef: "refs/tags/v1.2.3",
+				BuildConfigURI:      "https://github.com/kartverket/accesserator/.github/workflows/build.yml",
+			},
+		}
 
-	It("returns an error when the payload is not valid JSON", func() {
-		_, err := utilities.GetRepositorySourceFromSigstoreBundle(
-			bundleWithDsseEnvelope([]byte("not-json")),
-		)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("failed to unmarshal in-toto payload"))
-	})
+		source := utilities.GetRepositorySourceFromVerifiedSigstoreBundleCertificate(summary)
 
-	It("extracts repository, workflow and ref from the in-toto payload", func() {
-		payload := []byte(`{
-			"predicate": {
-				"buildDefinition": {
-					"externalParameters": {
-						"workflow": {
-							"ref": "refs/heads/main",
-							"repository": "https://github.com/kartverket/accesserator",
-							"path": ".github/workflows/build.yml"
-						}
-					}
-				}
-			}
-		}`)
-
-		source, err := utilities.GetRepositorySourceFromSigstoreBundle(bundleWithDsseEnvelope(payload))
-		Expect(err).NotTo(HaveOccurred())
 		Expect(source.Repository).To(Equal("kartverket/accesserator"))
-		Expect(source.Workflow).To(Equal(".github/workflows/build.yml"))
+		Expect(source.Ref).To(Equal("refs/tags/v1.2.3"))
+		Expect(source.Workflow).To(BeEmpty())
+	})
+
+	It("keeps the full BuildConfigURI path when the workflow lives in a different repo", func() {
+		summary := certificate.Summary{
+			Extensions: certificate.Extensions{
+				SourceRepositoryURI: "https://github.com/kartverket/accesserator",
+				SourceRepositoryRef: "refs/heads/main",
+				// Reusable workflow lives in a different repo. The current
+				// implementation only trims the SourceRepositoryURI prefix,
+				// so the workflow path here does NOT match that prefix and
+				// stays as the full workflow URI (minus the @<ref> suffix).
+				BuildConfigURI: "https://github.com/kartverket/github-workflows" +
+					"/.github/workflows/build-and-push-opa-rules.yml@refs/heads/main",
+			},
+		}
+
+		source := utilities.GetRepositorySourceFromVerifiedSigstoreBundleCertificate(summary)
+
+		Expect(source.Repository).To(Equal("kartverket/accesserator"))
 		Expect(source.Ref).To(Equal("refs/heads/main"))
+		Expect(source.Workflow).To(Equal(
+			"https://github.com/kartverket/github-workflows/.github/workflows/build-and-push-opa-rules.yml",
+		))
+	})
+
+	It("returns an empty Repository when SourceRepositoryURI is not a github.com URI", func() {
+		summary := certificate.Summary{
+			Extensions: certificate.Extensions{
+				SourceRepositoryRef: "refs/heads/main",
+			},
+		}
+
+		source := utilities.GetRepositorySourceFromVerifiedSigstoreBundleCertificate(summary)
+
+		Expect(source.Repository).To(BeEmpty())
+		Expect(source.Ref).To(Equal("refs/heads/main"))
+		Expect(source.Workflow).To(BeEmpty())
 	})
 })
 

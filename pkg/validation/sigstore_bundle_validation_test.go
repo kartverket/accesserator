@@ -17,16 +17,20 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"oras.land/oras-go/v2/registry/remote"
 )
 
-var _ = Describe("ValidateSigstoreBundleSignature", func() {
+var _ = Describe("VerifySigstoreBundleCertificate", func() {
 	It("returns an error when the bundle cannot produce a verifier", func() {
 		// A nil bundle produces no verifier options, so GetBundleVerifier fails
 		// before any signature verification is attempted.
-		err := validation.ValidateSigstoreBundleSignature(logger, nil, nil)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("failed to get bundle verifier"))
+		summary, verifyErr := validation.VerifySigstoreBundleCertificate(
+			logger, nil, nil, verify.CertificateIdentity{},
+		)
+		Expect(verifyErr).To(HaveOccurred())
+		Expect(verifyErr.Error()).To(ContainSubstring("failed to get bundle verifier"))
+		Expect(summary).To(BeNil())
 	})
 })
 
@@ -41,9 +45,9 @@ var _ = Describe("BuildGitHubSANRegex", func() {
 		var re *regexp.Regexp
 
 		BeforeEach(func() {
-			pattern, err := validation.BuildGitHubSANRegex([]string{"kartverket"})
+			var err error
+			re, err = validation.BuildGitHubSANRegex([]string{"kartverket"})
 			Expect(err).NotTo(HaveOccurred())
-			re = regexp.MustCompile(pattern)
 		})
 
 		It("matches a workflow SAN for the org with a .yml extension", func() {
@@ -117,9 +121,9 @@ var _ = Describe("BuildGitHubSANRegex", func() {
 		var re *regexp.Regexp
 
 		BeforeEach(func() {
-			pattern, err := validation.BuildGitHubSANRegex([]string{"kartverket", "accesserator"})
+			var err error
+			re, err = validation.BuildGitHubSANRegex([]string{"kartverket", "accesserator"})
 			Expect(err).NotTo(HaveOccurred())
-			re = regexp.MustCompile(pattern)
 		})
 
 		It("matches a SAN from the first org", func() {
@@ -151,9 +155,8 @@ var _ = Describe("BuildGitHubSANRegex", func() {
 	It("escapes regex metacharacters in org names so they are matched literally", func() {
 		// `.` is a regex wildcard. If it weren't escaped, "a.b" would match
 		// "axb". With QuoteMeta it must match the literal "a.b".
-		pattern, err := validation.BuildGitHubSANRegex([]string{"a.b"})
+		re, err := validation.BuildGitHubSANRegex([]string{"a.b"})
 		Expect(err).NotTo(HaveOccurred())
-		re := regexp.MustCompile(pattern)
 
 		Expect(re.MatchString(
 			"https://github.com/a.b/foo/.github/workflows/build.yml@refs/heads/main",
@@ -164,10 +167,10 @@ var _ = Describe("BuildGitHubSANRegex", func() {
 	})
 
 	It("returns a regex that compiles via Go's regexp engine", func() {
-		pattern, err := validation.BuildGitHubSANRegex([]string{"kartverket"})
+		re, err := validation.BuildGitHubSANRegex([]string{"kartverket"})
 		Expect(err).NotTo(HaveOccurred())
-		_, compileErr := regexp.Compile(pattern)
-		Expect(compileErr).NotTo(HaveOccurred())
+		Expect(re).NotTo(BeNil())
+		Expect(re.String()).NotTo(BeEmpty())
 	})
 })
 
@@ -284,7 +287,7 @@ var _ = Describe("DefaultAttestationFetcher.GetSigstoreProvenanceReferrers", fun
 		server := referrersServer([]ocispec.Descriptor{provenanceReferrer, otherReferrer})
 		DeferCleanup(server.Close)
 
-		got, err := validation.DefaultAttestationFetcher{}.GetSigstoreProvenanceReferrers(
+		got, err := validation.DefaultAttestationFetcher{}.GetSLSAProvenanceReferrers(
 			context.Background(),
 			repoAndDigestFor(server),
 		)
@@ -297,7 +300,7 @@ var _ = Describe("DefaultAttestationFetcher.GetSigstoreProvenanceReferrers", fun
 		server := referrersServer(nil)
 		DeferCleanup(server.Close)
 
-		_, err := validation.DefaultAttestationFetcher{}.GetSigstoreProvenanceReferrers(
+		_, err := validation.DefaultAttestationFetcher{}.GetSLSAProvenanceReferrers(
 			context.Background(),
 			repoAndDigestFor(server),
 		)
@@ -306,22 +309,21 @@ var _ = Describe("DefaultAttestationFetcher.GetSigstoreProvenanceReferrers", fun
 	})
 })
 
-var _ = Describe("GetSigstoreBundleMatchingVerification", func() {
+var _ = Describe("ValidateSigstoreBundlesMatchesExpectedSource", func() {
 	verificationSource := model.OpaBundleSource{Repository: "kartverket/accesserator"}
 
-	It("returns a source-mismatch error and no bundle when there are no referrers", func() {
+	It("returns ErrNoMatchingSigstoreBundleFound when there are no referrers", func() {
 		repoAndDig := utilities.OciRepositoryAndDigest{
 			Digest: "sha256:" + "0000000000000000000000000000000000000000000000000000000000000000",
 		}
-		bundle, err := validation.GetSigstoreBundleMatchingVerification(
+		err := validation.ValidateSigstoreBundlesMatchesExpectedSource(
 			context.Background(),
 			repoAndDig,
 			nil,
 			verificationSource,
 		)
-		Expect(bundle).To(BeNil())
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, validation.ErrSourceMismatch)).To(BeTrue())
+		Expect(errors.Is(err, validation.ErrNoMatchingSigstoreBundleFound)).To(BeTrue())
 	})
 
 	It("aggregates fetch errors when a referrer's bundle cannot be pulled", func() {
@@ -348,13 +350,12 @@ var _ = Describe("GetSigstoreBundleMatchingVerification", func() {
 			},
 		}
 
-		bundle, err := validation.GetSigstoreBundleMatchingVerification(
+		err = validation.ValidateSigstoreBundlesMatchesExpectedSource(
 			context.Background(),
 			repoAndDig,
 			referrers,
 			verificationSource,
 		)
-		Expect(bundle).To(BeNil())
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed to fetch Sigstore bundle bytes"))
 	})

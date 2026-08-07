@@ -2,14 +2,13 @@ package utilities
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 	"sync"
 
 	"github.com/kartverket/accesserator/internal/model"
 	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/verify"
@@ -27,20 +26,6 @@ var (
 	//go:embed github-tuf-root.json
 	githubTUFRootAnchor []byte
 )
-
-type InTotoStatement struct {
-	Predicate struct {
-		BuildDefinition struct {
-			ExternalParameters struct {
-				Workflow struct {
-					Ref        string `json:"ref"`
-					Repository string `json:"repository"`
-					Path       string `json:"path"`
-				} `json:"workflow"`
-			} `json:"externalParameters"`
-		} `json:"buildDefinition"`
-	} `json:"predicate"`
-}
 
 // GetBundleVerifier returns a Sigstore verifier for the given Sigstore bundle, using the appropriate trusted
 // root (GitHub's or public-good) based on the presence of TLog entries in the bundle.
@@ -107,69 +92,24 @@ func GitHubTrustedRoot(cachePath string) (root.TrustedMaterial, error) {
 	return githubTrustedMaterial, err
 }
 
-// GetRepositorySourceFromSigstoreBundle extracts the GitHub repository source information from a Sigstore bundle's
-// in-toto statement payload (the DSSE-envelope).
-func GetRepositorySourceFromSigstoreBundle(
-	sigstoreBundle *sigstorebundle.Bundle,
-) (*model.OpaBundleSource, error) {
-	if sigstoreBundle == nil || sigstoreBundle.GetDsseEnvelope() == nil {
-		return nil, fmt.Errorf("no DsseEnvelope in Sigstore bundle")
+// GetRepositorySourceFromVerifiedSigstoreBundleCertificate extracts the GitHub repository source information from a
+// Sigstore bundle's certificate. It performs no verification of the certificate.
+func GetRepositorySourceFromVerifiedSigstoreBundleCertificate(
+	certificateSummary certificate.Summary,
+) model.OpaBundleSource {
+	const gitHubUri = "https://github.com"
+	source := model.OpaBundleSource{
+		Repository: strings.TrimPrefix(certificateSummary.SourceRepositoryURI, gitHubUri+"/"),
+		Ref:        certificateSummary.SourceRepositoryRef,
 	}
 
-	var inTotoStatement InTotoStatement
-	if err := json.Unmarshal(sigstoreBundle.GetDsseEnvelope().GetPayload(), &inTotoStatement); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal in-toto payload: %w", err)
+	/*
+		BuildConfigURI looks like: https://github.com/<owner>/<repo>/.github/workflows/<file>.yml@<ref>.
+		Extract just the workflow file path (relative to the repo root).
+	*/
+	if workflowFileURI, _, ok := strings.Cut(certificateSummary.BuildConfigURI, "@"); ok {
+		repoPrefix := certificateSummary.SourceRepositoryURI + "/"
+		source.Workflow = strings.TrimPrefix(workflowFileURI, repoPrefix)
 	}
-
-	rawRepo := inTotoStatement.Predicate.BuildDefinition.ExternalParameters.Workflow.Repository
-	repoName, err := extractGitHubRepoName(rawRepo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract repository name from %q: %w", rawRepo, err)
-	}
-
-	return &model.OpaBundleSource{
-		Repository: repoName,
-		Workflow:   inTotoStatement.Predicate.BuildDefinition.ExternalParameters.Workflow.Path,
-		Ref:        inTotoStatement.Predicate.BuildDefinition.ExternalParameters.Workflow.Ref,
-	}, nil
-}
-
-// extractGitHubRepoName extracts the "<org>/<repo>" path from a GitHub repository URL or a bare
-// "<org>/<repo>" string. Returns an error if the input cannot be resolved to a valid two-segment path.
-func extractGitHubRepoName(raw string) (string, error) {
-	if raw == "" {
-		return "", fmt.Errorf("repository field is empty")
-	}
-
-	// If it looks like a URL (has a scheme), parse it properly.
-	if strings.Contains(raw, "://") {
-		u, err := url.Parse(raw)
-		if err != nil {
-			return "", fmt.Errorf("invalid URL: %w", err)
-		}
-		if !strings.EqualFold(u.Host, "github.com") {
-			return "", fmt.Errorf("unexpected host %q, expected github.com", u.Host)
-		}
-		// u.Path starts with "/", trim it and any trailing slash.
-		path := strings.Trim(u.Path, "/")
-		if err := validateOrgRepo(path); err != nil {
-			return "", err
-		}
-		return path, nil
-	}
-
-	// Otherwise assume it is already in "<org>/<repo>" form.
-	if err := validateOrgRepo(raw); err != nil {
-		return "", err
-	}
-	return raw, nil
-}
-
-// validateOrgRepo checks that s is exactly "<org>/<repo>" with no extra segments.
-func validateOrgRepo(s string) error {
-	parts := strings.Split(s, "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return fmt.Errorf("expected \"<org>/<repo>\", got %q", s)
-	}
-	return nil
+	return source
 }
