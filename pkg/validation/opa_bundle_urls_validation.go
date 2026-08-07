@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	githubActionsOIDCIssuer = "https://token.actions.githubusercontent.com"
-
 	SigstoreBundleMediaType                  = "application/vnd.dev.sigstore.bundle.v0.3+json"
 	SigstoreBundleContentAnnotationKey       = "dev.sigstore.bundle.content"
 	SigstoreBundleContentAnnotationValue     = "dsse-envelope"

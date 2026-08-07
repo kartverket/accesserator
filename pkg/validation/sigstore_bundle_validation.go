@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -67,27 +66,6 @@ func VerifySigstoreBundleCertificate(
 	return result.Signature.Certificate, nil
 }
 
-// BuildGitHubSANRegex returns an anchored regex that matches the SAN of any
-// keyless cert signed by a workflow in one of the given GitHub orgs.
-func BuildGitHubSANRegex(orgs []string) (*regexp.Regexp, error) {
-	if len(orgs) == 0 {
-		return nil, fmt.Errorf("at least one org is required")
-	}
-	escaped := make([]string, len(orgs))
-	for i, o := range orgs {
-		escaped[i] = regexp.QuoteMeta(o)
-	}
-	sanRegex := fmt.Sprintf(
-		`^https://github\.com/(?:%s)/[^/]+/\.github/workflows/[^@]+\.ya?ml@.+`,
-		strings.Join(escaped, "|"),
-	)
-	compiledSanRegex, err := regexp.Compile(sanRegex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to compile SAN regex: %w", err)
-	}
-	return compiledSanRegex, nil
-}
-
 // pullSigstoreBundleBytes pulls the bytes of a Sigstore bundle from the given OCI repository and referrer descriptor.
 func pullSigstoreBundleBytes(
 	ctx context.Context,
@@ -145,14 +123,6 @@ func ValidateSigstoreBundlesMatchesExpectedSource(
 			ociRepositoryAndDigest.Digest,
 		)
 	}
-	sanRegex, err := BuildGitHubSANRegex(config.Get().OpaAllowedBundleSignatureSourceOrgs)
-	if err != nil {
-		return fmt.Errorf("failed to build GitHub SAN regex: %w", err)
-	}
-	certificateIdentity, err := GetCertificateIdentity(*sanRegex)
-	if err != nil {
-		return fmt.Errorf("failed to create CertificateIdentity: %w", err)
-	}
 
 	// Pull the referrer bundles that have a valid certificate concurrently.
 	gCtx, cancel := context.WithCancel(ctx)
@@ -183,7 +153,7 @@ func ValidateSigstoreBundlesMatchesExpectedSource(
 				return nil
 			}
 			certificateSummary, verifyErr := VerifySigstoreBundleCertificate(
-				logger, bundle, artifactSHA256, *certificateIdentity,
+				logger, bundle, artifactSHA256, config.CertificateIdentityForGithubActions,
 			)
 			if verifyErr != nil {
 				mu.Lock()
@@ -271,20 +241,4 @@ func sourceRepositoriesToString(
 	}
 
 	return strings.Join(compactSources, "\n")
-}
-
-func GetCertificateIdentity(sanRegex regexp.Regexp) (*verify.CertificateIdentity, error) {
-	certificateIdentity, err := verify.NewCertificateIdentity(
-		verify.SubjectAlternativeNameMatcher{
-			Regexp: sanRegex,
-		},
-		verify.IssuerMatcher{
-			Issuer: githubActionsOIDCIssuer,
-		},
-		certificate.Extensions{},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create CertificateIdentity: %w", err)
-	}
-	return &certificateIdentity, nil
 }

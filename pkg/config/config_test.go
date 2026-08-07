@@ -567,3 +567,171 @@ func contains(s, substr string) bool {
 	}
 	return false
 }
+
+func TestBuildGitHubSANRegex_NilOrgList(t *testing.T) {
+	_, err := config.BuildGitHubSANRegex(nil)
+	if err == nil {
+		t.Fatal("expected error for nil org list, got nil")
+	}
+	if got := err.Error(); !contains(got, "at least one org is required") {
+		t.Errorf("error = %q, want it to contain %q", got, "at least one org is required")
+	}
+}
+
+func TestBuildGitHubSANRegex_SingleOrg(t *testing.T) {
+	re, err := config.BuildGitHubSANRegex([]string{"kartverket"})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if re == nil {
+		t.Fatal("expected non-nil regex")
+	}
+
+	tests := []struct {
+		name  string
+		san   string
+		match bool
+	}{
+		{
+			name:  "matches workflow SAN with .yml extension",
+			san:   "https://github.com/kartverket/accesserator/.github/workflows/build.yml@refs/heads/main",
+			match: true,
+		},
+		{
+			name:  "matches workflow SAN with .yaml extension",
+			san:   "https://github.com/kartverket/accesserator/.github/workflows/build.yaml@refs/heads/main",
+			match: true,
+		},
+		{
+			name:  "matches workflow SAN on a tag ref",
+			san:   "https://github.com/kartverket/accesserator/.github/workflows/build.yml@refs/tags/v1.2.3",
+			match: true,
+		},
+		{
+			name: "matches reusable workflow SAN when owning org is allowed",
+			san: "https://github.com/kartverket/github-workflows" +
+				"/.github/workflows/build-and-push-opa-rules.yml@refs/heads/main",
+			match: true,
+		},
+		{
+			name:  "rejects SAN whose org is not in the allowlist",
+			san:   "https://github.com/attacker/accesserator/.github/workflows/build.yml@refs/heads/main",
+			match: false,
+		},
+		{
+			name: "rejects SAN whose host has been spoofed with a path (^-anchor)",
+			san: "https://malicious.example/github.com/kartverket/accesserator" +
+				"/.github/workflows/build.yml@refs/heads/main",
+			match: false,
+		},
+		{
+			name:  "rejects SAN where the dot in 'github.com' is replaced (escaped '.')",
+			san:   "https://githubXcom/kartverket/accesserator/.github/workflows/build.yml@refs/heads/main",
+			match: false,
+		},
+		{
+			name:  "rejects SAN without a workflow path",
+			san:   "https://github.com/kartverket/accesserator",
+			match: false,
+		},
+		{
+			name:  "rejects SAN with an unsupported file extension",
+			san:   "https://github.com/kartverket/accesserator/.github/workflows/build.txt@refs/heads/main",
+			match: false,
+		},
+		{
+			name:  "rejects SAN without a ref portion",
+			san:   "https://github.com/kartverket/accesserator/.github/workflows/build.yml",
+			match: false,
+		},
+		{
+			name:  "rejects SAN with an empty repo",
+			san:   "https://github.com/kartverket//.github/workflows/build.yml@refs/heads/main",
+			match: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := re.MatchString(tt.san); got != tt.match {
+				t.Errorf("re.MatchString(%q) = %v, want %v", tt.san, got, tt.match)
+			}
+		})
+	}
+}
+
+func TestBuildGitHubSANRegex_MultipleOrgs(t *testing.T) {
+	re, err := config.BuildGitHubSANRegex([]string{"kartverket", "accesserator"})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if re == nil {
+		t.Fatal("expected non-nil regex")
+	}
+
+	tests := []struct {
+		name  string
+		san   string
+		match bool
+	}{
+		{
+			name:  "matches SAN from the first org",
+			san:   "https://github.com/kartverket/accesserator/.github/workflows/build.yml@refs/heads/main",
+			match: true,
+		},
+		{
+			name:  "matches SAN from the second org",
+			san:   "https://github.com/accesserator/foo/.github/workflows/x.yml@refs/tags/v1",
+			match: true,
+		},
+		{
+			name:  "rejects SAN from an org that is not in the allowlist",
+			san:   "https://github.com/attacker/repo/.github/workflows/build.yml@refs/heads/main",
+			match: false,
+		},
+		{
+			// "accesserator" must not also match "accesserator-evil".
+			name:  "does not match an org name that is a substring of an allowed org",
+			san:   "https://github.com/accesserator-evil/foo/.github/workflows/build.yml@refs/heads/main",
+			match: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := re.MatchString(tt.san); got != tt.match {
+				t.Errorf("re.MatchString(%q) = %v, want %v", tt.san, got, tt.match)
+			}
+		})
+	}
+}
+
+func TestBuildGitHubSANRegex_EscapesMetacharactersInOrgNames(t *testing.T) {
+	// `.` is a regex wildcard. If it weren't escaped, "a.b" would match "axb".
+	// With QuoteMeta it must match the literal "a.b" only.
+	re, err := config.BuildGitHubSANRegex([]string{"a.b"})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	literal := "https://github.com/a.b/foo/.github/workflows/build.yml@refs/heads/main"
+	if !re.MatchString(literal) {
+		t.Errorf("re.MatchString(%q) = false, want true", literal)
+	}
+	wildcard := "https://github.com/axb/foo/.github/workflows/build.yml@refs/heads/main"
+	if re.MatchString(wildcard) {
+		t.Errorf("re.MatchString(%q) = true, want false", wildcard)
+	}
+}
+
+func TestBuildGitHubSANRegex_ReturnsCompiledRegex(t *testing.T) {
+	re, err := config.BuildGitHubSANRegex([]string{"kartverket"})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if re == nil {
+		t.Fatal("expected non-nil regex")
+	}
+	if re.String() == "" {
+		t.Error("expected non-empty regex pattern string")
+	}
+}
