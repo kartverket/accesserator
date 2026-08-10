@@ -14,7 +14,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
@@ -27,12 +26,11 @@ type mockAttestationFetcher struct {
 	referrers    []ocispec.Descriptor
 	referrersErr error
 
-	bundle    *sigstorebundle.Bundle
-	bundleErr error
+	validateErr error
 
 	resolveCalls   int
 	referrersCalls int
-	bundleCalls    int
+	validateCalls  int
 }
 
 func (m *mockAttestationFetcher) ResolveOciRepositoryAndDigest(
@@ -52,7 +50,7 @@ func (m *mockAttestationFetcher) ResolveOciRepositoryAndDigest(
 	return m.repoAndDigest, nil
 }
 
-func (m *mockAttestationFetcher) GetSigstoreProvenanceReferrers(
+func (m *mockAttestationFetcher) GetSLSAProvenanceReferrers(
 	_ context.Context,
 	_ utilities.OciRepositoryAndDigest,
 ) ([]ocispec.Descriptor, error) {
@@ -60,14 +58,14 @@ func (m *mockAttestationFetcher) GetSigstoreProvenanceReferrers(
 	return m.referrers, m.referrersErr
 }
 
-func (m *mockAttestationFetcher) GetSigstoreBundleMatchingVerificationSource(
+func (m *mockAttestationFetcher) ValidateSigstoreBundlesMatchesExpectedSource(
 	_ context.Context,
 	_ utilities.OciRepositoryAndDigest,
 	_ []ocispec.Descriptor,
 	_ model.OpaBundleSource,
-) (*sigstorebundle.Bundle, error) {
-	m.bundleCalls++
-	return m.bundle, m.bundleErr
+) error {
+	m.validateCalls++
+	return m.validateErr
 }
 
 var _ validation.AttestationFetcher = (*mockAttestationFetcher)(nil)
@@ -240,63 +238,59 @@ var _ = Describe("VerifyBundleSource", func() {
 
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(Equal(
-			fmt.Sprintf("failed to fetch Sigstore provenance referrers for %s", bundleURL),
+			fmt.Sprintf("failed to fetch SLSA referrers for %s", bundleURL),
 		))
 		Expect(fetcher.referrersCalls).To(Equal(1))
-		Expect(fetcher.bundleCalls).To(BeZero())
+		Expect(fetcher.validateCalls).To(BeZero())
 	})
 
-	It("propagates ErrSourceMismatch unchanged", func() {
+	It("wraps ErrSourceMismatch with the bundle URL when the fetcher signals a source mismatch", func() {
 		mismatch := fmt.Errorf("%w: the found source did not match", validation.ErrSourceMismatch)
-		fetcher := &mockAttestationFetcher{bundleErr: mismatch}
+		fetcher := &mockAttestationFetcher{validateErr: mismatch}
 
 		err := validation.VerifyBundleSource(context.Background(), fetcher, nil, withVerification)
 
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, validation.ErrSourceMismatch)).To(BeTrue())
-		Expect(fetcher.bundleCalls).To(Equal(1))
+		Expect(err.Error()).To(ContainSubstring("OPA bundle verification failed for"))
+		Expect(err.Error()).To(ContainSubstring(bundleURL))
+		Expect(fetcher.validateCalls).To(Equal(1))
+	})
+
+	It("wraps ErrNoMatchingSigstoreBundleFound with the bundle URL when no matching bundle is found", func() {
+		noMatch := fmt.Errorf("verification failed: %w", validation.ErrNoMatchingSigstoreBundleFound)
+		fetcher := &mockAttestationFetcher{validateErr: noMatch}
+
+		err := validation.VerifyBundleSource(context.Background(), fetcher, nil, withVerification)
+
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, validation.ErrNoMatchingSigstoreBundleFound)).To(BeTrue())
+		Expect(err.Error()).To(ContainSubstring("OPA bundle verification failed for"))
+		Expect(err.Error()).To(ContainSubstring(bundleURL))
+		Expect(fetcher.validateCalls).To(Equal(1))
 	})
 
 	It("returns a generic error when the bundle match fails for a non-mismatch reason", func() {
-		fetcher := &mockAttestationFetcher{bundleErr: errors.New("network boom")}
+		fetcher := &mockAttestationFetcher{validateErr: errors.New("network boom")}
 
 		err := validation.VerifyBundleSource(context.Background(), fetcher, nil, withVerification)
 
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(Equal("failed to fetch Sigstore bundle matching verification"))
+		Expect(err.Error()).To(Equal(fmt.Sprintf("OPA bundle verification failed for %s", bundleURL)))
 		Expect(errors.Is(err, validation.ErrSourceMismatch)).To(BeFalse())
+		Expect(errors.Is(err, validation.ErrNoMatchingSigstoreBundleFound)).To(BeFalse())
+		Expect(fetcher.validateCalls).To(Equal(1))
 	})
 
-	It("returns an error when the resolved digest cannot be decoded", func() {
-		fetcher := &mockAttestationFetcher{
-			repoAndDigest: &utilities.OciRepositoryAndDigest{Digest: "sha512:deadbeef"},
-			bundle:        &sigstorebundle.Bundle{},
-		}
+	It("succeeds when the fetcher validates the Sigstore bundle successfully", func() {
+		fetcher := &mockAttestationFetcher{}
 
 		err := validation.VerifyBundleSource(context.Background(), fetcher, nil, withVerification)
 
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("failed to strip alg prefix artifact SHA256 for digest"))
-	})
-
-	It("proceeds to signature validation and fails when the bundle cannot be verified", func() {
-		// A valid digest and a matching (but empty) Sigstore bundle exercise the
-		// full happy path up to signature verification, which fails because the
-		// empty bundle cannot produce a verifier.
-		fetcher := &mockAttestationFetcher{
-			repoAndDigest: &utilities.OciRepositoryAndDigest{
-				Digest: "sha256:" + strings.Repeat("0", 64),
-			},
-			bundle: &sigstorebundle.Bundle{},
-		}
-
-		err := validation.VerifyBundleSource(context.Background(), fetcher, nil, withVerification)
-
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(Equal("failed to verify sigstore bundle signature"))
+		Expect(err).NotTo(HaveOccurred())
 		Expect(fetcher.resolveCalls).To(Equal(1))
 		Expect(fetcher.referrersCalls).To(Equal(1))
-		Expect(fetcher.bundleCalls).To(Equal(1))
+		Expect(fetcher.validateCalls).To(Equal(1))
 	})
 })
 

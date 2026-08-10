@@ -3,14 +3,21 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
 var (
+	githubActionsOIDCIssuer = "https://token.actions.githubusercontent.com"
+
+	CertificateIdentityForGithubActions verify.CertificateIdentity
+
 	CredStore *credentials.DynamicStore
 
 	OpaSelfAuthorizationBundleBinaryData map[string][]byte
@@ -114,10 +121,62 @@ func Load() error {
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
 	}
+
+	if cfg.OpaEnabled {
+		certificateIdentityForGitHubActions, err := GetCertificateIdentityForGitHubOrgs(
+			cfg.OpaAllowedBundleSignatureSourceOrgs,
+		)
+		if err != nil {
+			return fmt.Errorf("failed setting up CertificateIdentity for GitHub Actions: %w", err)
+		}
+		CertificateIdentityForGithubActions = *certificateIdentityForGitHubActions
+	}
+
 	appCfg = cfg
 	return nil
 }
 
 func Get() Config {
 	return appCfg
+}
+
+func GetCertificateIdentityForGitHubOrgs(orgs []string) (*verify.CertificateIdentity, error) {
+	sanRegex, err := BuildGitHubSANRegex(orgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build GitHub SAN regex: %w", err)
+	}
+	certificateIdentity, err := verify.NewCertificateIdentity(
+		verify.SubjectAlternativeNameMatcher{
+			Regexp: *sanRegex,
+		},
+		verify.IssuerMatcher{
+			Issuer: githubActionsOIDCIssuer,
+		},
+		certificate.Extensions{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CertificateIdentity: %w", err)
+	}
+	return &certificateIdentity, nil
+}
+
+// BuildGitHubSANRegex returns an anchored regex that matches the SAN of any
+// keyless cert signed by a workflow in one of the given GitHub orgs.
+func BuildGitHubSANRegex(orgs []string) (*regexp.Regexp, error) {
+	if len(orgs) == 0 {
+		return nil, fmt.Errorf("at least one org is required")
+	}
+	escaped := make([]string, len(orgs))
+	for i, o := range orgs {
+		escaped[i] = regexp.QuoteMeta(o)
+	}
+	sanRegex := fmt.Sprintf(
+		`^https://github\.com/(?:%s)/[^/]+/\.github/workflows/[^@]+\.ya?ml@.+`,
+		strings.Join(escaped, "|"),
+	)
+	compiledSanRegex, err := regexp.Compile(sanRegex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile SAN regex: %w", err)
+	}
+	return compiledSanRegex, nil
 }
