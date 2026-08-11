@@ -132,8 +132,8 @@ updating Go version).
    The version of Chainsaw must support the same major and minor version as your chosen Go version. Patch versions may
    typically be updated without updating Chainsaw. If necessary, update `CHAINSAW_VERSION` in the `Makefile`
 4. Update Go version in `go.mod`
-5. Revert any changes made to `github.com/nais/liberator`. Liberator must be updated separately.
-6. Perform dependency updates for direct dependencies with `go get -u ./...`
+5. Perform dependency updates for direct dependencies with `go get -u ./...`
+6. Revert any changes made to `github.com/nais/liberator`. Liberator must be updated separately.
 7. Run `go mod tidy`
 
 #### Updating Golang base image version
