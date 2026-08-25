@@ -358,7 +358,7 @@ istio-gateways: kubectl istiohelm install-istio ## Install istio ingress gateway
 	  -n istio-gateways --kube-context $(KUBECONTEXT) \
 	  --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
 	@echo "⬇️  Installing Gateway API gateways (routingProvider=Standard)"
-	"$(KUBECTL)" apply --context $(KUBECONTEXT) -f config/istio-gateways/gateways.yaml
+	"$(KUBECTL)" apply --context $(KUBECONTEXT) -f config/istio/gateways.yaml
 	"$(KUBECTL)" wait gateway istio-external istio-internal -n istio-gateways \
 	  --for=condition=Programmed --timeout=120s --context $(KUBECONTEXT)
 	@echo "✅  Istio gateways installed."

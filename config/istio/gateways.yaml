@@ -1,0 +1,112 @@
+---
+# kind has no LoadBalancer controller, so the Services that Istio generates for
+# these Gateways must be ClusterIP or they would never get an address and the
+# Gateway would never report Programmed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gw-options
+  namespace: istio-gateways
+data:
+  service: |
+    spec:
+      type: ClusterIP
+---
+# Placeholder cert for the placeholder HTTPS listeners below. Skiperator's
+# ListenerSets bring their own per-hostname certificate, so this one is never
+# used to serve real traffic - a Gateway just needs at least one valid listener.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: placeholder-tls
+  namespace: istio-gateways
+spec:
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: cluster-issuer
+  secretName: placeholder-tls
+  dnsNames:
+    - placeholder.external.invalid
+    - placeholder.internal.invalid
+---
+# Skiperator points an Application's ListenerSet at istio-external for any
+# hostname that is not *.skip.statkart.no / *.kartverket-intern.cloud.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: istio-external
+  namespace: istio-gateways
+spec:
+  gatewayClassName: istio
+  # allowedListeners is what lets ListenerSets in application namespaces attach
+  # to this Gateway. Without it every ListenerSet stays unattached.
+  allowedListeners:
+    namespaces:
+      from: All
+  infrastructure:
+    labels:
+      # Skiperator's generated NetworkPolicy allows ingress only from pods with
+      # this label in istio-gateways.
+      app: istio-ingress-external
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: gw-options
+  listeners:
+    - name: placeholder-http
+      hostname: placeholder.external.invalid
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: placeholder-https
+      hostname: placeholder.external.invalid
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: placeholder-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+# Used for *.skip.statkart.no and *.kartverket-intern.cloud hostnames.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: istio-internal
+  namespace: istio-gateways
+spec:
+  gatewayClassName: istio
+  allowedListeners:
+    namespaces:
+      from: All
+  infrastructure:
+    labels:
+      app: istio-ingress-internal
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: gw-options
+  listeners:
+    - name: placeholder-http
+      hostname: placeholder.internal.invalid
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: placeholder-https
+      hostname: placeholder.internal.invalid
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: placeholder-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
