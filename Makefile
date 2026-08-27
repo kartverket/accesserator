@@ -43,6 +43,10 @@ KIND_IMAGE					= kindest/node:v$(KUBERNETES_VERSION)
 KIND_CLUSTER_NAME          ?= accesserator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
 LOCAL_WEBHOOK_CERTS_DIR	   ?= webhook-certs
+HOSTS_FILE				   ?= /etc/hosts
+GATEWAY					   ?= istio-external
+GATEWAY_NS 				   ?= istio-gateways
+GATEWAY_PORTS 			   ?= 443:443 80:80
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
@@ -71,6 +75,7 @@ GOLANGCI_LINT_VERSION ?= v2.12.2
 HELM_VERSION ?= v4.0.0
 KUBEFWD_VERSION ?= 1.25.15
 JQ_VERSION ?= 1.8.1
+GATEWAY_API_VERSION ?= 1.5.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -325,8 +330,18 @@ skiperator: ## Install Skiperator on k8s cluster
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
+.PHONY: gateway-api-crds
+gateway-api-crds: kubectl ## Install Gateway API CRDs (standard channel — includes ListenerSet)
+	@echo "⬇️  Installing Gateway API v$(GATEWAY_API_VERSION) CRDs..."
+	"$(KUBECTL)" apply --context $(KUBECONTEXT) --server-side --force-conflicts \
+	  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v$(GATEWAY_API_VERSION)/standard-install.yaml
+	"$(KUBECTL)" wait --for=condition=Established --timeout=60s --context $(KUBECONTEXT) \
+	  crd/gateways.gateway.networking.k8s.io \
+	  crd/httproutes.gateway.networking.k8s.io \
+	  crd/listenersets.gateway.networking.k8s.io
+
 .PHONY: install-istio
-install-istio: ## Install istio
+install-istio: gateway-api-crds ## Install istio
 	@echo "⬇️ Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "⛵️  Installing Istio on Kubernetes cluster..."
@@ -335,11 +350,17 @@ install-istio: ## Install istio
 	@echo "✅  Istio installation complete."
 
 .PHONY: istio-gateways
-istio-gateways: istiohelm install-istio ## Install istio gateways
+istio-gateways: kubectl istiohelm install-istio ## Install istio ingress gateways (Legacy + Gateway API)
 	@echo "⛵️ Creating istio-gateways namespace..."
-	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
-	@echo "⬇️  Installing istio-gateways"
-	"$(HELM)" install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@"$(KUBECTL)" create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
+	@echo "⬇️  Installing legacy istio-ingressgateway (routingProvider=Legacy)"
+	"$(HELM)" upgrade --install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) \
+	  -n istio-gateways --kube-context $(KUBECONTEXT) \
+	  --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@echo "⬇️  Installing Gateway API gateways (routingProvider=Standard)"
+	"$(KUBECTL)" apply --context $(KUBECONTEXT) -f config/istio/gateways.yaml
+	"$(KUBECTL)" wait gateway istio-external istio-internal -n istio-gateways \
+	  --for=condition=Programmed --timeout=120s --context $(KUBECONTEXT)
 	@echo "✅  Istio gateways installed."
 
 .PHONY: cert-manager
@@ -428,6 +449,91 @@ mock-token: ## Retrieves a JWT issued by mock-oauth2
 		exit 1; \
 	fi; \
 	echo "$$token"
+
+.PHONY: host-entry
+host-entry: ## Point a hostname at 127.0.0.1 in /etc/hosts. Usage: make host-entry host=foo.bar
+	$(if $(strip $(host)),,$(error host is not set. Usage: make host-entry host=<HOSTNAME>))
+	@marker="# accesserator-managed"; \
+	if awk -v h="$(host)" '!/^[[:space:]]*#/ { for (i = 2; i <= NF; i++) if ($$i == h) { found = 1; exit } } END { exit(found ? 0 : 1) }' "$(HOSTS_FILE)"; then \
+	   echo "✅  '$(host)' is already in $(HOSTS_FILE), nothing to do"; \
+	   exit 0; \
+	fi; \
+	echo "🤞  Adding '$(host)' to $(HOSTS_FILE) (requires sudo)"; \
+	printf '127.0.0.1\t%s\t%s\n' "$(host)" "$$marker" | sudo tee -a "$(HOSTS_FILE)" > /dev/null; \
+	echo "✅  Added: 127.0.0.1 $(host)  $$marker"; \
+	case "$(host)" in \
+	   *.skip.statkart.no|*.kartverket-intern.cloud) \
+	      echo "ℹ️   Skiperator routes this hostname through the internal gateway. Reach it with:"; \
+	      echo "    make gateway-forward GATEWAY=istio-internal" ;; \
+	   *) \
+	      echo "ℹ️   Reach it with:"; \
+	      echo "    make gateway-forward" ;; \
+	esac
+
+.PHONY: host-entry-clean
+host-entry-clean: ## Remove /etc/hosts entries added by 'make host-entry'. All of them, or one: make host-entry-clean host=foo.bar
+	@marker="# accesserator-managed"; \
+	matches=$$(awk -v m="$$marker" -v h="$(strip $(host))" \
+	   'function hostmatch() { for (i = 2; i <= NF; i++) if ($$i == h) return 1; return 0 } \
+	    index($$0, m) > 0 && (h == "" || hostmatch())' "$(HOSTS_FILE)"); \
+	if [ -z "$$matches" ]; then \
+	   if [ -n "$(strip $(host))" ]; then \
+	      echo "✅  No entry for '$(host)' managed by accesserator in $(HOSTS_FILE), nothing to do"; \
+	   else \
+	      echo "✅  No entries managed by accesserator in $(HOSTS_FILE), nothing to do"; \
+	   fi; \
+	   exit 0; \
+	fi; \
+	echo "🧹  Removing from $(HOSTS_FILE) (requires sudo):"; \
+	echo "$$matches" | sed 's/^/      /'; \
+	tmp=$$(mktemp); \
+	awk -v m="$$marker" -v h="$(strip $(host))" \
+	   'function hostmatch() { for (i = 2; i <= NF; i++) if ($$i == h) return 1; return 0 } \
+	    !(index($$0, m) > 0 && (h == "" || hostmatch()))' "$(HOSTS_FILE)" > "$$tmp"; \
+	if [ ! -s "$$tmp" ]; then \
+	   echo "❌  Refusing to write an empty $(HOSTS_FILE) - aborting, nothing changed"; \
+	   rm -f "$$tmp"; \
+	   exit 1; \
+	fi; \
+	sudo tee "$(HOSTS_FILE)" < "$$tmp" > /dev/null; \
+	rm -f "$$tmp"; \
+	echo "✅  Removed $$(printf '%s\n' "$$matches" | wc -l | tr -d ' ') entry/entries from $(HOSTS_FILE)"
+
+.PHONY: gateway-forward
+gateway-forward: kubectl ## Forward the istio gateway to localhost so ingresses resolve in your browser. Override: GATEWAY=istio-internal GATEWAY_PORTS="8443:443"
+	@echo "🔍  Checking gateway '$(GATEWAY)' in namespace '$(GATEWAY_NS)'..."
+	@"$(KUBECTL)" wait gateway $(GATEWAY) -n $(GATEWAY_NS) --for=condition=Programmed \
+	   --timeout=30s --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
+	   echo "❌  Gateway '$(GATEWAY)' is not Programmed. Install it with 'make istio-gateways'."; \
+	   exit 1; \
+	}
+	@svc="$(GATEWAY)-istio"; \
+	"$(KUBECTL)" get svc "$$svc" -n $(GATEWAY_NS) --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
+	   echo "❌  Service '$$svc' not found in $(GATEWAY_NS)."; \
+	   exit 1; \
+	}; \
+	for mapping in $(GATEWAY_PORTS); do \
+	   port="$${mapping%%:*}"; \
+	   if lsof -nP -iTCP:"$$port" -sTCP:LISTEN > /dev/null 2>&1; then \
+	      echo "❌  Local port $$port is already in use. Stop whatever holds it, or pass GATEWAY_PORTS."; \
+	      exit 1; \
+	   fi; \
+	done; \
+	hosts=$$("$(KUBECTL)" get httproutes -A --context $(KUBECONTEXT) \
+	   -o jsonpath='{range .items[*]}{range .spec.hostnames[*]}{@}{"\n"}{end}{end}' 2>/dev/null | sort -u); \
+	if [ -n "$$hosts" ]; then \
+	   echo "🌐  Hostnames routed by this cluster:"; \
+	   for h in $$hosts; do \
+	      if awk -v h="$$h" '!/^[[:space:]]*#/ { for (i = 2; i <= NF; i++) if ($$i == h) { found = 1; exit } } END { exit(found ? 0 : 1) }' $(HOSTS_FILE); then \
+	         echo "      https://$$h"; \
+	      else \
+	         echo "      https://$$h   ⚠️  not in $(HOSTS_FILE) - run 'make host-entry host=$$h'"; \
+	      fi; \
+	   done; \
+	fi; \
+	echo "🔌  Forwarding $(GATEWAY_PORTS) from $$svc (Ctrl-C to stop, sudo needed for ports below 1024)"; \
+	exec sudo KUBECONFIG="$$HOME/.kube/config" "$(KUBECTL)" port-forward \
+	   -n $(GATEWAY_NS) "svc/$$svc" $(GATEWAY_PORTS) --context $(KUBECONTEXT)
 
 .PHONY: ensurelocal
 ensurelocal: kind kubectl ## Ensure local environment is set up with necessary tools and kind cluster is running
