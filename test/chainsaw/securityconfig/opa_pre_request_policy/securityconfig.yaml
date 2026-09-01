@@ -1,0 +1,15 @@
+apiVersion: accesserator.kartverket.no/v1alpha
+kind: SecurityConfig
+metadata:
+  name: security-config
+spec:
+  opa:
+    enabled: true
+    bundleUrls:
+      # The following policy will deny requests to /api/admin and enrich requests with x-touched-by-opa: true
+      - name: test-bundle
+        url: ghcr.io/kartverket/accesserator/opa-bundle@sha256:24c7e3f35a699ee43d7838101a06573c50136341b688ecee94ba68b376ecffcb
+    requestPolicy:
+      enabled: false
+      endpoint: /v1/data/request/authz/allow
+  applicationRef: app

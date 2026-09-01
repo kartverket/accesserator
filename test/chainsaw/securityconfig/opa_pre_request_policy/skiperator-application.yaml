@@ -1,0 +1,17 @@
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: app
+spec:
+  image: mendhak/http-https-echo:latest
+  port: 5678
+  routingProvider: Standard
+  ingresses:
+    - opa-pre-request-policy.chainsawtest
+  env:
+    - name: HTTP_PORT
+      value: "5678"
+  podSettings:
+    annotations:
+      accesserator.kartverket.no/services: "opa"
+  replicas: 1

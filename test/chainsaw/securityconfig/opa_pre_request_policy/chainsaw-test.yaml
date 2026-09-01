@@ -1,0 +1,248 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: opa-pre-request-policy
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        skip.kartverket.no/skip-managed: "true"
+        istio.io/rev: default
+  steps:
+    - try:
+        # Port-forward to Istio ingress gateway
+        - script:
+            content: |
+              PIDFILE="/tmp/pf-${NAMESPACE}.pid"
+              LOGFILE="/tmp/pf-${NAMESPACE}.log"
+              
+              nohup kubectl port-forward -n istio-gateways \
+              svc/istio-external-istio 5678:443 \
+              > "$LOGFILE" 2>&1 &
+              echo $! > "$PIDFILE"
+              
+              # Wait up to 15s for the port to actually accept connections
+              i=0
+              while [ "$i" -lt 30 ]; do
+              if nc -z 127.0.0.1 5678 2>/dev/null; then
+              echo "✅ port-forward ready on :5678"
+              exit 0
+              fi
+              # If the process died, bail out and dump the log
+              if ! kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+              echo "❌ port-forward exited early:"
+              cat "$LOGFILE"
+              exit 1
+              fi
+              sleep 0.5
+              i=$((i + 1))
+              done
+              
+              echo "❌ port-forward never became ready:"
+              cat "$LOGFILE"
+              kill "$(cat "$PIDFILE")" 2>/dev/null || true
+              exit 1
+
+        # Create SecurityConfig with OPA requestPolicy disabled
+        - create:
+            file: securityconfig.yaml
+
+        # Create Application with ingress at opa-pre-request-policy.chainsawtest
+        - create:
+            file: skiperator-application.yaml
+
+        # Wait for running pod
+        - assert:
+            file: pod-with-pre-request-disabled.yaml
+
+        # Verify that no OPA EnvoyFilter is created when OPA requestPolicy is disabled
+        - error:
+            file: envoyfilter-failure-mode-allow-false.yaml
+        - error:
+            file: envoyfilter-failure-mode-allow-true.yaml
+
+        # Verify that the application returns 200 OK on requests to /api/admin
+        - script:
+            content: |
+              STATUS=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -o /dev/null -w '%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/admin)
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                exit 1
+              fi
+              echo "✅ got 200 OK"
+
+        # Update SecurityConfig to enable OPA requestPolicy
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  requestPolicy:
+                    enabled: true
+
+        # Verify that OPA EnvoyFilter is created when OPA requestPolicy is enabled and that failureMode defaulted to
+        # DENY, i.e. failure_mode_allow: false.
+        - assert:
+            file: envoyfilter-failure-mode-allow-false.yaml
+
+        - script:
+            content: |
+              kubectl -n "$NAMESPACE" rollout restart deployment/app
+              kubectl -n "$NAMESPACE" rollout status deployment/app
+
+        # Wait for running pod
+        - assert:
+            file: pod-with-pre-request-enabled.yaml
+
+        # Verify that the application returns 200 OK on requests to /api/something/else
+        # and that the x-touched-by-opa header is set.
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+              
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+              
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+              
+              if ! printf '%s' "$BODY" | jq -e '
+                    (.headers // {})
+                    | with_entries(.key |= ascii_downcase)
+                    | .["x-touched-by-opa"] == "true"
+                  ' > /dev/null; then
+                echo "❌ expected header 'x-touched-by-opa: true' in echoed body"
+                echo "body: $BODY"
+                exit 1
+              fi
+              
+              echo "✅ got 200 OK with x-touched-by-opa: true"
+
+        # Verify that the application returns 403 Access denied on requests to /api/admin
+        - script:
+            content: |
+              STATUS=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -o /dev/null -w '%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/admin)
+              if [ "$STATUS" != "403" ]; then
+                echo "❌ expected 403, got $STATUS"
+                exit 1
+              fi
+              echo "✅ got 403 Access denied"
+
+        # Update SecurityConfig to set requestPolicy.endpoint to the wrong endpoint to ensure failure.
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  requestPolicy:
+                    enabled: true
+                    endpoint: /v1/data/wrong/rule
+
+        - script:
+            content: |
+              kubectl -n "$NAMESPACE" rollout restart deployment/app
+              kubectl -n "$NAMESPACE" rollout status deployment/app
+
+        # Wait for running pod
+        - assert:
+            file: pod-with-pre-request-enabled-wrong-endpoint.yaml
+
+        # Verify that the application returns 403 Access denied on requests to /api/admin even on failure.
+        - script:
+            content: |
+              STATUS=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -o /dev/null -w '%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/admin)
+              if [ "$STATUS" != "403" ]; then
+                echo "❌ expected 403, got $STATUS"
+                exit 1
+              fi
+              echo "✅ got 403 Access denied"
+
+        # Update SecurityConfig to set requestPolicy.failureMode: FORWARD so request are forwarded on failure.
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  requestPolicy:
+                    enabled: true
+                    failureMode: FORWARD
+
+        # Verify that OPA EnvoyFilter is created when OPA requestPolicy is enabled and that failureMode is now set to
+        # FORWARD, i.e. failure_mode_allow: true.
+        - assert:
+            file: envoyfilter-failure-mode-allow-false.yaml
+
+        - script:
+            content: |
+              kubectl -n "$NAMESPACE" rollout restart deployment/app
+              kubectl -n "$NAMESPACE" rollout status deployment/app
+
+        # Wait for running pod
+        - assert:
+            file: pod-with-pre-request-enabled-wrong-endpoint.yaml
+
+        # Verify that the application returns 200 OK on requests to /api/admin on failure when failureMode: FORWARD is
+        # set. Also verify that the header 'x-envoy-auth-failure-mode-allowed: true' is set.
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/admin)
+
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              if ! printf '%s' "$BODY" | jq -e '
+                    (.headers // {})
+                    | with_entries(.key |= ascii_downcase)
+                    | .["x-envoy-auth-failure-mode-allowed"] == "true"
+                  ' > /dev/null; then
+                echo "❌ expected header 'x-envoy-auth-failure-mode-allowed: true' in echoed body"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              echo "✅ got 200 OK with x-envoy-auth-failure-mode-allowed: true"
+
+      finally:
+        - script:
+            content: |
+              PIDFILE="/tmp/pf-${NAMESPACE}.pid"
+              if [ -f "$PIDFILE" ]; then
+                kill "$(cat "$PIDFILE")" 2>/dev/null || true
+                rm -f "$PIDFILE" "/tmp/pf-${NAMESPACE}.log"
+              fi
