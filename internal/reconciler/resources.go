@@ -15,7 +15,7 @@ import (
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenclient"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
-	"github.com/kartverket/accesserator/pkg/resourcegenerators/opa"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/opa/opaconfigmap"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
@@ -347,7 +347,7 @@ func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapte
 		Namespace: scope.SecurityConfig.Namespace,
 		Labels:    labels.SecurityConfigStandardLabels(),
 	}
-	desiredResource := opa.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)
+	desiredResource := opaconfigmap.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)
 
 	return ControllerResourceAdapter[*corev1.ConfigMap]{
 		reconciliation.ReconcilerAdapter[*corev1.ConfigMap]{
