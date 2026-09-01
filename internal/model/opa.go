@@ -10,6 +10,13 @@ import (
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 )
 
+const (
+	OpaRequestPolicyFailureModeDeny OpaRequestPolicyFailureMode = iota
+	OpaRequestPolicyFailureModeForward
+)
+
+type OpaRequestPolicyFailureMode int
+
 var (
 	githubRepositoryPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}/[a-zA-Z0-9_][a-zA-Z0-9._-]{0,99}$`)
 	githubWorkflowPattern   = regexp.MustCompile(`^\.github/workflows/[a-zA-Z0-9_.-]+\.(yml|yaml)$`)
@@ -81,4 +88,15 @@ func (bundle OpaBundle) ValidateOpaBundle() error {
 
 func (o OpaBundleSource) ToGitHubRepositoryURI() string {
 	return fmt.Sprintf("https://github.com/%s", o.Repository)
+}
+
+func ToOpaRequestPolicyFailureMode(fromFailureMode string) OpaRequestPolicyFailureMode {
+	switch strings.ToLower(fromFailureMode) {
+	case "deny":
+		return OpaRequestPolicyFailureModeDeny
+	case "forward":
+		return OpaRequestPolicyFailureModeForward
+	default:
+		return OpaRequestPolicyFailureModeDeny
+	}
 }
