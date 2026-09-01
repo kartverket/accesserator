@@ -14,6 +14,9 @@ metadata:
 spec:
   image: nginxinc/nginx-unprivileged:latest
   port: 8080
+  routingProvider: Standard
+  ingresses:
+    - foo.bar
   podSettings:
     annotations:
       accesserator.kartverket.no/verify-securityconfig: "true"
@@ -30,10 +33,14 @@ spec:
     enabled: true
     bundleUrls:
       - name: test-bundle
-        url: ghcr.io/kartverket/accesserator/opa-bundle:setup-cosign-verification
+        url: ghcr.io/kartverket/accesserator/opa-bundle:opa-pre-request-evaluation
         verification:
           source:
             repository: kartverket/accesserator
             workflow: .github/workflows/build-and-push-opa-bundle.yml
-            ref: refs/pull/73/merge
+            ref: refs/pull/133/merge
+    requestPolicy:
+      enabled: true
+      failureMode: DENY
+      endpoint: /v1/data/request/authz/allow
   applicationRef: app
