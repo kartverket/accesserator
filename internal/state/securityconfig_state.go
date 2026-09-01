@@ -5,6 +5,7 @@ import (
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"google.golang.org/protobuf/types/known/structpb"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -65,6 +66,14 @@ type AnsattportenConfig struct {
 type OpaConfig struct {
 	Enabled          bool
 	BundleBinaryData map[string][]byte
+	RequestPolicy    RequestPolicyConfig
+}
+
+type RequestPolicyConfig struct {
+	Enabled                               bool
+	WorkloadLabels                        map[string]string
+	ClusterConfigPatchValue               *structpb.Struct
+	ExternalAuthorizationConfigPatchValue *structpb.Struct
 }
 
 type Descendant[T client.Object] struct {
