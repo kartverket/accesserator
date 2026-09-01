@@ -51,7 +51,7 @@ const (
 	AnsattportenTestHost         = "test.ansattporten.no"
 	AnsattportenTestWellKnownURL = "https://test.ansattporten.no/.well-known/openid-configuration"
 
-	OpaConfigMapNameSuffix  = "opa"
+	OpaNameSuffix           = "opa"
 	OpaBundleLayerMediaType = "application/vnd.oci.image.layer.v1.tar+gzip"
 
 	IstioReadinessProbeRewritePathPattern = "/app-health/%s/readyz"

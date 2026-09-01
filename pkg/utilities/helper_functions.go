@@ -163,7 +163,11 @@ func NewOpaNamer(sc v1alpha.SecurityConfig) OpaNamer {
 }
 
 func (n OpaNamer) ConfigMapName() string {
-	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, OpaConfigMapNameSuffix))
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, OpaNameSuffix))
+}
+
+func (n OpaNamer) EnvoyFilterName() string {
+	return WithShortHashSuffix(fmt.Sprintf("%s-%s", n.securityConfigName, OpaNameSuffix))
 }
 
 func WithShortHashSuffix(s string) string {

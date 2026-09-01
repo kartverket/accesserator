@@ -152,6 +152,12 @@ var _ = Describe("Helper Functions", func() {
 			Expect(namer.ConfigMapName()).
 				To(Equal("my-name-opa-bc75e7d6"))
 		})
+
+		It("EnvoyFilterName returns base with opa suffix", func() {
+			namer := utilities.NewOpaNamer(securityConfig())
+			Expect(namer.EnvoyFilterName()).
+				To(Equal("my-name-opa-bc75e7d6"))
+		})
 	})
 
 	Describe("WithShortHashSuffix", func() {
