@@ -1258,7 +1258,107 @@ var _ = Describe("SecurityConfig CRD", func() {
 					})
 				})
 			})
-		})
 
+			Describe("When spec.opa.requestPolicy is specified", func() {
+				makeOpaWithRequestPolicy := func(requestPolicy map[string]interface{}) *unstructured.Unstructured {
+					return makeSecurityConfig(map[string]interface{}{
+						"applicationRef": skiperatorAppName,
+						"opa": map[string]interface{}{
+							"enabled": true,
+							"bundleUrls": []map[string]interface{}{
+								{
+									"name": "opa-bundle",
+									"url":  AllowedOpaBundleSourcePrefix + "bundle:latest",
+								},
+							},
+							"requestPolicy": requestPolicy,
+						},
+					})
+				}
+
+				It("should require .enabled to be set", func() {
+					requestPolicySpec := map[string]interface{}{
+						"endpoint": "/v1/data/some/rule",
+					}
+					sc := makeOpaWithRequestPolicy(requestPolicySpec)
+					err := k8sClient.Create(ctx, sc)
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("spec.opa.requestPolicy.enabled: Required value"))
+
+					requestPolicySpec["enabled"] = true
+					sc = makeOpaWithRequestPolicy(requestPolicySpec)
+					err = k8sClient.Create(ctx, sc)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should require .endpoint to set", func() {
+					requestPolicySpec := map[string]interface{}{
+						"enabled": true,
+					}
+					sc := makeOpaWithRequestPolicy(requestPolicySpec)
+					err := k8sClient.Create(ctx, sc)
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("spec.opa.requestPolicy.endpoint: Required value"))
+
+					requestPolicySpec["endpoint"] = "/v1/data/some/rule"
+					sc = makeOpaWithRequestPolicy(requestPolicySpec)
+					err = k8sClient.Create(ctx, sc)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should require .endpoint to start with /v1/data/", func() {
+					for _, invalidEndpoint := range []string{
+						"envoy/authz/allow",
+						"/envoy/authz/allow",
+						"/v1/some/rule",
+						"/v1/data",
+						"/v1/data/",
+					} {
+						sc := makeOpaWithRequestPolicy(map[string]interface{}{
+							"enabled":  true,
+							"endpoint": invalidEndpoint,
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred(), "expected %q to be rejected", invalidEndpoint)
+						Expect(err.Error()).To(ContainSubstring(
+							fmt.Sprintf("spec.opa.requestPolicy.endpoint: Invalid value: \"%s\"", invalidEndpoint),
+						))
+						Expect(err.Error()).To(ContainSubstring("spec.opa.requestPolicy.endpoint in body should match '^/v1/data(/[a-z_][a-z0-9_]*)"))
+					}
+
+					sc := makeOpaWithRequestPolicy(map[string]interface{}{
+						"enabled":  true,
+						"endpoint": "/v1/data/envoy/authz/allow",
+					})
+					Expect(k8sClient.Create(ctx, sc)).To(Succeed())
+				})
+
+				It("should enforce enum on .failureMode", func() {
+					for _, invalidFailureMode := range []string{"deny", "forward", "Deny", "Forward", "ALLOW", "bogus"} {
+						sc := makeOpaWithRequestPolicy(map[string]interface{}{
+							"enabled":     true,
+							"endpoint":    "/v1/data/some/rule",
+							"failureMode": invalidFailureMode,
+						})
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred(), "expected %q to be rejected", invalidFailureMode)
+						Expect(err.Error()).To(ContainSubstring(
+							fmt.Sprintf("spec.opa.requestPolicy.failureMode: Unsupported value: \"%s\"", invalidFailureMode),
+						))
+						Expect(err.Error()).To(ContainSubstring("supported values: \"FORWARD\", \"DENY\""))
+					}
+
+					for _, validFailureMode := range []string{"DENY", "FORWARD"} {
+						sc := makeOpaWithRequestPolicy(map[string]interface{}{
+							"enabled":     true,
+							"endpoint":    "/v1/data/some/rule",
+							"failureMode": validFailureMode,
+						})
+						Expect(k8sClient.Create(ctx, sc)).To(Succeed(), "expected %q to be accepted", validFailureMode)
+						Expect(k8sClient.Delete(ctx, sc)).To(Succeed())
+					}
+				})
+			})
+		})
 	})
 })
