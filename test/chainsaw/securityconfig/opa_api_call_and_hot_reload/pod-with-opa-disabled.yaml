@@ -23,14 +23,6 @@ spec:
         - run
         - --server
         - --addr=0.0.0.0:3010
-        - --bundle
-        - /bundles/opa-common-self-auth
-        - --bundle
-        - /bundles/test-bundle
-        - --watch
-        - --authorization=basic
-      command:
-        - opa
 status:
   containerStatuses:
     - name: app
