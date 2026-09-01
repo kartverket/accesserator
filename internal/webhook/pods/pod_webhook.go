@@ -8,6 +8,7 @@ import (
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/utilities"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,8 +21,6 @@ import (
 const (
 	CreatedBySkipNamespaceLabel      = "skip.kartverket.no/skip-managed"
 	CreatedBySkipNamespaceLabelValue = "true"
-
-	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
 
 	AccesseratorWebhookAnnotationPrefix = "accesserator.kartverket.no/"
 	AccesseratorServicesAnnotation      = AccesseratorWebhookAnnotationPrefix + "services"
@@ -231,7 +230,7 @@ func GetPodSecurityConfiguration(ctx context.Context, k8sClient client.Client, p
 		return &PodSecurityConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
 
-	appName, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	appName, isSkiperatorPod := pod.Labels[utilities.SkiperatorApplicationRefLabel]
 	if !isSkiperatorPod {
 		return &PodSecurityConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
@@ -393,7 +392,7 @@ func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.
 	if pod.Labels == nil {
 		return false, fmt.Sprintf("pod %s/%s has no labels", pod.Namespace, pod.Name)
 	}
-	_, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	_, isSkiperatorPod := pod.Labels[utilities.SkiperatorApplicationRefLabel]
 	if !isSkiperatorPod {
 		return false, fmt.Sprintf("pod %s/%s is not created from a Skiperator Application", pod.Namespace, pod.Name)
 	}

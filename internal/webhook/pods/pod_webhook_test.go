@@ -61,7 +61,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+						utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 				},
 			}
@@ -77,7 +77,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+						utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 				},
 			}
@@ -98,7 +98,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+						utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 					Annotations: map[string]string{
 						pods.AccesseratorVerifyAnnotationKey: pods.AccesseratorVerifyAnnotationValue,
@@ -121,7 +121,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+						utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 					Annotations: map[string]string{
 						pods.AccesseratorVerifyAnnotationKey: pods.AccesseratorVerifyAnnotationValue,
@@ -164,7 +164,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+						utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 					Annotations: map[string]string{
 						pods.AccesseratorVerifyAnnotationKey: pods.AccesseratorVerifyAnnotationValue,
@@ -211,7 +211,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+						utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 					Annotations: map[string]string{
 						pods.AccesseratorServicesAnnotation: "Texas",
@@ -332,7 +332,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						pods.SkiperatorApplicationRefLabel: "app",
+						utilities.SkiperatorApplicationRefLabel: "app",
 					},
 					Annotations: map[string]string{
 						pods.AccesseratorServicesAnnotation: "texas",
@@ -362,7 +362,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 		It("returns false when pod is not created from a Skiperator Application", func() {
 			pod := newPod()
-			delete(pod.Labels, pods.SkiperatorApplicationRefLabel)
+			delete(pod.Labels, utilities.SkiperatorApplicationRefLabel)
 
 			eligible, msg := pods.IsWebhookEligible(ctx, utilities.GetMockKubernetesClient(scheme), pod)
 

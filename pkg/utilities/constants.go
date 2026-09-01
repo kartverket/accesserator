@@ -7,6 +7,8 @@ import (
 )
 
 const (
+	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
+
 	EgressNameSuffix = "egress"
 
 	JwkerSecretNameSuffix                       = "jwker-secret"
