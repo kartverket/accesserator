@@ -16,11 +16,13 @@ import (
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportensecret"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/maskinporten/maskinportenserviceentry"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/opa/opaconfigmap"
+	"github.com/kartverket/accesserator/pkg/resourcegenerators/opa/opaenvoyfilter"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/egress"
 	"github.com/kartverket/accesserator/pkg/resourcegenerators/tokenx/jwker"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
+	istioclientgov1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -45,6 +47,7 @@ func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource
 		idportenServiceEntryControllerResource(scope),
 		ansattportenServiceEntryControllerResource(scope),
 		opaConfigMapControllerResource(scope),
+		opaEnvoyFilterControllerResource(scope),
 	}
 }
 
@@ -361,6 +364,54 @@ func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapte
 			},
 		},
 	}
+}
+
+/*
+opaEnvoyFilterControllerResource reconciles an EnvoyFilter resource configuring the OPA sidecar as an external
+authorizations service to call before forwarding the request to the upstream service.
+*/
+func opaEnvoyFilterControllerResource(scope *state.Scope) ControllerResourceAdapter[*istioclientgov1alpha3.EnvoyFilter] {
+	opaEnvoyFilterName := utilities.NewOpaNamer(scope.SecurityConfig).EnvoyFilterName()
+	opaEnvoyFilterObjectMeta := metav1.ObjectMeta{
+		Name:      opaEnvoyFilterName,
+		Namespace: scope.SecurityConfig.Namespace,
+		Labels:    labels.SecurityConfigStandardLabels(),
+	}
+	desiredResource := opaenvoyfilter.GetDesired(opaEnvoyFilterObjectMeta, scope.OpaConfig)
+
+	return ControllerResourceAdapter[*istioclientgov1alpha3.EnvoyFilter]{
+		reconciliation.ReconcilerAdapter[*istioclientgov1alpha3.EnvoyFilter]{
+			Func: reconciliation.ResourceReconciler[*istioclientgov1alpha3.EnvoyFilter]{
+				ResourceKind:    "EnvoyFilter",
+				ResourceName:    opaEnvoyFilterObjectMeta.Name,
+				DesiredResource: utilities.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    EnvoyFilterShouldUpdate,
+				UpdateFields:    EnvoyFilterUpdateFields,
+			},
+		},
+	}
+}
+
+func EnvoyFilterShouldUpdate(current, desired *istioclientgov1alpha3.EnvoyFilter) bool {
+	return !reflect.DeepEqual(
+		current.Spec.Priority,
+		desired.Spec.Priority,
+	) || !reflect.DeepEqual(
+		current.Spec.GetWorkloadSelector(),
+		desired.Spec.GetWorkloadSelector(),
+	) || !reflect.DeepEqual(
+		current.Spec.GetConfigPatches(),
+		desired.Spec.GetConfigPatches(),
+	) ||
+		labelsNeedUpdate(current, desired)
+}
+
+func EnvoyFilterUpdateFields(current, desired *istioclientgov1alpha3.EnvoyFilter) {
+	current.Spec.Priority = desired.Spec.Priority
+	current.Spec.WorkloadSelector = desired.Spec.GetWorkloadSelector()
+	current.Spec.ConfigPatches = desired.Spec.GetConfigPatches()
+	current.Labels = desired.Labels
 }
 
 func ConfigMapShouldUpdateFunc(current, desired *corev1.ConfigMap) bool {
