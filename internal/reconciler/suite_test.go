@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
+	istioclientgov1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 
@@ -54,6 +55,7 @@ var _ = BeforeSuite(func() {
 	Expect(naisiov1.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(networkingv1.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(istionetworkingv1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(istioclientgov1alpha3.AddToScheme(scheme.Scheme)).To(Succeed())
 
 	// Load environment variables
 	Expect(os.Setenv("ACCESSERATOR_RUNS_IN_PRODUCTION", "false")).To(Succeed())
