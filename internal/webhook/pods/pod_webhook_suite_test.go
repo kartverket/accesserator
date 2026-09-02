@@ -15,6 +15,7 @@ import (
 	"github.com/kartverket/accesserator/internal/webhook/pods"
 	"github.com/kartverket/accesserator/internal/webhook/securityconfigs"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/skiperator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -267,7 +268,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 					pods.AccesseratorServicesAnnotation: pods.Texas.String(),
 				},
 				Labels: map[string]string{
-					pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+					utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 				},
 			},
 			skiperatorAppName,
@@ -300,7 +301,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 			pod.Labels = make(map[string]string)
 		}
 
-		pod.Labels[pods.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[utilities.SkiperatorApplicationRefLabel] = skiperatorAppName
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 
 		mutatedPod := &corev1.Pod{}
@@ -326,7 +327,7 @@ var _ = Describe("Pod mutating and validating webhook", func() {
 					pods.AccesseratorVerifyAnnotationKey: pods.AccesseratorVerifyAnnotationValue,
 				},
 				Labels: map[string]string{
-					pods.SkiperatorApplicationRefLabel: skiperatorAppName,
+					utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 				},
 			},
 			skiperatorAppName,

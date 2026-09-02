@@ -1,4 +1,4 @@
-package opa
+package opaconfigmap
 
 import (
 	"github.com/kartverket/accesserator/internal/state"

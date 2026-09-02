@@ -30,13 +30,17 @@ spec:
   opa:
     enabled: true
     bundleUrls:
-      - name: authz-bundle
-        url: ghcr.io/kartverket/accesserator/opa-bundle:setup-cosign-verification
+      - name: test-bundle
+        url: ghcr.io/kartverket/accesserator/opa-bundle:opa-pre-request-evaluation
         verification:
           source:
             repository: kartverket/accesserator
             workflow: .github/workflows/build-and-push-opa-bundle.yml
-            ref: refs/pull/73
+            ref: refs/pull/133/merge
+    requestPolicy:
+      enabled: true
+      failureMode: DENY
+      endpoint: /v1/data/request/authz/allow
   applicationRef: app
 ```
 
@@ -67,7 +71,7 @@ spec:
 The result is a pod where the main app container can call the API of the `opa` sidecar to perform authorization checks based on the policies and data in the OPA bundle specified in the `SecurityConfig`.
 
 ### Example: Perform authorization checks with `opa`
-In this example, we will use the OPA bundle built from the folder [.opa](../../.opa/authz.rego), which is a simple policy which allows access (i.e. returns `{"result":true}`) if `input.password` is `password123`.
+In this example, we will use the OPA bundle built from the folder [.opa/authz](../../.opa/authz/authz.rego), which is a simple policy which allows access (i.e. returns `{"result":true}`) if `input.password` is `password123`.
 
 Check if a local cluster with all the necessary dependencies is configured and
 that accesserator is running on your machine or as a deployment in the local cluster.
@@ -118,4 +122,47 @@ OPA_RESPONSE=$("$KUBECTL" exec -n opa-example deploy/app -c app -- \
 echo "OPA response:"
 echo "$OPA_RESPONSE"
 echo
+```
+
+### Example: Requests are denied because of `spec.opa.requestPolicy`
+In this example, we will demonstrate how OPA can be configured with a policy which is evaluated before a request reaches the application. 
+The policy which controls which requests are denied or forwarded can be viewed in [.opa/request/authz/authz.rego](../../.opa/request/authz/authz.rego), which is a simple policy which denies access to `/api/admin`.
+It also enrich the request with the header `x-touched-by-opa: true`.
+
+Check if a local cluster with all the necessary dependencies is configured and
+that accesserator is running on your machine or as a deployment in the local cluster.
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+make -C "$REPO_ROOT" ensurelocal ensurerunningordeployed
+```
+
+Apply the example resources, which include a Skiperator application with the `opa` sidecar injected
+and a `SecurityConfig` that configures the OPA capability.
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+KUBECTL="$REPO_ROOT/bin/kubectl"
+make -C "$REPO_ROOT" kubectl
+"$KUBECTL" apply -f "$REPO_ROOT/examples/opa/manifests.yaml"
+printf "Waiting for app pod to be ready"
+until "$KUBECTL" -n opa-example get pods -l app=app 2>/dev/null | grep -q app; do
+  printf "."; sleep 1
+done
+"$KUBECTL" wait --for=condition=Ready pod -l app=app -n opa-example --timeout=60s && printf " ✅\n"
+```
+
+Configure a host and the Istio gateway (requires root privileges)
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+make -C "$REPO_ROOT" host-entry host=foo.bar
+make -C "$REPO_ROOT" gateway-forward
+```
+
+Send a request to /api/something (should return non-403 response)
+```bash
+curl -o /dev/null -sk -w "%{http_code}\n" https://foo.bar/api/something
+```
+
+Send a request to /api/admin (should return 403 Access denied)
+```bash
+curl -o /dev/null -sk -w "%{http_code}\n" https://foo.bar/api/admin
 ```

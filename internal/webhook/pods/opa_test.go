@@ -58,7 +58,6 @@ var _ = Describe("opa.go unit tests", func() {
 				config.Get().OpaImageTag,
 				config.Get().OpaImageSha,
 			)))
-			Expect(c.Command).To(Equal([]string{"opa"}))
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
@@ -87,7 +86,6 @@ var _ = Describe("opa.go unit tests", func() {
 
 			c := pods.GetOpaContainer(securityConfig)
 
-			Expect(c.Command).To(Equal([]string{"opa"}))
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
@@ -112,7 +110,6 @@ var _ = Describe("opa.go unit tests", func() {
 			)))
 			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
 			Expect(c.SecurityContext).ToNot(BeNil())
-			Expect(c.Command).To(Equal([]string{"opa"}))
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
@@ -154,6 +151,52 @@ var _ = Describe("opa.go unit tests", func() {
 			}))
 			Expect(os.Unsetenv("ACCESSERATOR_OPA_SELF_AUTHORIZATION_BUNDLE")).To(Succeed())
 			Expect(config.Load()).To(Succeed())
+		})
+
+		When("spec.opa.requestPolicy is configured", func() {
+			securityConfig := newSecurityConfig(true)
+			Context("and spec.requestPolicy.enabled: false", func() {
+				It("returns an OPA init container with envoy_ext_authz_grpc plugin NOT configured", func() {
+					securityConfig.Spec.Opa.RequestPolicy = &v1alpha.OpaRequestPolicy{Enabled: false}
+					c := pods.GetOpaContainer(securityConfig)
+					Expect(c.Ports).NotTo(ContainElement(
+						Or(
+							HaveField("ContainerPort", config.Get().OpaGrpcPort),
+							HaveField("Name", "grpc"),
+						),
+					))
+					Expect(c.Args).NotTo(ContainElement(
+						Or(
+							HavePrefix("--set=plugins.envoy_ext_authz_grpc.addr=:"),
+							HavePrefix("--set=plugins.envoy_ext_authz_grpc.path="),
+							Equal("--set=plugins.envoy_ext_authz_grpc.dry-run=false"),
+						),
+					))
+				})
+			})
+
+			Context("and spec.requestPolicy.enabled: true", func() {
+				It("returns an OPA init container with envoy_ext_authz_grpc plugin configured", func() {
+					securityConfig.Spec.Opa.RequestPolicy = &v1alpha.OpaRequestPolicy{
+						Enabled:  true,
+						Endpoint: "/v1/data/request/authz/allow",
+					}
+					c := pods.GetOpaContainer(securityConfig)
+					Expect(c.Ports).To(ContainElement(
+						And(
+							HaveField("ContainerPort", config.Get().OpaGrpcPort),
+							HaveField("Name", "grpc"),
+						),
+					))
+					Expect(c.Args).To(ContainElements(
+						HavePrefix(
+							fmt.Sprintf("--set=plugins.envoy_ext_authz_grpc.addr=:%d", config.Get().OpaGrpcPort),
+						),
+						HavePrefix("--set=plugins.envoy_ext_authz_grpc.path=request/authz/allow"),
+						HavePrefix("--set=plugins.envoy_ext_authz_grpc.dry-run=false"),
+					))
+				})
+			})
 		})
 	})
 

@@ -75,6 +75,7 @@ rules:
 - apiGroups:
   - networking.istio.io
   resources:
+  - envoyfilters
   - serviceentries
   verbs:
   - create

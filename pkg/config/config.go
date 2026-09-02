@@ -46,6 +46,7 @@ type Config struct {
 	OpaImageTag                         string           `split_words:"true"`
 	OpaImageSha                         string           `split_words:"true"`
 	OpaPort                             int32            `split_words:"true" default:"3010"`
+	OpaGrpcPort                         int32            `split_words:"true" default:"9191"`
 	OpaUrlEnvVarName                    string           `split_words:"true" default:"OPA_URL"`
 	OpaAllowedBundleRegistryUrlPrefixes []string         `split_words:"true"`
 	OpaAllowedBundleSignatureSourceOrgs []string         `split_words:"true"`

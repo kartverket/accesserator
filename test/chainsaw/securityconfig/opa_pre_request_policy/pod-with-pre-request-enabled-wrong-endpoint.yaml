@@ -3,18 +3,7 @@ kind: Pod
 metadata:
   labels:
     app: app
-    app.kubernetes.io/managed-by: skiperator
-    app.kubernetes.io/name: app
-    app.kubernetes.io/version: latest
-    application.skiperator.no/app: app
-    application.skiperator.no/app-name: app
-    skiperator.kartverket.no/controller: application
 spec:
-  containers:
-    - env:
-        - name: OPA_URL
-          value: http://localhost:3010
-      name: app
   initContainers:
     - name: istio-init
     - name: istio-proxy
@@ -29,8 +18,16 @@ spec:
         - /bundles/test-bundle
         - --watch
         - --authorization=basic
-      command:
-        - opa
+        - --set=plugins.envoy_ext_authz_grpc.addr=:9191
+        - --set=plugins.envoy_ext_authz_grpc.path=wrong/rule
+        - --set=plugins.envoy_ext_authz_grpc.dry-run=false
+      ports:
+        - containerPort: 3010
+          name: http
+          protocol: TCP
+        - containerPort: 9191
+          name: grpc
+          protocol: TCP
 status:
   containerStatuses:
     - name: app

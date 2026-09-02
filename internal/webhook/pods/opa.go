@@ -3,6 +3,7 @@ package pods
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
 	"github.com/kartverket/accesserator/pkg/config"
@@ -25,19 +26,6 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 		"run",
 		"--server",
 		fmt.Sprintf("--addr=0.0.0.0:%d", config.Get().OpaPort),
-	}
-	if securityConfig.Spec.Opa != nil && securityConfig.Spec.Opa.Enabled {
-		for _, opaBundleName := range securityConfig.Status.OpaBundleSource.BundleNames {
-			opaContainerArgs = append(
-				opaContainerArgs,
-				"--bundle",
-				fmt.Sprintf("%s/%s", OpaBundleMountPath, opaBundleName),
-			)
-		}
-		opaContainerArgs = append(opaContainerArgs, "--watch")
-		if config.Get().OpaSelfAuthorizationBundle != nil {
-			opaContainerArgs = append(opaContainerArgs, "--authorization=basic")
-		}
 	}
 
 	opaContainer := utilities.CommonInitContainer
@@ -63,8 +51,6 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 		},
 		InitialDelaySeconds: 2,
 	}
-	opaContainer.Command = []string{"opa"}
-	opaContainer.Args = opaContainerArgs
 
 	if securityConfig.Spec.Opa != nil && securityConfig.Spec.Opa.Enabled {
 		opaContainer.VolumeMounts = []corev1.VolumeMount{
@@ -74,7 +60,44 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 				ReadOnly:  true,
 			},
 		}
+		for _, opaBundleName := range securityConfig.Status.OpaBundleSource.BundleNames {
+			opaContainerArgs = append(
+				opaContainerArgs,
+				"--bundle",
+				fmt.Sprintf("%s/%s", OpaBundleMountPath, opaBundleName),
+			)
+		}
+		opaContainerArgs = append(opaContainerArgs, "--watch")
+		if config.Get().OpaSelfAuthorizationBundle != nil {
+			opaContainerArgs = append(opaContainerArgs, "--authorization=basic")
+		}
+
+		if securityConfig.Spec.Opa.RequestPolicy != nil &&
+			securityConfig.Spec.Opa.RequestPolicy.Enabled {
+			opaContainer.Ports = append(opaContainer.Ports, corev1.ContainerPort{
+				ContainerPort: config.Get().OpaGrpcPort,
+				Name:          "grpc",
+				Protocol:      corev1.ProtocolTCP,
+			})
+
+			// The RequestPolicy.Endpoint field is validated by the CRD to always start with "/v1/data/". We therefore
+			// strip this since OPA envoy_ext_authz_grpc plugin's `path` option expects the hierarchical rule path
+			// relative to the OPA data document (e.g. `envoy/authz/allow`).
+			queryPath := strings.TrimPrefix(
+				securityConfig.Spec.Opa.RequestPolicy.Endpoint,
+				"/v1/data/",
+			)
+
+			opaContainerArgs = append(opaContainerArgs,
+				fmt.Sprintf("--set=plugins.envoy_ext_authz_grpc.addr=:%d", config.Get().OpaGrpcPort),
+				fmt.Sprintf("--set=plugins.envoy_ext_authz_grpc.path=%s", queryPath),
+				// The value of dry-run controls whether policy decisions are enforced (false) or just logged (true).
+				"--set=plugins.envoy_ext_authz_grpc.dry-run=false",
+			)
+		}
 	}
+
+	opaContainer.Args = opaContainerArgs
 
 	return opaContainer
 }
@@ -89,7 +112,6 @@ func IsOpaContainerEqual(expected, actual corev1.Container) bool {
 	return expected.Name == actual.Name &&
 		expected.Image == actual.Image &&
 		reflect.DeepEqual(expected.RestartPolicy, actual.RestartPolicy) &&
-		reflect.DeepEqual(expected.Command, actual.Command) &&
 		reflect.DeepEqual(expected.Args, actual.Args) &&
 		isVolumeMountsEqual(expected.VolumeMounts, actual.VolumeMounts) &&
 		reflect.DeepEqual(expected.Ports, actual.Ports) &&

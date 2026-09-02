@@ -330,6 +330,47 @@ type OpenPolicyAgentSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self.all(x, self.filter(y, y.name == x.name).size() == 1)",message="Each bundle name must be unique"
 	// +kubebuilder:validation:XValidation:rule="self.all(x, self.filter(y, y.url == x.url).size() == 1)",message="Each bundle URL must be unique"
 	BundleURLs []BundleSource `json:"bundleUrls"`
+
+	// RequestPolicy enables per-request evaluation against the OPA sidecar via Envoy's external authorization
+	// (ext_authz) filter. When configured, every incoming request to the application is sent to OPA for
+	// policy evaluation before it reaches the application container. The rego policy decides the outcome,
+	// which may be authorization (allow/deny) or request enrichment (e.g. adding headers).
+	//
+	// +kubebuilder:validation:Optional
+	RequestPolicy *OpaRequestPolicy `json:"requestPolicy,omitempty"`
+}
+
+// OpaRequestPolicy configures the Envoy ext_authz integration that consults the OPA sidecar on each
+// incoming request. The referenced rego rule at `Endpoint` is evaluated for every request and its
+// decision determines whether the request is forwarded, denied, or mutated.
+//
+// +kubebuilder:object:generate=true
+type OpaRequestPolicy struct {
+	// Enabled indicates whether Envoy should call the OPA sidecar for external authorization on each
+	// request. When false, no EnvoyFilter is installed and requests bypass OPA evaluation entirely.
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// Endpoint is the OPA Data API endpoint that Envoy queries for each request. It must start with
+	// `/v1/data` and be followed by the slash-separated package/rule path of the rego rule to evaluate
+	// (e.g. `/v1/data/envoy/authz/allow`). The referenced rule must be defined in one of the loaded
+	// bundles.
+	//
+	// +kubebuilder:validation:Pattern=`^/v1/data(/[a-z_][a-z0-9_]*)+$`
+	// +kubebuilder:validation:Required
+	Endpoint string `json:"endpoint"`
+
+	// FailureMode determines how Envoy handles requests when the OPA sidecar is unreachable or returns
+	// an error (e.g. HTTP 5xx). `DENY` fails closed and rejects the request, which is the
+	// safe choice when OPA is used for authorization. `FORWARD` fails open and lets the request through
+	// to the application; only use this when OPA is used purely for enrichment or non-critical checks,
+	// never for authorization decisions.
+	// Defaults to DENY.
+	//
+	// +kubebuilder:validation:Enum=FORWARD;DENY
+	// +kubebuilder:validation:Optional
+	FailureMode string `json:"failureMode,omitempty"`
 }
 
 // BundleSource defines a source for an OPA bundle.

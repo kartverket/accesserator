@@ -19,4 +19,7 @@ package crd
 //go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/nais/liberator/f638cfb830180dc1d175cab8e7a07a1606688667/config/crd/bases/nais.io_azureadapplications.yaml
 
 // Istio ServiceEntry CRD
-//go:generate urlcrd -outdir=./bases -kind=ServiceEntry -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.28.0/kubernetes/customresourcedefinitions.gen.yaml
+//go:generate urlcrd -outdir=./bases -kind=ServiceEntry -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.30.3/kubernetes/customresourcedefinitions.gen.yaml
+
+// Istio EnvoyFilter CRD
+//go:generate urlcrd -outdir=./bases -kind=EnvoyFilter -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.30.3/kubernetes/customresourcedefinitions.gen.yaml

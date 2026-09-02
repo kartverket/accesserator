@@ -95,6 +95,7 @@ var _ = Describe("ControllerResources", func() {
 					"ServiceEntry",
 					"ServiceEntry",
 					"ConfigMap",
+					"EnvoyFilter",
 				),
 			)
 		})
@@ -120,6 +121,7 @@ var _ = Describe("ControllerResources", func() {
 					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.NewIdPortenNamer(securityConfig).ServiceEntryName()),
 					fmt.Sprintf("%s/%s", "ServiceEntry", utilities.NewAnsattportenNamer(securityConfig).ServiceEntryName()),
 					fmt.Sprintf("%s/%s", "ConfigMap", utilities.NewOpaNamer(securityConfig).ConfigMapName()),
+					fmt.Sprintf("%s/%s", "EnvoyFilter", utilities.NewOpaNamer(securityConfig).EnvoyFilterName()),
 				),
 			)
 		})

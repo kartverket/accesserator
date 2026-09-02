@@ -163,4 +163,32 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(bundle.ValidateOpaBundle()).To(HaveOccurred())
 		})
 	})
+
+	Describe("ToOpaRequestPolicyFailureMode", func() {
+		It("returns Deny for \"deny\"", func() {
+			Expect(ToOpaRequestPolicyFailureMode("deny")).To(Equal(OpaRequestPolicyFailureModeDeny))
+		})
+
+		It("returns Forward for \"forward\"", func() {
+			Expect(ToOpaRequestPolicyFailureMode("forward")).To(Equal(OpaRequestPolicyFailureModeForward))
+		})
+
+		It("is case-insensitive", func() {
+			Expect(ToOpaRequestPolicyFailureMode("Deny")).To(Equal(OpaRequestPolicyFailureModeDeny))
+			Expect(ToOpaRequestPolicyFailureMode("DENY")).To(Equal(OpaRequestPolicyFailureModeDeny))
+			Expect(ToOpaRequestPolicyFailureMode("Forward")).To(Equal(OpaRequestPolicyFailureModeForward))
+			Expect(ToOpaRequestPolicyFailureMode("FORWARD")).To(Equal(OpaRequestPolicyFailureModeForward))
+			Expect(ToOpaRequestPolicyFailureMode("ForWaRd")).To(Equal(OpaRequestPolicyFailureModeForward))
+		})
+
+		It("defaults to Deny for the empty string", func() {
+			Expect(ToOpaRequestPolicyFailureMode("")).To(Equal(OpaRequestPolicyFailureModeDeny))
+		})
+
+		It("defaults to Deny for unknown values", func() {
+			Expect(ToOpaRequestPolicyFailureMode("allow")).To(Equal(OpaRequestPolicyFailureModeDeny))
+			Expect(ToOpaRequestPolicyFailureMode("reject")).To(Equal(OpaRequestPolicyFailureModeDeny))
+			Expect(ToOpaRequestPolicyFailureMode("nonsense")).To(Equal(OpaRequestPolicyFailureModeDeny))
+		})
+	})
 })

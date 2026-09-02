@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/protobuf/types/known/structpb"
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
@@ -330,6 +331,59 @@ var _ = Describe("OPA Resolver", func() {
 			// to ResolveOpaConfigWithFetcher with the default OCI-backed
 			// fetcher, which would hit the network. Coverage of that branch
 			// lives in the ResolveOpaConfigWithFetcher tests above.
+		})
+	})
+
+	Describe("ResolveOpaRequestAuthorization", func() {
+		const skiperatorAppName = "my-app"
+
+		It("sets the correct Skiperator application workload label", func() {
+			result, err := resolver.ResolveOpaRequestAuthorization(
+				skiperatorAppName,
+				accesseratorv1alpha.OpaRequestPolicy{Enabled: false},
+			)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).NotTo(BeNil())
+			Expect(result.WorkloadLabels).To(HaveKeyWithValue(
+				utilities.SkiperatorApplicationRefLabel, skiperatorAppName,
+			))
+		})
+
+		When("Enabled is false", func() {
+			It("returns Enabled=false and leaves the patch values unset", func() {
+				result, err := resolver.ResolveOpaRequestAuthorization(
+					skiperatorAppName,
+					accesseratorv1alpha.OpaRequestPolicy{Enabled: false},
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
+				Expect(result.Enabled).To(BeFalse())
+				Expect(result.ClusterConfigPatchValue).To(BeNil())
+				Expect(result.ExternalAuthorizationConfigPatchValue).To(BeNil())
+			})
+		})
+
+		When("Enabled is true", func() {
+			It("returns non-nil *structpb.Struct patch values", func() {
+				result, err := resolver.ResolveOpaRequestAuthorization(
+					skiperatorAppName,
+					accesseratorv1alpha.OpaRequestPolicy{
+						Enabled:     true,
+						Endpoint:    "/v1/data/envoy/authz/allow",
+						FailureMode: "Deny",
+					},
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
+				Expect(result.Enabled).To(BeTrue())
+				Expect(result.ClusterConfigPatchValue).NotTo(BeNil())
+				Expect(result.ClusterConfigPatchValue).To(BeAssignableToTypeOf(&structpb.Struct{}))
+				Expect(result.ExternalAuthorizationConfigPatchValue).NotTo(BeNil())
+				Expect(result.ExternalAuthorizationConfigPatchValue).To(BeAssignableToTypeOf(&structpb.Struct{}))
+			})
 		})
 	})
 })
