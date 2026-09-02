@@ -6,8 +6,6 @@ metadata:
 spec:
   exportTo:
     - .
-    - istio-system
-    - istio-gateways
   hosts:
     - ghcr.io
     - pkg-containers.githubusercontent.com
