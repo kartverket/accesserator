@@ -1,7 +1,8 @@
-package model
+package model_test
 
 import (
 	"github.com/kartverket/accesserator/api/v1alpha"
+	"github.com/kartverket/accesserator/internal/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -34,14 +35,14 @@ var _ = Describe("opa.go unit tests", func() {
 				},
 			}
 
-			result := ToOpaBundles(input)
+			result := model.ToOpaBundles(input)
 
 			Expect(result).To(HaveLen(2))
-			Expect(result).To(Equal([]OpaBundle{
+			Expect(result).To(Equal([]model.OpaBundle{
 				{
 					Name: "bundle-a",
 					URL:  "ghcr.io/kartverket/a:latest",
-					BundleSource: OpaBundleSource{
+					BundleSource: model.OpaBundleSource{
 						Repository: "kartverket/accesserator",
 						Workflow:   ".github/workflows/release.yaml",
 						Ref:        "refs/heads/main",
@@ -50,7 +51,7 @@ var _ = Describe("opa.go unit tests", func() {
 				{
 					Name: "bundle-b",
 					URL:  "ghcr.io/kartverket/b:latest",
-					BundleSource: OpaBundleSource{
+					BundleSource: model.OpaBundleSource{
 						Repository: "kartverket/accesserator",
 						Workflow:   ".github/workflows/release.yaml",
 						Ref:        "refs/tags/v1.0.0",
@@ -60,7 +61,7 @@ var _ = Describe("opa.go unit tests", func() {
 		})
 
 		It("returns an empty result for empty input", func() {
-			Expect(ToOpaBundles([]v1alpha.BundleSource{})).To(BeEmpty())
+			Expect(model.ToOpaBundles([]v1alpha.BundleSource{})).To(BeEmpty())
 		})
 	})
 
@@ -78,12 +79,12 @@ var _ = Describe("opa.go unit tests", func() {
 				},
 			}
 
-			result := ToOpaBundle(input)
+			result := model.ToOpaBundle(input)
 
-			Expect(result).To(Equal(OpaBundle{
+			Expect(result).To(Equal(model.OpaBundle{
 				Name: "bundle-a",
 				URL:  "ghcr.io/kartverket/a:latest",
-				BundleSource: OpaBundleSource{
+				BundleSource: model.OpaBundleSource{
 					Repository: "kartverket/accesserator",
 					Workflow:   ".github/workflows/release.yaml",
 					Ref:        "refs/heads/main",
@@ -94,15 +95,15 @@ var _ = Describe("opa.go unit tests", func() {
 
 	Describe("OpaBundle Decode", func() {
 		It("decodes a valid JSON object", func() {
-			var decoded OpaBundle
+			var decoded model.OpaBundle
 
 			err := decoded.Decode(`{"name":"bundle-a","url":"ghcr.io/kartverket/a:latest","verification":{"repository":"kartverket/accesserator","workflow":".github/workflows/release.yaml","ref":"refs/heads/main"}}`)
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(decoded).To(Equal(OpaBundle{
+			Expect(decoded).To(Equal(model.OpaBundle{
 				Name: "bundle-a",
 				URL:  "ghcr.io/kartverket/a:latest",
-				BundleSource: OpaBundleSource{
+				BundleSource: model.OpaBundleSource{
 					Repository: "kartverket/accesserator",
 					Workflow:   ".github/workflows/release.yaml",
 					Ref:        "refs/heads/main",
@@ -111,17 +112,17 @@ var _ = Describe("opa.go unit tests", func() {
 		})
 
 		It("returns an error for invalid JSON", func() {
-			var decoded OpaBundle
+			var decoded model.OpaBundle
 			Expect(decoded.Decode(`{`)).To(HaveOccurred())
 		})
 	})
 
 	Describe("OpaBundle Validate", func() {
-		newValidBundle := func() OpaBundle {
-			return OpaBundle{
+		newValidBundle := func() model.OpaBundle {
+			return model.OpaBundle{
 				Name: "self-auth",
 				URL:  "https://ghcr.io/kartverket/accesserator/self-auth:latest",
-				BundleSource: OpaBundleSource{
+				BundleSource: model.OpaBundleSource{
 					Repository: "kartverket/accesserator",
 					Workflow:   ".github/workflows/release.yaml",
 					Ref:        "refs/heads/main",
@@ -164,31 +165,81 @@ var _ = Describe("opa.go unit tests", func() {
 		})
 	})
 
-	Describe("ToOpaRequestPolicyFailureMode", func() {
-		It("returns Deny for \"deny\"", func() {
-			Expect(ToOpaRequestPolicyFailureMode("deny")).To(Equal(OpaRequestPolicyFailureModeDeny))
+	Describe("ToOpaEnvoyExtAuthzFilterConfig", func() {
+		It("should apply the correct defaults when .requestBody is not specified", func() {
+			result := model.ToOpaEnvoyExtAuthzFilterConfig(v1alpha.OpaRequestPolicy{
+				Enabled:     true,
+				Endpoint:    "/v1/data/envoy/authz/allow",
+				FailureMode: "FORWARD",
+			})
+
+			Expect(result).To(Equal(model.OpaEnvoyExtAuthzFilterConfig{
+				FailureMode: model.OpaRequestPolicyFailureModeForward,
+				RequestBodyConfig: model.RequestBodyConfig{
+					IncludeRequestBody: false,
+				},
+			}))
 		})
 
-		It("returns Forward for \"forward\"", func() {
-			Expect(ToOpaRequestPolicyFailureMode("forward")).To(Equal(OpaRequestPolicyFailureModeForward))
+		It("should set MaxRequestBodyBytes to the same as defined in the spec", func() {
+			result := model.ToOpaEnvoyExtAuthzFilterConfig(v1alpha.OpaRequestPolicy{
+				Enabled:     true,
+				Endpoint:    "/v1/data/envoy/authz/allow",
+				FailureMode: "DENY",
+				RequestBody: &v1alpha.OpaRequestPolicyRequestBody{
+					Include:             true,
+					MaxRequestBodyBytes: 42,
+				},
+			})
+
+			Expect(result).To(Equal(model.OpaEnvoyExtAuthzFilterConfig{
+				FailureMode: model.OpaRequestPolicyFailureModeDeny,
+				RequestBodyConfig: model.RequestBodyConfig{
+					IncludeRequestBody:  true,
+					MaxRequestBodyBytes: 42,
+				},
+			}))
 		})
 
-		It("is case-insensitive", func() {
-			Expect(ToOpaRequestPolicyFailureMode("Deny")).To(Equal(OpaRequestPolicyFailureModeDeny))
-			Expect(ToOpaRequestPolicyFailureMode("DENY")).To(Equal(OpaRequestPolicyFailureModeDeny))
-			Expect(ToOpaRequestPolicyFailureMode("Forward")).To(Equal(OpaRequestPolicyFailureModeForward))
-			Expect(ToOpaRequestPolicyFailureMode("FORWARD")).To(Equal(OpaRequestPolicyFailureModeForward))
-			Expect(ToOpaRequestPolicyFailureMode("ForWaRd")).To(Equal(OpaRequestPolicyFailureModeForward))
+		It("defaults FailureMode to Deny when empty", func() {
+			result := model.ToOpaEnvoyExtAuthzFilterConfig(v1alpha.OpaRequestPolicy{
+				Enabled:  true,
+				Endpoint: "/v1/data/envoy/authz/allow",
+			})
+
+			Expect(result.FailureMode).To(Equal(model.OpaRequestPolicyFailureModeDeny))
+			Expect(result.RequestBodyConfig.IncludeRequestBody).To(BeFalse())
 		})
 
-		It("defaults to Deny for the empty string", func() {
-			Expect(ToOpaRequestPolicyFailureMode("")).To(Equal(OpaRequestPolicyFailureModeDeny))
+		It("is case-insensitive for FailureMode", func() {
+			for _, mode := range []string{"deny", "Deny", "DENY"} {
+				result := model.ToOpaEnvoyExtAuthzFilterConfig(v1alpha.OpaRequestPolicy{
+					Enabled:     true,
+					Endpoint:    "/v1/data/envoy/authz/allow",
+					FailureMode: mode,
+				})
+				Expect(result.FailureMode).To(Equal(model.OpaRequestPolicyFailureModeDeny), "input %q", mode)
+			}
+
+			for _, mode := range []string{"forward", "Forward", "FORWARD", "ForWaRd"} {
+				result := model.ToOpaEnvoyExtAuthzFilterConfig(v1alpha.OpaRequestPolicy{
+					Enabled:     true,
+					Endpoint:    "/v1/data/envoy/authz/allow",
+					FailureMode: mode,
+				})
+				Expect(result.FailureMode).To(Equal(model.OpaRequestPolicyFailureModeForward), "input %q", mode)
+			}
 		})
 
-		It("defaults to Deny for unknown values", func() {
-			Expect(ToOpaRequestPolicyFailureMode("allow")).To(Equal(OpaRequestPolicyFailureModeDeny))
-			Expect(ToOpaRequestPolicyFailureMode("reject")).To(Equal(OpaRequestPolicyFailureModeDeny))
-			Expect(ToOpaRequestPolicyFailureMode("nonsense")).To(Equal(OpaRequestPolicyFailureModeDeny))
+		It("falls back to Deny for unknown FailureMode values", func() {
+			for _, mode := range []string{"allow", "reject", "nonsense"} {
+				result := model.ToOpaEnvoyExtAuthzFilterConfig(v1alpha.OpaRequestPolicy{
+					Enabled:     true,
+					Endpoint:    "/v1/data/envoy/authz/allow",
+					FailureMode: mode,
+				})
+				Expect(result.FailureMode).To(Equal(model.OpaRequestPolicyFailureModeDeny), "input %q", mode)
+			}
 		})
 	})
 })
