@@ -371,6 +371,33 @@ type OpaRequestPolicy struct {
 	// +kubebuilder:validation:Enum=FORWARD;DENY
 	// +kubebuilder:validation:Optional
 	FailureMode string `json:"failureMode,omitempty"`
+
+	// RequestBody specifies whether to include the request body in the ext_authz gRPC request to OPA. This is
+	// required if the rego policy needs to evaluate the request body.
+	//
+	// +kubebuilder:validation:Optional
+	RequestBody *OpaRequestPolicyRequestBody `json:"requestBody,omitempty"`
+}
+
+// OpaRequestPolicyRequestBody configures whether to include the request body in the ext_authz gRPC request to OPA.
+//
+// +kubebuilder:object:generate=true
+// +kubebuilder:validation:XValidation:rule="!self.include || has(self.maxRequestBodyBytes)",message=".maxRequestBodyBytes must be set when .include is true"
+type OpaRequestPolicyRequestBody struct {
+	// Include indicates whether Envoy should include the request body in the call made by the ext_authz filter to the
+	// OPA sidecar.
+	//
+	// +kubebuilder:validation:Required
+	Include bool `json:"include"`
+
+	// MaxRequestBodyBytes sets the maximum size of a message body that Envoy will hold in memory. Envoy will return
+	// HTTP 413 and will not initiate the authorization process when the buffer reaches the size set in this field.
+	// This maximum limit will apply to all requests the application receives.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1048576
+	// +kubebuilder:validation:Optional
+	MaxRequestBodyBytes int `json:"maxRequestBodyBytes,omitempty"`
 }
 
 // BundleSource defines a source for an OPA bundle.
