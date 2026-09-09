@@ -1,0 +1,7 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  labels:
+    accesserator.kartverket.no/controller: securityconfig
+    app.kubernetes.io/managed-by: accesserator
+  name: security-config-opa-1b65d437

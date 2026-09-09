@@ -8,7 +8,7 @@ spec:
     bundleUrls:
       # The following policy will deny requests to /api/admin and enrich requests with x-touched-by-opa: true
       - name: test-bundle
-        url: ghcr.io/kartverket/accesserator/opa-bundle@sha256:24c7e3f35a699ee43d7838101a06573c50136341b688ecee94ba68b376ecffcb
+        url: ghcr.io/kartverket/accesserator/opa-bundle@sha256:1c4a63425c0668e647df11d372ded80207c7fda35809851b7e9ec027cfd0b798
     requestPolicy:
       enabled: false
       endpoint: /v1/data/request/authz/allow
