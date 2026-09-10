@@ -1,0 +1,11 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: app
+status:
+  parents:
+    - conditions:
+        - type: Accepted
+          status: "True"
+        - type: ResolvedRefs
+          status: "True"

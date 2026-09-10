@@ -160,8 +160,8 @@ func ResolveOpaRequestAuthorization(
 			err,
 		)
 	}
-	externalAuthorizationConfigPatchValue, err := getExternalAuthorizationConfigPatchValue(
-		model.ToOpaRequestPolicyFailureMode(requestAuthorizationSpec.FailureMode),
+	externalAuthorizationConfigPatchValue, err := GetExternalAuthorizationConfigPatchValue(
+		model.ToOpaEnvoyExtAuthzFilterConfig(requestAuthorizationSpec),
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -210,11 +210,10 @@ func getClusterConfigPatchValue() (*structpb.Struct, error) {
 	return structpb.NewStruct(clusterConfigPatchValue)
 }
 
-func getExternalAuthorizationConfigPatchValue(
-	failureMode model.OpaRequestPolicyFailureMode,
+func GetExternalAuthorizationConfigPatchValue(
+	filterConfig model.OpaEnvoyExtAuthzFilterConfig,
 ) (*structpb.Struct, error) {
-	failureModeAllow := failureMode == model.OpaRequestPolicyFailureModeForward
-
+	failureModeAllow := filterConfig.FailureMode == model.OpaRequestPolicyFailureModeForward
 	externalAuthorizationConfigPatchValue := map[string]any{
 		"name": "envoy.filters.http.ext_authz",
 		"typed_config": map[string]any{
@@ -233,11 +232,13 @@ func getExternalAuthorizationConfigPatchValue(
 			// `x-envoy-auth-failure-mode-allowed: true` is added to the request if envoy failed to reach OPA or if OPA
 			// returned a 5xx response.
 			"failure_mode_allow_header_add": true,
-			"with_request_body": map[string]any{
-				"max_request_bytes":     8192,
-				"allow_partial_message": true,
-			},
 		},
+	}
+	if filterConfig.RequestBodyConfig.IncludeRequestBody {
+		externalAuthorizationConfigPatchValue["typed_config"].(map[string]any)["with_request_body"] = map[string]any{
+			"max_request_bytes":     filterConfig.RequestBodyConfig.MaxRequestBodyBytes,
+			"allow_partial_message": false,
+		}
 	}
 	return structpb.NewStruct(externalAuthorizationConfigPatchValue)
 }

@@ -60,9 +60,11 @@ spec:
 
         # Verify that no OPA EnvoyFilter is created when OPA requestPolicy is disabled
         - error:
-            file: envoyfilter-failure-mode-allow-false.yaml
-        - error:
-            file: envoyfilter-failure-mode-allow-true.yaml
+            file: envoyfilter.yaml
+
+        # Verify that HTTPRoute is ready to route traffic
+        - assert:
+            file: httproute-ready.yaml
 
         # Verify that the application returns 200 OK on requests to /api/admin
         - script:
@@ -89,10 +91,9 @@ spec:
                   requestPolicy:
                     enabled: true
 
-        # Verify that OPA EnvoyFilter is created when OPA requestPolicy is enabled and that failureMode defaulted to
-        # DENY, i.e. failure_mode_allow: false.
+        # Verify that OPA EnvoyFilter is created when OPA requestPolicy is enabled.
         - assert:
-            file: envoyfilter-failure-mode-allow-false.yaml
+            file: envoyfilter.yaml
 
         - script:
             content: |
@@ -102,6 +103,11 @@ spec:
         # Wait for running pod
         - assert:
             file: pod-with-pre-request-enabled.yaml
+
+        # Wait for the new pod to appear in the Service's EndpointSlice as a ready endpoint before we
+        # curl through the ingress, so Envoy has been reprogrammed with the new pod IP.
+        - assert:
+            file: endpointslice-ready.yaml
 
         # Verify that the application returns 200 OK on requests to /api/something/else
         # and that the x-touched-by-opa header is set.
@@ -146,6 +152,289 @@ spec:
               fi
               echo "✅ got 403 Access denied"
 
+        # Verify that x-opa-found-request-body is "false" when no request body is sent.
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              if ! printf '%s' "$BODY" | jq -e '
+                    (.headers // {})
+                    | with_entries(.key |= ascii_downcase)
+                    | .["x-opa-found-request-body"] == "false"
+                  ' > /dev/null; then
+                echo "❌ expected header 'x-opa-found-request-body: false' in echoed body"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              echo "✅ got 200 OK with x-opa-found-request-body: false"
+
+        # Verify that x-opa-found-request-body is "false" when a request body is sent
+        # (spec.opa.requestPolicy.requestBody is unset).
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -X POST \
+                -H 'content-type: application/json' \
+                --data '{"hello":"world"}' \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              if ! printf '%s' "$BODY" | jq -e '
+                    (.headers // {})
+                    | with_entries(.key |= ascii_downcase)
+                    | .["x-opa-found-request-body"] == "false"
+                  ' > /dev/null; then
+                echo "❌ expected header 'x-opa-found-request-body: false' in echoed body"
+                echo "body: $BODY"
+                exit 1
+              fi
+              
+              echo "✅ got 200 OK with x-opa-found-request-body: false"
+
+        # Update SecurityConfig to set .requestBody.include: false.
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  requestPolicy:
+                    requestBody:
+                      include: false
+                      maxRequestBodyBytes: 8192
+
+        - script:
+            content: |
+              kubectl -n "$NAMESPACE" rollout restart deployment/app
+              kubectl -n "$NAMESPACE" rollout status deployment/app
+
+        # Wait for running pod
+        - assert:
+            file: pod-with-pre-request-enabled.yaml
+
+        # Wait for the new pod to appear in the Service's EndpointSlice as a ready endpoint before we
+        # curl through the ingress, so Envoy has been reprogrammed with the new pod IP.
+        - assert:
+            file: endpointslice-ready.yaml
+
+        # Verify that x-opa-found-request-body is "false" when a request body is sent
+        # (spec.opa.requestPolicy.requestBody.incldue is false).
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -X POST \
+                -H 'content-type: application/json' \
+                --data '{"hello":"world"}' \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              if ! printf '%s' "$BODY" | jq -e '
+                    (.headers // {})
+                    | with_entries(.key |= ascii_downcase)
+                    | .["x-opa-found-request-body"] == "false"
+                  ' > /dev/null; then
+                echo "❌ expected header 'x-opa-found-request-body: false' in echoed body"
+                echo "body: $BODY"
+                exit 1
+              fi
+              
+              echo "✅ got 200 OK with x-opa-found-request-body: false"
+
+        # Update SecurityConfig to set .requestBody.include: true.
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  requestPolicy:
+                    requestBody:
+                      include: true
+                      maxRequestBodyBytes: 8192
+
+        - script:
+            content: |
+              kubectl -n "$NAMESPACE" rollout restart deployment/app
+              kubectl -n "$NAMESPACE" rollout status deployment/app
+
+        # Wait for running pod
+        - assert:
+            file: pod-with-pre-request-enabled.yaml
+
+        # Wait for the new pod to appear in the Service's EndpointSlice as a ready endpoint before we
+        # curl through the ingress, so Envoy has been reprogrammed with the new pod IP.
+        - assert:
+            file: endpointslice-ready.yaml
+
+        # Verify that x-opa-found-request-body is "false" when no request body is sent.
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              if ! printf '%s' "$BODY" | jq -e '
+                    (.headers // {})
+                    | with_entries(.key |= ascii_downcase)
+                    | .["x-opa-found-request-body"] == "false"
+                  ' > /dev/null; then
+                echo "❌ expected header 'x-opa-found-request-body: false' in echoed body"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              echo "✅ got 200 OK with x-opa-found-request-body: false"
+
+        # Verify that x-opa-found-request-body is "true" when a request body is sent
+        # (spec.opa.requestPolicy.requestBody.include: true.
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -X POST \
+                -H 'content-type: application/json' \
+                --data '{"hello":"world"}' \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              if ! printf '%s' "$BODY" | jq -e '
+                    (.headers // {})
+                    | with_entries(.key |= ascii_downcase)
+                    | .["x-opa-found-request-body"] == "true"
+                  ' > /dev/null; then
+                echo "❌ expected header 'x-opa-found-request-body: true' in echoed body"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              echo "✅ got 200 OK with x-opa-found-request-body: true"
+        # Lower .maxRequestBodyBytes so we can easily exceed it in the request body.
+        - patch:
+            resource:
+              apiVersion: accesserator.kartverket.no/v1alpha
+              kind: SecurityConfig
+              metadata:
+                name: security-config
+              spec:
+                opa:
+                  requestPolicy:
+                    requestBody:
+                      include: true
+                      maxRequestBodyBytes: 16
+
+        - script:
+            content: |
+              kubectl -n "$NAMESPACE" rollout restart deployment/app
+              kubectl -n "$NAMESPACE" rollout status deployment/app
+
+        - assert:
+            file: pod-with-pre-request-enabled.yaml
+
+        # Wait for the new pod to appear in the Service's EndpointSlice as a ready endpoint before we
+        # curl through the ingress, so Envoy has been reprogrammed with the new pod IP.
+        - assert:
+            file: endpointslice-ready.yaml
+
+        # Body <= 16 bytes → forwarded to OPA → 200 OK.
+        - script:
+            content: |
+              STATUS=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -X POST \
+                -H 'content-type: application/json' \
+                --data '{"a":"b"}' \
+                -o /dev/null -w '%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+              if [ "$STATUS" != "200" ]; then
+                echo "❌ expected 200 for small body, got $STATUS"
+                exit 1
+              fi
+              echo "✅ small body (< 16 bytes) accepted"
+
+        # Body > 16 bytes → Envoy rejects with 413 Payload Too Large before calling OPA.
+        - script:
+            content: |
+              RESPONSE=$(curl -sk \
+                --resolve opa-pre-request-policy.chainsawtest:5678:127.0.0.1 \
+                -X POST \
+                -H 'content-type: application/json' \
+                --data '{"payload":"this-body-is-clearly-longer-than-sixteen-bytes"}' \
+                -w '\n%{http_code}' \
+                https://opa-pre-request-policy.chainsawtest:5678/api/something/else)
+
+              STATUS=$(printf '%s' "$RESPONSE" | tail -n1)
+              BODY=$(printf '%s' "$RESPONSE" | sed '$d')
+
+              if [ "$STATUS" != "413" ]; then
+                echo "❌ expected 413 for oversized body, got $STATUS"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              if ! printf '%s' "$BODY" | grep -qi 'payload too large'; then
+                echo "❌ expected body to contain 'Payload Too Large'"
+                echo "body: $BODY"
+                exit 1
+              fi
+
+              echo "✅ oversized body rejected with 413 Payload Too Large"
+
         # Update SecurityConfig to set requestPolicy.endpoint to the wrong endpoint to ensure failure.
         - patch:
             resource:
@@ -167,6 +456,11 @@ spec:
         # Wait for running pod
         - assert:
             file: pod-with-pre-request-enabled-wrong-endpoint.yaml
+
+        # Wait for the new pod to appear in the Service's EndpointSlice as a ready endpoint before we
+        # curl through the ingress, so Envoy has been reprogrammed with the new pod IP.
+        - assert:
+            file: endpointslice-ready.yaml
 
         # Verify that the application returns 403 Access denied on requests to /api/admin even on failure.
         - script:
@@ -194,11 +488,6 @@ spec:
                     enabled: true
                     failureMode: FORWARD
 
-        # Verify that OPA EnvoyFilter is created when OPA requestPolicy is enabled and that failureMode is now set to
-        # FORWARD, i.e. failure_mode_allow: true.
-        - assert:
-            file: envoyfilter-failure-mode-allow-false.yaml
-
         - script:
             content: |
               kubectl -n "$NAMESPACE" rollout restart deployment/app
@@ -207,6 +496,11 @@ spec:
         # Wait for running pod
         - assert:
             file: pod-with-pre-request-enabled-wrong-endpoint.yaml
+
+        # Wait for the new pod to appear in the Service's EndpointSlice as a ready endpoint before we
+        # curl through the ingress, so Envoy has been reprogrammed with the new pod IP.
+        - assert:
+            file: endpointslice-ready.yaml
 
         # Verify that the application returns 200 OK on requests to /api/admin on failure when failureMode: FORWARD is
         # set. Also verify that the header 'x-envoy-auth-failure-mode-allowed: true' is set.

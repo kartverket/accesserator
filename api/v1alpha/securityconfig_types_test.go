@@ -1358,6 +1358,85 @@ var _ = Describe("SecurityConfig CRD", func() {
 						Expect(k8sClient.Delete(ctx, sc)).To(Succeed())
 					}
 				})
+
+				Describe("When spec.opa.requestPolicy.reqeustBody is specified", func() {
+					It("should require .include to be set", func() {
+						includeRequestBodySpec := map[string]any{}
+						requestPolicySpec := map[string]any{
+							"enabled":     true,
+							"endpoint":    "/v1/data/some/rule",
+							"requestBody": includeRequestBodySpec,
+						}
+						sc := makeOpaWithRequestPolicy(requestPolicySpec)
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring("spec.opa.requestPolicy.requestBody.include: Required value"))
+
+						includeRequestBodySpec["include"] = false
+						requestPolicySpec["requestBody"] = includeRequestBodySpec
+						sc = makeOpaWithRequestPolicy(requestPolicySpec)
+						err = k8sClient.Create(ctx, sc)
+						Expect(err).ToNot(HaveOccurred())
+					})
+
+					It("should require .maxRequestBodyBytes to be set when .include is true", func() {
+						includeRequestBodySpec := map[string]any{
+							"include": true,
+						}
+						requestPolicySpec := map[string]any{
+							"enabled":     true,
+							"endpoint":    "/v1/data/some/rule",
+							"requestBody": includeRequestBodySpec,
+						}
+						requestPolicySpec["requestBody"] = includeRequestBodySpec
+						sc := makeOpaWithRequestPolicy(requestPolicySpec)
+						err := k8sClient.Create(ctx, sc)
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring(".maxRequestBodyBytes must be set when .include is true"))
+
+						includeRequestBodySpec["maxRequestBodyBytes"] = 42
+						requestPolicySpec["requestBody"] = includeRequestBodySpec
+						sc = makeOpaWithRequestPolicy(requestPolicySpec)
+						err = k8sClient.Create(ctx, sc)
+						Expect(err).ToNot(HaveOccurred())
+					})
+
+					It("should enforce .maxRequestBodyBytes to be in the interval 1 <= .maxRequestBodyBytes <= 1048576",
+						func() {
+							cases := []struct {
+								value    int
+								accepted bool
+							}{
+								{-1, false},
+								{0, false},
+								{1, true},
+								{1048576, true},
+								{1048577, false},
+							}
+
+							for _, tc := range cases {
+								includeRequestBodySpec := map[string]interface{}{
+									"include":             true,
+									"maxRequestBodyBytes": tc.value,
+								}
+								sc := makeOpaWithRequestPolicy(map[string]interface{}{
+									"enabled":     true,
+									"endpoint":    "/v1/data/some/rule",
+									"requestBody": includeRequestBodySpec,
+								})
+								err := k8sClient.Create(ctx, sc)
+								if tc.accepted {
+									Expect(err).ToNot(HaveOccurred(), "expected %d to be accepted", tc.value)
+									Expect(k8sClient.Delete(ctx, sc)).To(Succeed())
+								} else {
+									Expect(err).To(HaveOccurred(), "expected %d to be rejected", tc.value)
+									Expect(errors.IsInvalid(err)).To(BeTrue())
+									Expect(err.Error()).To(ContainSubstring("spec.opa.requestPolicy.requestBody.maxRequestBodyBytes"))
+								}
+							}
+						},
+					)
+				})
 			})
 		})
 	})

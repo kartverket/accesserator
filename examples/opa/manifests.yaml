@@ -33,14 +33,17 @@ spec:
     enabled: true
     bundleUrls:
       - name: test-bundle
-        url: ghcr.io/kartverket/accesserator/opa-bundle:opa-pre-request-evaluation
+        url: ghcr.io/kartverket/accesserator/opa-bundle:include-request-body-to-opa-ext-authz
         verification:
           source:
             repository: kartverket/accesserator
             workflow: .github/workflows/build-and-push-opa-bundle.yml
-            ref: refs/pull/133/merge
+            ref: refs/pull/138/merge
     requestPolicy:
       enabled: true
       failureMode: DENY
       endpoint: /v1/data/request/authz/allow
+      requestBody:
+        include: true
+        maxRequestBodyBytes: 8192 # 8 KiB
   applicationRef: app

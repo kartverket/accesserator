@@ -620,6 +620,31 @@ spec:
                         - FORWARD
                         - DENY
                         type: string
+                      requestBody:
+                        description: |-
+                          RequestBody specifies whether to include the request body in the ext_authz gRPC request to OPA. This is
+                          required if the rego policy needs to evaluate the request body.
+                        properties:
+                          include:
+                            description: |-
+                              Include indicates whether Envoy should include the request body in the call made by the ext_authz filter to the
+                              OPA sidecar.
+                            type: boolean
+                          maxRequestBodyBytes:
+                            description: |-
+                              MaxRequestBodyBytes sets the maximum size of a message body that Envoy will hold in memory. Envoy will return
+                              HTTP 413 and will not initiate the authorization process when the buffer reaches the size set in this field.
+                              This maximum limit will apply to all requests the application receives.
+                            maximum: 1048576
+                            minimum: 1
+                            type: integer
+                        required:
+                        - include
+                        type: object
+                        x-kubernetes-validations:
+                        - message: .maxRequestBodyBytes must be set when .include
+                            is true
+                          rule: '!self.include || has(self.maxRequestBodyBytes)'
                     required:
                     - enabled
                     - endpoint

@@ -23,6 +23,16 @@ var (
 	githubRefPattern        = regexp.MustCompile(`^refs/(heads|tags|pull)/[a-zA-Z0-9/_.-]{1,243}$`)
 )
 
+type OpaEnvoyExtAuthzFilterConfig struct {
+	FailureMode       OpaRequestPolicyFailureMode
+	RequestBodyConfig RequestBodyConfig
+}
+
+type RequestBodyConfig struct {
+	IncludeRequestBody  bool
+	MaxRequestBodyBytes int
+}
+
 type OpaBundle struct {
 	Name         string          `json:"name"`
 	URL          string          `json:"url"`
@@ -90,7 +100,26 @@ func (o OpaBundleSource) ToGitHubRepositoryURI() string {
 	return fmt.Sprintf("https://github.com/%s", o.Repository)
 }
 
-func ToOpaRequestPolicyFailureMode(fromFailureMode string) OpaRequestPolicyFailureMode {
+func ToOpaEnvoyExtAuthzFilterConfig(requestPolicySpec v1alpha.OpaRequestPolicy) OpaEnvoyExtAuthzFilterConfig {
+	opaEnvoyExtAuthzFilterConfig := OpaEnvoyExtAuthzFilterConfig{
+		FailureMode: toOpaRequestPolicyFailureMode(requestPolicySpec.FailureMode),
+		RequestBodyConfig: RequestBodyConfig{
+			IncludeRequestBody: false,
+		},
+	}
+	if requestPolicySpec.RequestBody == nil {
+		return opaEnvoyExtAuthzFilterConfig
+	}
+
+	opaEnvoyExtAuthzFilterConfig.RequestBodyConfig.IncludeRequestBody = requestPolicySpec.RequestBody.Include
+	if opaEnvoyExtAuthzFilterConfig.RequestBodyConfig.IncludeRequestBody {
+		opaEnvoyExtAuthzFilterConfig.RequestBodyConfig.MaxRequestBodyBytes = requestPolicySpec.RequestBody.MaxRequestBodyBytes
+	}
+
+	return opaEnvoyExtAuthzFilterConfig
+}
+
+func toOpaRequestPolicyFailureMode(fromFailureMode string) OpaRequestPolicyFailureMode {
 	switch strings.ToLower(fromFailureMode) {
 	case "deny":
 		return OpaRequestPolicyFailureModeDeny
