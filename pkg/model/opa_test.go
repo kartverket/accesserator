@@ -97,7 +97,15 @@ var _ = Describe("opa.go unit tests", func() {
 		It("decodes a valid JSON object", func() {
 			var decoded model.OpaBundle
 
-			err := decoded.Decode(`{"name":"bundle-a","url":"ghcr.io/kartverket/a:latest","verification":{"repository":"kartverket/accesserator","workflow":".github/workflows/release.yaml","ref":"refs/heads/main"}}`)
+			err := decoded.Decode(`{
+				"name":"bundle-a",
+				"url":"ghcr.io/kartverket/a:latest",
+				"verification":{
+					"repository":"kartverket/accesserator",
+					"workflow":".github/workflows/release.yaml",
+					"ref":"refs/heads/main"
+				}
+			}`)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(decoded).To(Equal(model.OpaBundle{
