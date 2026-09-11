@@ -2,7 +2,7 @@ package model_test
 
 import (
 	"github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/accesserator/internal/model"
+	"github.com/kartverket/accesserator/pkg/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -174,7 +174,8 @@ var _ = Describe("opa.go unit tests", func() {
 			})
 
 			Expect(result).To(Equal(model.OpaEnvoyExtAuthzFilterConfig{
-				FailureMode: model.OpaRequestPolicyFailureModeForward,
+				OpaClusterName: model.OpaClusterName,
+				FailureMode:    model.OpaRequestPolicyFailureModeForward,
 				RequestBodyConfig: model.RequestBodyConfig{
 					IncludeRequestBody: false,
 				},
@@ -193,7 +194,8 @@ var _ = Describe("opa.go unit tests", func() {
 			})
 
 			Expect(result).To(Equal(model.OpaEnvoyExtAuthzFilterConfig{
-				FailureMode: model.OpaRequestPolicyFailureModeDeny,
+				OpaClusterName: model.OpaClusterName,
+				FailureMode:    model.OpaRequestPolicyFailureModeDeny,
 				RequestBodyConfig: model.RequestBodyConfig{
 					IncludeRequestBody:  true,
 					MaxRequestBodyBytes: 42,

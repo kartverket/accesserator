@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/internal/state"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
+	"github.com/kartverket/accesserator/pkg/model"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/accesserator/pkg/validation"
 	"google.golang.org/protobuf/types/known/structpb"

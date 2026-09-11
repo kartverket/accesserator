@@ -24,10 +24,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/internal/webhook/pods"
 	"github.com/kartverket/accesserator/internal/webhook/securityconfigs"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/model"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/accesserator/pkg/validation"
 	"github.com/kartverket/skiperator/api/v1alpha1"

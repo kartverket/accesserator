@@ -6,9 +6,9 @@ import (
 	"time"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
+	"github.com/kartverket/accesserator/pkg/model"
 	"github.com/kartverket/accesserator/pkg/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"

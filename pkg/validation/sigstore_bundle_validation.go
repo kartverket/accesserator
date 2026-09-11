@@ -10,9 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/log"
+	"github.com/kartverket/accesserator/pkg/model"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"

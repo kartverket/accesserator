@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/kartverket/accesserator/internal/model"
+	"github.com/kartverket/accesserator/pkg/model"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/accesserator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
