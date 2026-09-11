@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kartverket/accesserator/internal/model"
+	"github.com/kartverket/accesserator/pkg/model"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/verify"

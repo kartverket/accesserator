@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	accesseratorv1alpha "github.com/kartverket/accesserator/api/v1alpha"
-	"github.com/kartverket/accesserator/internal/model"
 	"github.com/kartverket/accesserator/internal/resolver"
 	"github.com/kartverket/accesserator/pkg/config"
+	"github.com/kartverket/accesserator/pkg/model"
 	"github.com/kartverket/accesserator/pkg/utilities"
 	"github.com/kartverket/accesserator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
@@ -334,11 +334,11 @@ var _ = Describe("OPA Resolver", func() {
 		})
 	})
 
-	Describe("ResolveOpaRequestAuthorization", func() {
+	Describe("ResolveOpaRequestPolicy", func() {
 		const skiperatorAppName = "my-app"
 
 		It("sets the correct Skiperator application workload label", func() {
-			result, err := resolver.ResolveOpaRequestAuthorization(
+			result, err := resolver.ResolveOpaRequestPolicy(
 				skiperatorAppName,
 				accesseratorv1alpha.OpaRequestPolicy{Enabled: false},
 			)
@@ -352,7 +352,7 @@ var _ = Describe("OPA Resolver", func() {
 
 		When("Enabled is false", func() {
 			It("returns Enabled=false and leaves the patch values unset", func() {
-				result, err := resolver.ResolveOpaRequestAuthorization(
+				result, err := resolver.ResolveOpaRequestPolicy(
 					skiperatorAppName,
 					accesseratorv1alpha.OpaRequestPolicy{Enabled: false},
 				)
@@ -367,7 +367,7 @@ var _ = Describe("OPA Resolver", func() {
 
 		When("Enabled is true", func() {
 			It("returns non-nil *structpb.Struct patch values", func() {
-				result, err := resolver.ResolveOpaRequestAuthorization(
+				result, err := resolver.ResolveOpaRequestPolicy(
 					skiperatorAppName,
 					accesseratorv1alpha.OpaRequestPolicy{
 						Enabled:     true,
@@ -383,94 +383,6 @@ var _ = Describe("OPA Resolver", func() {
 				Expect(result.ClusterConfigPatchValue).To(BeAssignableToTypeOf(&structpb.Struct{}))
 				Expect(result.ExternalAuthorizationConfigPatchValue).NotTo(BeNil())
 				Expect(result.ExternalAuthorizationConfigPatchValue).To(BeAssignableToTypeOf(&structpb.Struct{}))
-			})
-		})
-	})
-
-	Describe("GetExternalAuthorizationConfigPatchValue", func() {
-		// typedConfig returns the "typed_config" sub-map of the patch value.
-		typedConfig := func(s *structpb.Struct) map[string]any {
-			Expect(s).NotTo(BeNil())
-			m := s.AsMap()
-			Expect(m).To(HaveKey("typed_config"))
-			tc, ok := m["typed_config"].(map[string]any)
-			Expect(ok).To(BeTrue(), "typed_config should be a map")
-			return tc
-		}
-
-		Describe("failure_mode_allow mapping", func() {
-			It("sets failure_mode_allow=false when FailureMode is Deny", func() {
-				result, err := resolver.GetExternalAuthorizationConfigPatchValue(
-					model.OpaEnvoyExtAuthzFilterConfig{
-						FailureMode: model.OpaRequestPolicyFailureModeDeny,
-					},
-				)
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(typedConfig(result)).To(HaveKeyWithValue("failure_mode_allow", false))
-			})
-
-			It("sets failure_mode_allow=true when FailureMode is Forward", func() {
-				result, err := resolver.GetExternalAuthorizationConfigPatchValue(
-					model.OpaEnvoyExtAuthzFilterConfig{
-						FailureMode: model.OpaRequestPolicyFailureModeForward,
-					},
-				)
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(typedConfig(result)).To(HaveKeyWithValue("failure_mode_allow", true))
-			})
-
-			It("always sets failure_mode_allow_header_add=true", func() {
-				for _, mode := range []model.OpaRequestPolicyFailureMode{
-					model.OpaRequestPolicyFailureModeDeny,
-					model.OpaRequestPolicyFailureModeForward,
-				} {
-					result, err := resolver.GetExternalAuthorizationConfigPatchValue(
-						model.OpaEnvoyExtAuthzFilterConfig{FailureMode: mode},
-					)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(typedConfig(result)).To(HaveKeyWithValue("failure_mode_allow_header_add", true))
-				}
-			})
-		})
-
-		Describe("with_request_body gating on IncludeRequestBody.Enabled", func() {
-			It("omits with_request_body when IncludeRequestBody.Enabled is false", func() {
-				result, err := resolver.GetExternalAuthorizationConfigPatchValue(
-					model.OpaEnvoyExtAuthzFilterConfig{
-						FailureMode: model.OpaRequestPolicyFailureModeDeny,
-						RequestBodyConfig: model.RequestBodyConfig{
-							IncludeRequestBody: false,
-						},
-					},
-				)
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(typedConfig(result)).NotTo(HaveKey("with_request_body"))
-			})
-
-			It("includes with_request_body with the given MaxRequestBodyBytes when IncludeRequestBody is true", func() {
-				result, err := resolver.GetExternalAuthorizationConfigPatchValue(
-					model.OpaEnvoyExtAuthzFilterConfig{
-						FailureMode: model.OpaRequestPolicyFailureModeDeny,
-						RequestBodyConfig: model.RequestBodyConfig{
-							IncludeRequestBody:  true,
-							MaxRequestBodyBytes: 16384,
-						},
-					},
-				)
-
-				Expect(err).NotTo(HaveOccurred())
-
-				tc := typedConfig(result)
-				Expect(tc).To(HaveKey("with_request_body"))
-				wrb, ok := tc["with_request_body"].(map[string]any)
-				Expect(ok).To(BeTrue(), "with_request_body should be a map")
-
-				// structpb encodes all numbers as float64.
-				Expect(wrb).To(HaveKeyWithValue("max_request_bytes", float64(16384)))
-				Expect(wrb).To(HaveKeyWithValue("allow_partial_message", false))
 			})
 		})
 	})

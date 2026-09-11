@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	OpaClusterName = "opa_ext_authz"
+
 	OpaRequestPolicyFailureModeDeny OpaRequestPolicyFailureMode = iota
 	OpaRequestPolicyFailureModeForward
 )
@@ -24,6 +26,7 @@ var (
 )
 
 type OpaEnvoyExtAuthzFilterConfig struct {
+	OpaClusterName    string
 	FailureMode       OpaRequestPolicyFailureMode
 	RequestBodyConfig RequestBodyConfig
 }
@@ -102,7 +105,8 @@ func (o OpaBundleSource) ToGitHubRepositoryURI() string {
 
 func ToOpaEnvoyExtAuthzFilterConfig(requestPolicySpec v1alpha.OpaRequestPolicy) OpaEnvoyExtAuthzFilterConfig {
 	opaEnvoyExtAuthzFilterConfig := OpaEnvoyExtAuthzFilterConfig{
-		FailureMode: toOpaRequestPolicyFailureMode(requestPolicySpec.FailureMode),
+		OpaClusterName: OpaClusterName,
+		FailureMode:    toOpaRequestPolicyFailureMode(requestPolicySpec.FailureMode),
 		RequestBodyConfig: RequestBodyConfig{
 			IncludeRequestBody: false,
 		},

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kartverket/accesserator/internal/model"
+	"github.com/kartverket/accesserator/pkg/model"
 	sigstorebundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/root"
