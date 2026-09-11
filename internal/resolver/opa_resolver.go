@@ -17,10 +17,7 @@ import (
 	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
-const (
-	OpaBundleFetchLayerTimeout           = 60 * time.Second
-	OpaEnvoyFilterClusterConfigPatchName = "opa_ext_authz"
-)
+const OpaBundleFetchLayerTimeout = 60 * time.Second
 
 // OpaBundleFetcher is the set of OCI lookups the OPA resolver needs.
 // It extends validation.AttestationFetcher with the OPA bundle layer-pull operation.
@@ -105,7 +102,7 @@ func ResolveOpaConfigWithFetcher(
 		"name", securityConfig.Name,
 		"namespace", securityConfig.Namespace,
 	)
-	requestAuthorizationConfig, err := ResolveOpaRequestAuthorization(
+	requestAuthorizationConfig, err := ResolveOpaRequestPolicy(
 		string(securityConfig.Spec.ApplicationRef),
 		*securityConfig.Spec.Opa.RequestPolicy,
 	)
@@ -141,104 +138,38 @@ func resolveOpaBundle(
 	return layer, nil
 }
 
-func ResolveOpaRequestAuthorization(
-	skiperatorAppName string, requestAuthorizationSpec v1alpha.OpaRequestPolicy,
+func ResolveOpaRequestPolicy(
+	skiperatorAppName string, requestPolicySpec v1alpha.OpaRequestPolicy,
 ) (*state.RequestPolicyConfig, error) {
-	requestAuthorizationConfig := state.RequestPolicyConfig{
-		Enabled: requestAuthorizationSpec.Enabled,
+	requestPolicyConfig := state.RequestPolicyConfig{
+		Enabled: requestPolicySpec.Enabled,
 		WorkloadLabels: map[string]string{
 			utilities.SkiperatorApplicationRefLabel: skiperatorAppName,
 		},
 	}
-	if !requestAuthorizationSpec.Enabled {
-		return &requestAuthorizationConfig, nil
+	if !requestPolicySpec.Enabled {
+		return &requestPolicyConfig, nil
 	}
-	clusterConfigPatchValue, err := getClusterConfigPatchValue()
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to parse EnvoyFilter cluster config patch value as protobuf struct: %w",
-			err,
-		)
-	}
-	externalAuthorizationConfigPatchValue, err := GetExternalAuthorizationConfigPatchValue(
-		model.ToOpaEnvoyExtAuthzFilterConfig(requestAuthorizationSpec),
+
+	filterConfig := model.ToOpaEnvoyExtAuthzFilterConfig(requestPolicySpec)
+
+	localOpaClusterConfigAsProtobufStruct, err := structpb.NewStruct(
+		utilities.GetLocalClusterConfig(filterConfig.OpaClusterName, config.Get().OpaGrpcPort),
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to parse EnvoyFilter external authorization config patch value as protobuf struct: %w",
+			"failed to parse envoy cluster config for local OPA as protobuf struct: %w",
 			err,
 		)
 	}
-	requestAuthorizationConfig.ClusterConfigPatchValue = clusterConfigPatchValue
-	requestAuthorizationConfig.ExternalAuthorizationConfigPatchValue = externalAuthorizationConfigPatchValue
-	return &requestAuthorizationConfig, nil
-}
-
-func getClusterConfigPatchValue() (*structpb.Struct, error) {
-	clusterConfigPatchValue := map[string]any{
-		"name":            OpaEnvoyFilterClusterConfigPatchName,
-		"type":            "STRICT_DNS",
-		"connect_timeout": "1s",
-		"typed_extension_protocol_options": map[string]any{
-			"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": map[string]any{
-				"@type": "type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions",
-				"explicit_http_config": map[string]any{
-					"http2_protocol_options": map[string]any{},
-				},
-			},
-		},
-		"load_assignment": map[string]any{
-			"cluster_name": OpaEnvoyFilterClusterConfigPatchName,
-			"endpoints": []any{
-				map[string]any{
-					"lb_endpoints": []any{
-						map[string]any{
-							"endpoint": map[string]any{
-								"address": map[string]any{
-									"socket_address": map[string]any{
-										"address":    "127.0.0.1",
-										"port_value": config.Get().OpaGrpcPort,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+	externalAuthorizationFilterConfig, err := structpb.NewStruct(utilities.GetExternalAuthorizationFilterConfig(filterConfig))
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to parse envoy external authorization filter config as protobuf struct: %w",
+			err,
+		)
 	}
-	return structpb.NewStruct(clusterConfigPatchValue)
-}
-
-func GetExternalAuthorizationConfigPatchValue(
-	filterConfig model.OpaEnvoyExtAuthzFilterConfig,
-) (*structpb.Struct, error) {
-	failureModeAllow := filterConfig.FailureMode == model.OpaRequestPolicyFailureModeForward
-	externalAuthorizationConfigPatchValue := map[string]any{
-		"name": "envoy.filters.http.ext_authz",
-		"typed_config": map[string]any{
-			"@type":                 "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz",
-			"transport_api_version": "V3",
-			"grpc_service": map[string]any{
-				"envoy_grpc": map[string]any{
-					"cluster_name": OpaEnvoyFilterClusterConfigPatchName,
-				},
-				"timeout": "1s",
-			},
-			// The field failure_mode_allow specifies whether the request should be denied (false), i.e. returning
-			// 403 Access denied, or forwarded to the upstream application (true).
-			"failure_mode_allow": failureModeAllow,
-			// If failure_mode_allow AND field failure_mode_allow_header_add is set to true, the header
-			// `x-envoy-auth-failure-mode-allowed: true` is added to the request if envoy failed to reach OPA or if OPA
-			// returned a 5xx response.
-			"failure_mode_allow_header_add": true,
-		},
-	}
-	if filterConfig.RequestBodyConfig.IncludeRequestBody {
-		externalAuthorizationConfigPatchValue["typed_config"].(map[string]any)["with_request_body"] = map[string]any{
-			"max_request_bytes":     filterConfig.RequestBodyConfig.MaxRequestBodyBytes,
-			"allow_partial_message": false,
-		}
-	}
-	return structpb.NewStruct(externalAuthorizationConfigPatchValue)
+	requestPolicyConfig.ClusterConfigPatchValue = localOpaClusterConfigAsProtobufStruct
+	requestPolicyConfig.ExternalAuthorizationConfigPatchValue = externalAuthorizationFilterConfig
+	return &requestPolicyConfig, nil
 }
