@@ -67,7 +67,8 @@ JQ ?= $(LOCALBIN)/jq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
-CHAINSAW_VERSION ?= v0.2.15
+# Temporary pin until Chainsaw publishes a release with Go 1.27 support.
+CHAINSAW_VERSION ?= b7d4a4f5dd45e333add856a5ae9057fc5a57e93a
 CONTROLLER_TOOLS_VERSION ?= v0.21.0
 KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
