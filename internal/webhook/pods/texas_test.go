@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -38,6 +39,10 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(c.Image).To(Equal(fmt.Sprintf("%s:%s@%s", config.Get().TexasImageName, config.Get().TexasImageTag, config.Get().TexasImageSha)))
 			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
 			Expect(c.SecurityContext).ToNot(BeNil())
+			Expect(c.Resources.Requests.Cpu().String()).To(Equal(config.Get().TexasCPURequest))
+			Expect(c.Resources.Requests.Memory().String()).To(Equal(config.Get().TexasMemoryRequest))
+			Expect(c.Resources.Limits.Cpu().String()).To(Equal(config.Get().TexasCPULimit))
+			Expect(c.Resources.Limits.Memory().String()).To(Equal(config.Get().TexasMemoryLimit))
 			Expect(c.Env).NotTo(BeEmpty())
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: pods.TokenXEnabledEnvVarName, Value: "true"}))
 			Expect(c.EnvFrom).NotTo(BeEmpty())
@@ -501,6 +506,22 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(pods.IsTexasContainerEqual(a, b)).To(BeTrue())
 
 			b.Env = append(b.Env, corev1.EnvVar{Name: "DUMMY_ENV_VAR", Value: "dummy"})
+			Expect(pods.IsTexasContainerEqual(a, b)).To(BeFalse())
+		})
+
+		It("returns false when resource requirements differ", func() {
+			securityConfig := v1alpha.SecurityConfig{
+				Spec: v1alpha.SecurityConfigSpec{
+					ApplicationRef: applicationRef,
+				},
+			}
+			a := pods.GetTexasContainer(securityConfig)
+			b := pods.GetTexasContainer(securityConfig)
+			Expect(pods.IsTexasContainerEqual(a, b)).To(BeTrue())
+
+			b.Resources.Requests = corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("999m"),
+			}
 			Expect(pods.IsTexasContainerEqual(a, b)).To(BeFalse())
 		})
 	})

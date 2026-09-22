@@ -49,6 +49,7 @@ func GetTexasContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	texasContainer := utilities.CommonInitContainer
 	texasContainer.Name = TexasInitContainerName
 	texasContainer.Image = imageURL
+	texasContainer.Resources = config.TexasResources()
 	texasContainer.Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: config.Get().TexasPort,
@@ -189,6 +190,7 @@ func IsTexasContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.Env, actual.Env) &&
 		reflect.DeepEqual(expected.EnvFrom, actual.EnvFrom) &&
 		reflect.DeepEqual(expected.Ports, actual.Ports) &&
+		reflect.DeepEqual(expected.Resources, actual.Resources) &&
 		reflect.DeepEqual(expected.SecurityContext, actual.SecurityContext) &&
 		reflect.DeepEqual(expected.TerminationMessagePath, actual.TerminationMessagePath) &&
 		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy) &&
