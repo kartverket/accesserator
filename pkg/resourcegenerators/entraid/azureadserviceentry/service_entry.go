@@ -8,11 +8,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	IstioGatewayNamesapce = "istio-gateway"
-	IstiodNamesapce       = "istio-system"
-)
-
 func GetDesired(objectMeta v1.ObjectMeta, entraIdConfig state.EntraIdConfig) *istionetworkingv1.ServiceEntry {
 	if !entraIdConfig.Enabled {
 		return nil
@@ -23,8 +18,6 @@ func GetDesired(objectMeta v1.ObjectMeta, entraIdConfig state.EntraIdConfig) *is
 		Spec: istioapiv1.ServiceEntry{
 			ExportTo: []string{
 				".",
-				IstioGatewayNamesapce,
-				IstiodNamesapce,
 			},
 			Hosts: []string{
 				utilities.EntraIdHost,
