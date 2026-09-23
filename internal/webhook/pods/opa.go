@@ -31,6 +31,7 @@ func GetOpaContainer(securityConfig v1alpha.SecurityConfig) corev1.Container {
 	opaContainer := utilities.CommonInitContainer
 	opaContainer.Name = OpaInitContainerName
 	opaContainer.Image = imageURL
+	opaContainer.Resources = config.OpaResources()
 	opaContainer.Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: config.Get().OpaPort,
@@ -115,6 +116,7 @@ func IsOpaContainerEqual(expected, actual corev1.Container) bool {
 		reflect.DeepEqual(expected.Args, actual.Args) &&
 		isVolumeMountsEqual(expected.VolumeMounts, actual.VolumeMounts) &&
 		reflect.DeepEqual(expected.Ports, actual.Ports) &&
+		reflect.DeepEqual(expected.Resources, actual.Resources) &&
 		reflect.DeepEqual(expected.SecurityContext, actual.SecurityContext) &&
 		reflect.DeepEqual(expected.TerminationMessagePath, actual.TerminationMessagePath) &&
 		reflect.DeepEqual(expected.TerminationMessagePolicy, actual.TerminationMessagePolicy) &&

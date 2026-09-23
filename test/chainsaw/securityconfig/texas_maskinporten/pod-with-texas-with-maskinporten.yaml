@@ -45,7 +45,13 @@ spec:
         - containerPort: 3001
           name: probe
           protocol: TCP
-      resources: {}
+      resources:
+        limits:
+          cpu: 200m
+          memory: 128Mi
+        requests:
+          cpu: 1m
+          memory: 16Mi
       restartPolicy: Always
       securityContext:
         allowPrivilegeEscalation: false

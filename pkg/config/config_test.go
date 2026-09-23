@@ -162,6 +162,61 @@ func TestLoad_Defaults(t *testing.T) {
 	if c.OpaSelfAuthorizationBundle != nil {
 		t.Errorf("OpaSelfAuthorizationBundle = %v, want nil", c.OpaSelfAuthorizationBundle)
 	}
+	if c.TexasCPURequest != "1m" {
+		t.Errorf("TexasCPURequest = %q, want default %q", c.TexasCPURequest, "1m")
+	}
+	if c.TexasCPULimit != "200m" {
+		t.Errorf("TexasCPULimit = %q, want default %q", c.TexasCPULimit, "200m")
+	}
+	if c.TexasMemoryRequest != "16Mi" {
+		t.Errorf("TexasMemoryRequest = %q, want default %q", c.TexasMemoryRequest, "16Mi")
+	}
+	if c.TexasMemoryLimit != "128Mi" {
+		t.Errorf("TexasMemoryLimit = %q, want default %q", c.TexasMemoryLimit, "128Mi")
+	}
+	if c.OpaCPURequest != "2m" {
+		t.Errorf("OpaCPURequest = %q, want default %q", c.OpaCPURequest, "2m")
+	}
+	if c.OpaCPULimit != "500m" {
+		t.Errorf("OpaCPULimit = %q, want default %q", c.OpaCPULimit, "500m")
+	}
+	if c.OpaMemoryRequest != "32Mi" {
+		t.Errorf("OpaMemoryRequest = %q, want default %q", c.OpaMemoryRequest, "32Mi")
+	}
+	if c.OpaMemoryLimit != "256Mi" {
+		t.Errorf("OpaMemoryLimit = %q, want default %q", c.OpaMemoryLimit, "256Mi")
+	}
+}
+
+func TestLoad_ResourceQuantitiesOverridable(t *testing.T) {
+	setAllEnvVars(t)
+	t.Setenv("ACCESSERATOR_TEXAS_CPU_REQUEST", "5m")
+	t.Setenv("ACCESSERATOR_OPA_MEMORY_LIMIT", "512Mi")
+
+	if err := config.Load(); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	c := config.Get()
+	if c.TexasCPURequest != "5m" {
+		t.Errorf("TexasCPURequest = %q, want %q", c.TexasCPURequest, "5m")
+	}
+	if c.OpaMemoryLimit != "512Mi" {
+		t.Errorf("OpaMemoryLimit = %q, want %q", c.OpaMemoryLimit, "512Mi")
+	}
+}
+
+func TestLoad_InvalidResourceQuantity(t *testing.T) {
+	setAllEnvVars(t)
+	t.Setenv("ACCESSERATOR_TEXAS_CPU_REQUEST", "not-a-quantity")
+
+	err := config.Load()
+	if err == nil {
+		t.Fatal("expected error for invalid ACCESSERATOR_TEXAS_CPU_REQUEST, got nil")
+	}
+	if got := err.Error(); !contains(got, "ACCESSERATOR_TEXAS_CPU_REQUEST") {
+		t.Errorf("error = %q, want it to mention ACCESSERATOR_TEXAS_CPU_REQUEST", got)
+	}
 }
 
 func TestLoad_OpaSelfAuthorizationBundle_DefaultNil(t *testing.T) {

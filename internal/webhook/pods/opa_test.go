@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -110,6 +111,10 @@ var _ = Describe("opa.go unit tests", func() {
 			)))
 			Expect(*c.RestartPolicy).To(Equal(corev1.ContainerRestartPolicyAlways))
 			Expect(c.SecurityContext).ToNot(BeNil())
+			Expect(c.Resources.Requests.Cpu().String()).To(Equal(config.Get().OpaCPURequest))
+			Expect(c.Resources.Requests.Memory().String()).To(Equal(config.Get().OpaMemoryRequest))
+			Expect(c.Resources.Limits.Cpu().String()).To(Equal(config.Get().OpaCPULimit))
+			Expect(c.Resources.Limits.Memory().String()).To(Equal(config.Get().OpaMemoryLimit))
 			Expect(c.Args).To(Equal([]string{
 				"run",
 				"--server",
@@ -217,6 +222,18 @@ var _ = Describe("opa.go unit tests", func() {
 			Expect(pods.IsOpaContainerEqual(a, b)).To(BeTrue())
 
 			b.Args = append(b.Args, "--dummy")
+			Expect(pods.IsOpaContainerEqual(a, b)).To(BeFalse())
+		})
+
+		It("returns false when resource requirements differ", func() {
+			securityConfig := newSecurityConfig(true)
+			a := pods.GetOpaContainer(securityConfig)
+			b := pods.GetOpaContainer(securityConfig)
+			Expect(pods.IsOpaContainerEqual(a, b)).To(BeTrue())
+
+			b.Resources.Limits = corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("999Mi"),
+			}
 			Expect(pods.IsOpaContainerEqual(a, b)).To(BeFalse())
 		})
 
