@@ -51,7 +51,7 @@ var _ = Describe("Maskinporten ServiceEntry GetDesired", func() {
 
 		Expect(serviceEntry).NotTo(BeNil())
 		Expect(serviceEntry.Spec.Hosts).To(ConsistOf(utilities.MaskinportenTestHost))
-		Expect(serviceEntry.Spec.ExportTo).To(ConsistOf(".", "istio-gateway", "istio-system"))
+		Expect(serviceEntry.Spec.ExportTo).To(ConsistOf("."))
 		Expect(serviceEntry.Spec.Resolution).To(Equal(istioapiv1.ServiceEntry_DNS))
 		Expect(serviceEntry.Spec.Ports).To(HaveLen(1))
 		Expect(serviceEntry.Spec.Ports[0].Number).To(BeEquivalentTo(443))

@@ -8,8 +8,6 @@ metadata:
 spec:
   exportTo:
     - .
-    - istio-gateway
-    - istio-system
   hosts:
     - login.microsoftonline.com
   ports:
