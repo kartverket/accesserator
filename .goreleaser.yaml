@@ -51,36 +51,18 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
 
-dockers:
-  - image_templates:
-      - "ghcr.io/kartverket/accesserator:{{ .Tag }}-linux-amd64"
-    use: buildx
+dockers_v2:
+  - images:
+      - "ghcr.io/kartverket/accesserator"
     dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
+    tags:
+      - "{{ .Tag }}"
+      - "latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    flags:
       - "--pull"
-      - "--platform=linux/amd64"
-    goos: linux
-    goarch: amd64
-  - image_templates:
-      - "ghcr.io/kartverket/accesserator:{{ .Tag }}-linux-arm64"
-    use: buildx
-    dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/arm64"
-    goos: linux
-    goarch: arm64
-
-docker_manifests:
-  - name_template: "ghcr.io/kartverket/accesserator:{{ .Tag }}"
-    image_templates:
-      - "ghcr.io/kartverket/accesserator:{{ .Tag }}-linux-arm64"
-      - "ghcr.io/kartverket/accesserator:{{ .Tag }}-linux-amd64"
-
-  - name_template: "ghcr.io/kartverket/accesserator:latest"
-    image_templates:
-      - "ghcr.io/kartverket/accesserator:{{ .Tag }}-linux-arm64"
-      - "ghcr.io/kartverket/accesserator:{{ .Tag }}-linux-amd64"
 
 docker_signs:
   - artifacts: all

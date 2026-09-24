@@ -5,6 +5,7 @@ FROM scratch
 
 COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY accesserator /accesserator
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/accesserator /accesserator
 USER 65532:65532
 ENTRYPOINT ["/accesserator"]
