@@ -16,4 +16,4 @@ patches:
     path: patches/deployment.yaml
 images:
   - name: ghcr.io/nais/jwker
-    newTag: 2026-05-27-140723-71d7e1b@sha256:cebba93ed26bd878092aa7a4a334dfa97175174639753731a751a73b239ca211
+    newTag: 2026-09-10-124203-9ff0920@sha256:1d93abf5b502d72df7b123f43e4a43be6f46bc0331e7c886ebcf8e8949c3d9e4
