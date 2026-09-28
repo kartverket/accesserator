@@ -69,7 +69,7 @@ jobs:
           OPA_IMAGE: ${{ steps.opa-image.outputs.image }}
         run: |
           mise install go
-          mise run set-accesserator "ACCESSERATOR_VERSION"
+          mise run set-accesserator "$ACCESSERATOR_VERSION"
           mise run set-opa-image "$OPA_IMAGE"
 
       - name: Create Pull Request
