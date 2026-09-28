@@ -1,0 +1,91 @@
+name: Update SKIP-Tilgangsstyring-Local
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: skip-tilgangsstyring-local-update
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  update-version:
+    name: Update version
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get token for skip-tilgangsstyring-local
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: octo-sts
+        with:
+          scope: kartverket/skip-tilgangsstyring-local
+          identity: accesserator
+
+      - name: Checkout accesserator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: accesserator
+          persist-credentials: false
+
+      - name: Read OPA image from config/manager/base/.env
+        id: opa-image
+        run: |
+          set -euo pipefail
+          env_file="accesserator/config/manager/base/.env"
+          read_var() {
+            value="$(grep -m1 -E "^$1=" "$env_file" | cut -d= -f2-)"
+            if [ -z "$value" ]; then
+              echo "::error::$1 not found in $env_file" >&2
+              exit 1
+            fi
+            printf '%s' "$value"
+          }
+          name="$(read_var ACCESSERATOR_OPA_IMAGE_NAME)"
+          tag="$(read_var ACCESSERATOR_OPA_IMAGE_TAG)"
+          sha="$(read_var ACCESSERATOR_OPA_IMAGE_SHA)"
+          echo "image=${name}:${tag}@${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout kartverket/skip-tilgangsstyring-local
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: skip-tilgangsstyring-local
+          repository: kartverket/skip-tilgangsstyring-local
+          token: ${{ steps.octo-sts.outputs.token }}
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+
+      - name: Update version
+        working-directory: skip-tilgangsstyring-local
+        env:
+          ACCESSERATOR_VERSION: ${{ github.ref_name }}
+          OPA_IMAGE: ${{ steps.opa-image.outputs.image }}
+        run: |
+          mise install go
+          mise run set-accesserator "ACCESSERATOR_VERSION"
+          mise run set-opa-image "$OPA_IMAGE"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: skip-tilgangsstyring-local
+          token: ${{ steps.octo-sts.outputs.token }}
+          commit-message: "fix: update accesserator to ${{ github.ref_name }}"
+          title: "fix: update accesserator to ${{ github.ref_name }}"
+          body: |
+            Updates the accesserator Go module to ${{ github.ref_name }} and set the OPA-image used in Dockerfile.
+
+            Triggered by tag: ${{ github.ref_name }}
+            Source commit: ${{ github.sha }}
+          branch: update-accesserator-version
+          labels: |
+            dependencies
+            automated
+          delete-branch: true
