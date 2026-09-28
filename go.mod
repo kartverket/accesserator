@@ -20,7 +20,7 @@ require (
 	google.golang.org/protobuf v1.36.12
 	istio.io/api v1.31.0
 	istio.io/client-go v1.31.0
-	k8s.io/api v0.37.0
+	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.0
 	oras.land/oras-go/v2 v2.6.2
