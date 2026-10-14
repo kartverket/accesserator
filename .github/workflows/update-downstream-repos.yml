@@ -219,7 +219,6 @@ jobs:
           title: "${{ steps.pr-meta.outputs.title }}"
           body-path: github-workflows/pr-body.txt
           branch: update-opa-regal-version
-          team-reviewers: tilgangsstyring
           labels: |
             dependencies
             automated
@@ -297,7 +296,6 @@ jobs:
             Triggered by tag: ${{ github.ref_name }}
             Source commit: ${{ github.sha }}
           branch: update-accesserator-version
-          team-reviewers: tilgangsstyring
           labels: |
             dependencies
             automated
@@ -361,7 +359,6 @@ jobs:
             Triggered by tag: ${{ github.ref_name }}
             Source commit: ${{ github.sha }}
           branch: update-accesserator-api-docs
-          team-reviewers: tilgangsstyring
           labels: |
             documentation
             automated
