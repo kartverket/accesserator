@@ -1,0 +1,368 @@
+name: Update downstream repositories
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  update-github-workflows:
+    name: Update OPA/Regal version in kartverket/github-workflows
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: kartverket-github-workflows-update
+      cancel-in-progress: true
+    steps:
+      - name: Checkout accesserator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read OPA version from config/manager/base/.env
+        id: opa-version
+        run: |
+          set -euo pipefail
+          env_file="config/manager/base/.env"
+          read_var() {
+            value="$(grep -m1 -E "^$1=" "$env_file" | cut -d= -f2-)"
+            if [ -z "$value" ]; then
+              echo "::error::$1 not found in $env_file" >&2
+              exit 1
+            fi
+            printf '%s' "$value"
+          }
+          tag="$(read_var ACCESSERATOR_OPA_IMAGE_TAG)"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Get token for kartverket/github-workflows
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: octo-sts-github-workflows
+        with:
+          scope: kartverket/github-workflows
+          identity: accesserator
+
+      - name: Checkout kartverket/github-workflows
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: github-workflows
+          repository: kartverket/github-workflows
+          token: ${{ steps.octo-sts-github-workflows.outputs.token }}
+          persist-credentials: false
+
+      - name: Update OPA version pin in kartverket/github-workflows
+        id: update-opa
+        working-directory: github-workflows
+        env:
+          OPA_IMAGE_TAG: ${{ steps.opa-version.outputs.tag }}
+          TARGET_FILE: .github/workflows/build-and-push-opa-bundle.yml
+        run: |
+          set -euo pipefail
+          opa_version="$(grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' <<< "$OPA_IMAGE_TAG")"
+          if [ -z "$opa_version" ]; then
+            echo "::error::Could not extract a semver from OPA image tag: $OPA_IMAGE_TAG"
+            exit 1
+          fi
+
+          old_opa_version="$(grep -m1 -E '^\s*OPA_VERSION:' "$TARGET_FILE" | awk '{print $2}')"
+          if [ -z "$old_opa_version" ]; then
+            echo "::error::Could not find OPA_VERSION in $TARGET_FILE"
+            exit 1
+          fi
+
+          sed -i -E "s/^(\s*OPA_VERSION:\s*).*/\1${opa_version}/" "$TARGET_FILE"
+
+          # Assert the replacement actually landed, so a renamed/moved env
+          # key doesn't silently no-op.
+          if ! grep -qE "^\s*OPA_VERSION:\s*${opa_version}\s*$" "$TARGET_FILE"; then
+            echo "::error::Failed to update OPA_VERSION in $TARGET_FILE"
+            exit 1
+          fi
+
+          echo "version=$opa_version" >> "$GITHUB_OUTPUT"
+          if [ "$old_opa_version" = "$opa_version" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve compatible Regal version
+        id: update-regal
+        working-directory: github-workflows
+        env:
+          GH_TOKEN: ${{ steps.octo-sts-github-workflows.outputs.token }}
+          TARGET_FILE: .github/workflows/build-and-push-opa-bundle.yml
+        run: |
+          set -euo pipefail
+          opa_version="${{ steps.update-opa.outputs.version }}"
+          opa_minor="$(cut -d. -f1,2 <<< "$opa_version")"
+
+          echo "Looking for the Regal release with the nearest OPA dependency >= v${opa_minor}.x..."
+          tags="$(curl -sSL --fail \
+            -H "Authorization: ******" \
+            "https://api.github.com/repos/open-policy-agent/regal/releases?per_page=100" \
+            | jq -r '.[].tag_name')"
+
+          if [ -z "$tags" ]; then
+            echo "::error::Could not list Regal releases from GitHub"
+            exit 1
+          fi
+
+          regal_version=""
+          required_opa=""
+          # Regal's vendored OPA dependency increases monotonically with
+          # newer releases, so walking oldest -> newest and taking the first
+          # minor >= ours gives the *closest* compatible release, rather than
+          # just the newest Regal release overall.
+          for tag in $(printf '%s\n' "$tags" | sort -V); do
+            go_mod="$(curl -sSL --fail \
+              "https://raw.githubusercontent.com/open-policy-agent/regal/${tag}/go.mod" || true)"
+            [ -z "$go_mod" ] && continue
+
+            candidate_opa="$(grep -m1 -E '^\s*github.com/open-policy-agent/opa ' <<< "$go_mod" \
+              | awk '{print $2}' | sed 's/^v//')"
+            [ -z "$candidate_opa" ] && continue
+
+            candidate_opa_minor="$(cut -d. -f1,2 <<< "$candidate_opa")"
+
+            if [ "$(printf '%s\n%s\n' "$opa_minor" "$candidate_opa_minor" | sort -V | tail -n1)" = "$candidate_opa_minor" ]; then
+              regal_version="${tag#v}"
+              required_opa="$candidate_opa"
+              echo "Selected Regal ${tag} (built against OPA v${required_opa}, nearest match >= v${opa_minor})"
+              break
+            fi
+          done
+
+          if [ -z "$regal_version" ]; then
+            echo "::error::No Regal release found with OPA dependency >= v${opa_minor}.x"
+            exit 1
+          fi
+
+          old_regal_version="$(grep -m1 -E '^\s*REGAL_VERSION:' "$TARGET_FILE" | awk '{print $2}')"
+          if [ -z "$old_regal_version" ]; then
+            echo "::error::Could not find REGAL_VERSION in $TARGET_FILE"
+            exit 1
+          fi
+
+          new_regal_version="v${regal_version}"
+          sed -i -E "s/^(\s*REGAL_VERSION:\s*).*/\1${new_regal_version}/" "$TARGET_FILE"
+
+          if ! grep -qE "^\s*REGAL_VERSION:\s*${new_regal_version}\s*$" "$TARGET_FILE"; then
+            echo "::error::Failed to update REGAL_VERSION in $TARGET_FILE"
+            exit 1
+          fi
+
+          echo "version=$regal_version" >> "$GITHUB_OUTPUT"
+          if [ "$old_regal_version" = "$new_regal_version" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          required_opa_minor="$(cut -d. -f1,2 <<< "$required_opa")"
+          if [ "$required_opa_minor" = "$opa_minor" ]; then
+            echo "match-kind=exact minor match" >> "$GITHUB_OUTPUT"
+          else
+            echo "match-kind=**fallback** — nearest OPA dependency (v${required_opa}) above pinned v${opa_version}; review the Regal lint diff carefully" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build PR metadata from actual changes
+        id: pr-meta
+        working-directory: github-workflows
+        run: |
+          set -euo pipefail
+
+          summary_parts=()
+          body_rows=""
+          if [ "${{ steps.update-opa.outputs.changed }}" = "true" ]; then
+            summary_parts+=("OPA to ${{ steps.update-opa.outputs.version }}")
+            body_rows+="| \`OPA_VERSION\` | \`${{ steps.update-opa.outputs.version }}\` |"$'\n'
+          fi
+          if [ "${{ steps.update-regal.outputs.changed }}" = "true" ]; then
+            summary_parts+=("Regal to v${{ steps.update-regal.outputs.version }}")
+            body_rows+="| \`REGAL_VERSION\` | \`v${{ steps.update-regal.outputs.version }}\` |"$'\n'
+          fi
+
+          if [ ${#summary_parts[@]} -eq 0 ]; then
+            title="deps: OPA/Regal already up to date"
+          else
+            title="deps: bump $(IFS=', '; echo "${summary_parts[*]}")"
+          fi
+
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Changed values in \`.github/workflows/build-and-push-opa-bundle.yml\`"
+            echo ""
+            echo "| Env var | New value |"
+            echo "|------|-----------|"
+            printf '%s' "$body_rows"
+            echo ""
+            echo "**Regal version match:** ${{ steps.update-regal.outputs.match-kind }}"
+            echo ""
+            echo "Triggered by accesserator tag: \`${{ github.ref_name }}\`"
+            echo "Source commit: ${{ github.sha }}"
+          } > pr-body.txt
+
+      - name: Create Pull Request in github-workflows
+        id: create-pr-github-workflows
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: github-workflows
+          token: ${{ steps.octo-sts-github-workflows.outputs.token }}
+          commit-message: "${{ steps.pr-meta.outputs.title }}"
+          title: "${{ steps.pr-meta.outputs.title }}"
+          body-path: github-workflows/pr-body.txt
+          branch: update-opa-regal-version
+          team-reviewers: tilgangsstyring
+          labels: |
+            dependencies
+            automated
+          delete-branch: true
+
+  update-skip-tilgangsstyring-local:
+    name: Update version in kartverket/skip-tilgangsstyring-local
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: skip-tilgangsstyring-local-update
+      cancel-in-progress: true
+    steps:
+      - name: Checkout accesserator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read OPA image from config/manager/base/.env
+        id: opa-image
+        run: |
+          set -euo pipefail
+          env_file="config/manager/base/.env"
+          read_var() {
+            value="$(grep -m1 -E "^$1=" "$env_file" | cut -d= -f2-)"
+            if [ -z "$value" ]; then
+              echo "::error::$1 not found in $env_file" >&2
+              exit 1
+            fi
+            printf '%s' "$value"
+          }
+          name="$(read_var ACCESSERATOR_OPA_IMAGE_NAME)"
+          tag="$(read_var ACCESSERATOR_OPA_IMAGE_TAG)"
+          sha="$(read_var ACCESSERATOR_OPA_IMAGE_SHA)"
+          echo "image=${name}:${tag}@${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Get token for skip-tilgangsstyring-local
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: octo-sts
+        with:
+          scope: kartverket/skip-tilgangsstyring-local
+          identity: accesserator
+
+      - name: Checkout kartverket/skip-tilgangsstyring-local
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: skip-tilgangsstyring-local
+          repository: kartverket/skip-tilgangsstyring-local
+          token: ${{ steps.octo-sts.outputs.token }}
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+
+      - name: Update version
+        working-directory: skip-tilgangsstyring-local
+        env:
+          ACCESSERATOR_VERSION: ${{ github.ref_name }}
+          OPA_IMAGE: ${{ steps.opa-image.outputs.image }}
+        run: |
+          mise install go
+          mise run set-accesserator "$ACCESSERATOR_VERSION"
+          mise run set-opa-image "$OPA_IMAGE"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: skip-tilgangsstyring-local
+          token: ${{ steps.octo-sts.outputs.token }}
+          commit-message: "fix: update accesserator to ${{ github.ref_name }}"
+          title: "fix: update accesserator to ${{ github.ref_name }}"
+          body: |
+            Updates the accesserator Go module to ${{ github.ref_name }} and set the OPA-image used in Dockerfile.
+
+            Triggered by tag: ${{ github.ref_name }}
+            Source commit: ${{ github.sha }}
+          branch: update-accesserator-version
+          team-reviewers: tilgangsstyring
+          labels: |
+            dependencies
+            automated
+          delete-branch: true
+
+  update-api-docs:
+    name: Update API docs in skip.kartverket.no
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: api-docs-update
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Generate api-docs.md
+        run: |
+          make apidocs
+
+      - name: Get token for skip.kartverket.no
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: octo-sts
+        with:
+          scope: kartverket/skip.kartverket.no
+          identity: accesserator
+
+      - name: Checkout target repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: target
+          repository: kartverket/skip.kartverket.no
+          token: ${{ steps.octo-sts.outputs.token }}
+          persist-credentials: false
+
+      - name: Compare generated API docs
+        id: api-docs
+        run: |
+          target_file=target/docs/08-tilgangsstyring/09-accesserator/03-api-docs.md
+          if cmp --silent api-docs.md "$target_file"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            mkdir -p "$(dirname "$target_file")"
+            cp api-docs.md "$target_file"
+          fi
+
+      - name: Create Pull Request
+        if: steps.api-docs.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: target
+          token: ${{ steps.octo-sts.outputs.token }}
+          commit-message: "Update accesserator API docs"
+          title: "Update accesserator API docs"
+          body: |
+            This PR updates the generated accesserator API documentation.
+
+            Triggered by tag: ${{ github.ref_name }}
+            Source commit: ${{ github.sha }}
+          branch: update-accesserator-api-docs
+          team-reviewers: tilgangsstyring
+          labels: |
+            documentation
+            automated
+          delete-branch: true
