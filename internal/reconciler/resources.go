@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/kartverket/accesserator/internal/state"
+	"github.com/kartverket/accesserator/pkg/annotations"
 	"github.com/kartverket/accesserator/pkg/config"
 	"github.com/kartverket/accesserator/pkg/labels"
 	"github.com/kartverket/accesserator/pkg/reconciliation"
@@ -156,9 +157,10 @@ maskinportenSecretControllerResource reconciles a Secret resource based on an ex
 func maskinportenSecretControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.Secret] {
 	maskinportenSecretName := utilities.NewMaskinportenNamer(scope.SecurityConfig).SecretFromRefName()
 	maskinportenSecretObjectMeta := metav1.ObjectMeta{
-		Name:      maskinportenSecretName,
-		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    labels.SecurityConfigStandardLabels(),
+		Name:        maskinportenSecretName,
+		Namespace:   scope.SecurityConfig.Namespace,
+		Labels:      labels.SecurityConfigStandardLabels(),
+		Annotations: annotations.ReloaderMatchAnnotation(),
 	}
 	desiredResource := maskinportensecret.GetDesired(maskinportenSecretObjectMeta, scope.MaskinportenConfig)
 
@@ -242,9 +244,10 @@ azureAdSecretControllerResource reconciles a Secret resource based on an existin
 func azureAdSecretControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.Secret] {
 	azureAdSecretName := utilities.NewEntraIdNamer(scope.SecurityConfig).SecretFromRefName()
 	azureAdSecretObjectMeta := metav1.ObjectMeta{
-		Name:      azureAdSecretName,
-		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    labels.SecurityConfigStandardLabels(),
+		Name:        azureAdSecretName,
+		Namespace:   scope.SecurityConfig.Namespace,
+		Labels:      labels.SecurityConfigStandardLabels(),
+		Annotations: annotations.ReloaderMatchAnnotation(),
 	}
 	desiredResource := azureadsecret.GetDesired(azureAdSecretObjectMeta, scope.EntraIdConfig)
 
@@ -346,9 +349,10 @@ opaConfigMapControllerResource reconciles a ConfigMap resource with all configur
 func opaConfigMapControllerResource(scope *state.Scope) ControllerResourceAdapter[*corev1.ConfigMap] {
 	opaConfigMapName := utilities.NewOpaNamer(scope.SecurityConfig).ConfigMapName()
 	opaConfigMapObjectMeta := metav1.ObjectMeta{
-		Name:      opaConfigMapName,
-		Namespace: scope.SecurityConfig.Namespace,
-		Labels:    labels.SecurityConfigStandardLabels(),
+		Name:        opaConfigMapName,
+		Namespace:   scope.SecurityConfig.Namespace,
+		Labels:      labels.SecurityConfigStandardLabels(),
+		Annotations: annotations.ReloaderMatchAnnotation(),
 	}
 	desiredResource := opaconfigmap.GetDesired(opaConfigMapObjectMeta, scope.OpaConfig)
 
@@ -418,7 +422,8 @@ func ConfigMapShouldUpdateFunc(current, desired *corev1.ConfigMap) bool {
 	return !equality.Semantic.DeepEqual(current.BinaryData, desired.BinaryData) ||
 		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
 		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable) ||
-		labelsNeedUpdate(current, desired)
+		labelsNeedUpdate(current, desired) ||
+		annotationsNeedUpdate(current, desired)
 }
 
 func configMapUpdateFieldsFunc(current, desired *corev1.ConfigMap) {
@@ -426,13 +431,15 @@ func configMapUpdateFieldsFunc(current, desired *corev1.ConfigMap) {
 	current.Data = desired.Data
 	current.Immutable = desired.Immutable
 	current.Labels = desired.Labels
+	current.Annotations = desired.Annotations
 }
 
 func SecretShouldUpdateFunc(current, desired *corev1.Secret) bool {
 	return !equality.Semantic.DeepEqual(current.StringData, desired.StringData) ||
 		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
 		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable) ||
-		labelsNeedUpdate(current, desired)
+		labelsNeedUpdate(current, desired) ||
+		annotationsNeedUpdate(current, desired)
 }
 
 func secretUpdateFieldsFunc(current, desired *corev1.Secret) {
@@ -441,6 +448,7 @@ func secretUpdateFieldsFunc(current, desired *corev1.Secret) {
 	current.Immutable = desired.Immutable
 	current.Type = desired.Type
 	current.Labels = desired.Labels
+	current.Annotations = desired.Annotations
 }
 
 func ServiceEntryShouldUpdateFunc(current, desired *istionetworkingv1.ServiceEntry) bool {
@@ -470,6 +478,23 @@ func labelsNeedUpdate(current, desired LabeledObject) bool {
 	currentLabels := current.GetLabels()
 	for key, value := range desiredLabels {
 		if currentValue, ok := currentLabels[key]; !ok || currentValue != value {
+			return true
+		}
+	}
+	return false
+}
+
+type AnnotatedObject interface {
+	GetAnnotations() map[string]string
+}
+
+// annotationsNeedUpdate reports whether any of the desired annotations are missing from current or have a
+// different value. Annotations on current that are not part of the desired set are ignored.
+func annotationsNeedUpdate(current, desired AnnotatedObject) bool {
+	desiredAnnotations := desired.GetAnnotations()
+	currentAnnotations := current.GetAnnotations()
+	for key, value := range desiredAnnotations {
+		if currentValue, ok := currentAnnotations[key]; !ok || currentValue != value {
 			return true
 		}
 	}

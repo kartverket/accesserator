@@ -208,6 +208,7 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 			HaveKeyWithValue("app.kubernetes.io/managed-by", "accesserator"),
 			HaveKeyWithValue("accesserator.kartverket.no/controller", "securityconfig"),
 		))
+		Expect(createdSecret.Annotations).To(HaveKeyWithValue("reloader.stakater.com/match", "true"))
 	})
 
 	It("does NOT update a Secret when data changes, but the Secret is not owned by SecurityConfig", func() {
@@ -316,6 +317,38 @@ var _ = Describe("maskinportenSecretControllerResource", func() {
 			HaveKeyWithValue("app.kubernetes.io/managed-by", "accesserator"),
 			HaveKeyWithValue("accesserator.kartverket.no/controller", "securityconfig"),
 		))
+	})
+
+	It("adds reloader match annotation to an existing Secret that is missing it", func() {
+		secretName := utilities.NewMaskinportenNamer(securityConfig).SecretFromRefName()
+
+		existing := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: testNamespace,
+			},
+			Data: map[string][]byte{
+				"token": []byte("initial-token"),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		// Set ownerReference to SecurityConfig
+		Expect(ctrl.SetControllerReference(
+			&scope.SecurityConfig,
+			existing,
+			scheme.Scheme,
+		)).To(Succeed())
+		Expect(k8sClient.Create(ctx, existing)).To(Succeed())
+
+		_, err := adapter.Reconcile(ctx, k8sClient, scheme.Scheme)
+		Expect(err).NotTo(HaveOccurred())
+
+		updated := &corev1.Secret{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: testNamespace,
+		}, updated)).To(Succeed())
+		Expect(updated.Annotations).To(HaveKeyWithValue("reloader.stakater.com/match", "true"))
 	})
 
 	It("does not update a Secret when data is unchanged", func() {
@@ -602,6 +635,17 @@ var _ = Describe("ConfigMapShouldUpdateFunc", func() {
 
 		Expect(reconciler.ConfigMapShouldUpdateFunc(current, desired)).To(BeTrue())
 	})
+
+	It("returns true when a desired annotation is missing on current", func() {
+		current := &corev1.ConfigMap{}
+		desired := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{"reloader.stakater.com/match": "true"},
+			},
+		}
+
+		Expect(reconciler.ConfigMapShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
 })
 
 var _ = Describe("SecretShouldUpdateFunc", func() {
@@ -721,6 +765,17 @@ var _ = Describe("SecretShouldUpdateFunc", func() {
 		desired := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{"app.kubernetes.io/managed-by": "accesserator"},
+			},
+		}
+
+		Expect(reconciler.SecretShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a desired annotation is missing on current", func() {
+		current := &corev1.Secret{}
+		desired := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{"reloader.stakater.com/match": "true"},
 			},
 		}
 
