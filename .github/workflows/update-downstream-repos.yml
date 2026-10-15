@@ -189,12 +189,7 @@ jobs:
             body_rows+="| \`REGAL_VERSION\` | \`v${{ steps.update-regal.outputs.version }}\` |"$'\n'
           fi
 
-          if [ ${#summary_parts[@]} -eq 0 ]; then
-            title="deps: OPA/Regal already up to date"
-          else
-            title="deps: bump $(IFS=', '; echo "${summary_parts[*]}")"
-          fi
-
+          title="Bump $(IFS=', '; echo "${summary_parts[*]}")"
           echo "title=$title" >> "$GITHUB_OUTPUT"
           echo "body-path=$PR_BODY_FILE" >> "$GITHUB_OUTPUT"
 
@@ -290,8 +285,8 @@ jobs:
         with:
           path: skip-tilgangsstyring-local
           token: ${{ steps.octo-sts.outputs.token }}
-          commit-message: "fix: update accesserator to ${{ github.ref_name }}"
-          title: "fix: update accesserator to ${{ github.ref_name }}"
+          commit-message: "update accesserator to ${{ github.ref_name }}"
+          title: "Update accesserator to ${{ github.ref_name }}"
           body: |
             Updates the accesserator Go module to ${{ github.ref_name }} and set the OPA-image used in Dockerfile.
 
