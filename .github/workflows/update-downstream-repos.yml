@@ -173,7 +173,8 @@ jobs:
 
       - name: Build PR metadata from actual changes
         id: pr-meta
-        working-directory: github-workflows
+        env:
+          PR_BODY_FILE: ${{ runner.temp }}/github-workflows-pr-body.txt
         run: |
           set -euo pipefail
 
@@ -188,13 +189,9 @@ jobs:
             body_rows+="| \`REGAL_VERSION\` | \`v${{ steps.update-regal.outputs.version }}\` |"$'\n'
           fi
 
-          if [ ${#summary_parts[@]} -eq 0 ]; then
-            title="deps: OPA/Regal already up to date"
-          else
-            title="deps: bump $(IFS=', '; echo "${summary_parts[*]}")"
-          fi
-
+          title="Bump $(IFS=', '; echo "${summary_parts[*]}")"
           echo "title=$title" >> "$GITHUB_OUTPUT"
+          echo "body-path=$PR_BODY_FILE" >> "$GITHUB_OUTPUT"
 
           {
             echo "## Changed values in \`.github/workflows/build-and-push-opa-bundle.yml\`"
@@ -207,7 +204,7 @@ jobs:
             echo ""
             echo "Triggered by accesserator tag: \`${{ github.ref_name }}\`"
             echo "Source commit: ${{ github.sha }}"
-          } > pr-body.txt
+          } > "$PR_BODY_FILE"
 
       - name: Create Pull Request in github-workflows
         id: create-pr-github-workflows
@@ -217,7 +214,7 @@ jobs:
           token: ${{ steps.octo-sts-github-workflows.outputs.token }}
           commit-message: "${{ steps.pr-meta.outputs.title }}"
           title: "${{ steps.pr-meta.outputs.title }}"
-          body-path: github-workflows/pr-body.txt
+          body-path: ${{ steps.pr-meta.outputs.body-path }}
           branch: update-opa-regal-version
           labels: |
             dependencies
@@ -288,8 +285,8 @@ jobs:
         with:
           path: skip-tilgangsstyring-local
           token: ${{ steps.octo-sts.outputs.token }}
-          commit-message: "fix: update accesserator to ${{ github.ref_name }}"
-          title: "fix: update accesserator to ${{ github.ref_name }}"
+          commit-message: "update accesserator to ${{ github.ref_name }}"
+          title: "Update accesserator to ${{ github.ref_name }}"
           body: |
             Updates the accesserator Go module to ${{ github.ref_name }} and set the OPA-image used in Dockerfile.
 
