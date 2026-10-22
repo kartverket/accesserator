@@ -28,6 +28,6 @@ allow := {
 	"allowed": permit,
 	"headers": {
 		"x-touched-by-opa": "true",
-		"x-opa-found-request-body": sprintf("%v", [found_request_body]),
+		"x-opa-found-request-body": $"{found_request_body}",
 	},
 }
