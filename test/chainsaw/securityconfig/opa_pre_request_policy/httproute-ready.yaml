@@ -4,8 +4,5 @@ metadata:
   name: app
 status:
   parents:
-    - conditions:
-        - type: Accepted
-          status: "True"
-        - type: ResolvedRefs
-          status: "True"
+    - (conditions[?type == 'Accepted'].status): ["True"]
+      (conditions[?type == 'ResolvedRefs'].status): ["True"]

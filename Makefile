@@ -82,6 +82,7 @@ KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
 GOLANGCI_LINT_VERSION ?= v2.13.2
 HELM_VERSION ?= v4.0.0
+GATEWAY_API_VERSION ?= v1.6.2
 KUBEFWD_VERSION ?= 1.25.15
 JQ_VERSION ?= 1.8.1
 
@@ -350,9 +351,9 @@ skiperator: ## Install Skiperator on k8s cluster
 
 .PHONY: gateway-api-crds
 gateway-api-crds: kubectl ## Install Gateway API CRDs (standard channel — includes ListenerSet)
-	@echo "⬇️  Installing Gateway API v$(GATEWAY_API_VERSION) CRDs..."
+	@echo "⬇️  Installing Gateway API $(GATEWAY_API_VERSION) CRDs..."
 	"$(KUBECTL)" apply --context $(KUBECONTEXT) --server-side --force-conflicts \
-	  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v$(GATEWAY_API_VERSION)/standard-install.yaml
+	  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/$(GATEWAY_API_VERSION)/standard-install.yaml
 	"$(KUBECTL)" wait --for=condition=Established --timeout=60s --context $(KUBECONTEXT) \
 	  crd/gateways.gateway.networking.k8s.io \
 	  crd/httproutes.gateway.networking.k8s.io \
