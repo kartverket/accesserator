@@ -40,7 +40,7 @@ CRDOC_IMAGE                ?= ghcr.io/fybrik/crdoc@sha256:355ef777a45021ee864e61
 CRDOC_RESOURCES_DIR        := crdoc-resources
 
 KUBERNETES_VERSION			= 1.35.0
-ISTIO_VERSION 				= 1.30.1
+ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
 CERT_MANAGER_VERSION		= 1.20.2
 
 KIND_IMAGE					= kindest/node:v$(KUBERNETES_VERSION)
@@ -359,7 +359,12 @@ install-istio: gateway-api-crds ## Install istio
 	@echo "⬇️ Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "⛵️  Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
+	@# Strict gateway merging is disabled so Skiperator's Legacy (Istio Gateway) and
+	@# Standard (Gateway API) routing can both be served by the Gateway API managed gateways.
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y \
+	  --set meshConfig.accessLogFile=/dev/stdout \
+	  --set profile=ambient \
+	  --set values.pilot.env.PILOT_ENABLE_STRICT_GATEWAY_MERGING=false
 	@rm -rf istio-$(ISTIO_VERSION)
 	@echo "✅  Istio installation complete."
 
@@ -651,7 +656,7 @@ ensure-ghcr-secret:
 .PHONY: istiohelm
 istiohelm: helm ## Fetch helm charts for Istio
 	# Ensure istio helm repo exists
-	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && $(HELM) repo add istio https://istio-release.storage.googleapis.com/charts)
+	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && $(HELM) repo add istio https://istio-release.r2.istio.io/charts)
 	# Make sure the requested ISTIO_VERSION is available; update index if not
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && $(HELM) repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
@@ -839,6 +844,11 @@ $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{
 endef
 
 ### CUSTOM TARGETS ###
+
+# Extracts the version number for a given dependency found in go.mod.
+# Makes the test setup be in sync with what the operator itself uses.
+extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
+
 ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running and that mock-oauth2 is reachable
 	@KUBEFWD_PIDS=$$(pgrep -f "kubefwd( |$$)" 2>/dev/null); \
 	if [ -z "$$KUBEFWD_PIDS" ]; then \

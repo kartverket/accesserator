@@ -16,7 +16,7 @@ spec:
           value: http://localhost:3010
       name: app
   initContainers:
-    - name: istio-init
+    - name: istio-validation
     - name: istio-proxy
     - name: opa
       args:
@@ -28,7 +28,7 @@ status:
     - name: app
       ready: true
   initContainerStatuses:
-    - name: istio-init
+    - name: istio-validation
       ready: true
     - name: istio-proxy
       ready: true
