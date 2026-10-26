@@ -2,11 +2,11 @@
 set -euo pipefail
 
 KUBECONTEXT=${KUBECONTEXT:-"kind-accesserator"}
-SKIPERATOR_VERSION=${SKIPERATOR_VERSION:-"v2.18.0"}
-# Versions below are the ones skiperator v2.18.0 builds against (see its go.mod)
-PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"v0.93.1"}
-GATEWAY_API_VERSION=${GATEWAY_API_VERSION:-"v1.5.1"}
-CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.20.3"}
+SKIPERATOR_VERSION=${SKIPERATOR_VERSION:-"v2.19.0"}
+# Versions below are the ones skiperator v2.19.0 builds against (see its go.mod)
+PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"v0.94.0"}
+GATEWAY_API_VERSION=${GATEWAY_API_VERSION:-"v1.6.2"}
+CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.21.2"}
 KUBECTL_BIN="${KUBECTL_BIN:-./bin/kubectl}"
 
 KUBECTL=("${KUBECTL_BIN}" --context "${KUBECONTEXT}")

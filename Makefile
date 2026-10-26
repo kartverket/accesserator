@@ -340,7 +340,8 @@ jwker: kustomize install-jwker-crds jwker-namespace ## Installing Jwker on k8s c
 .PHONY: skiperator
 skiperator: ## Install Skiperator on k8s cluster
 	@echo -e "🤞  Installing Skiperator..."
-	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-skiperator.sh
+	@KUBECONTEXT=$(KUBECONTEXT) SKIPERATOR_VERSION=$(SKIPERATOR_VERSION) GATEWAY_API_VERSION=$(GATEWAY_API_VERSION) \
+	  /bin/bash ./scripts/install-skiperator.sh
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
