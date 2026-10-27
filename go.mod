@@ -18,8 +18,8 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/sync v0.24.0
 	google.golang.org/protobuf v1.36.12
-	istio.io/api v1.31.1-0.20260915183457-d60a532be69a
-	istio.io/client-go v1.31.1
+	istio.io/api v1.31.3
+	istio.io/client-go v1.31.3
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
