@@ -411,7 +411,7 @@ See [CONTRIBUTING.md#managing-dependencies-and-patching-vulnerabilities](CONTRIB
 - **Build & Deploy**: `.github/workflows/` — builds container image, pushes to `ghcr.io`.
 - **Tests**: Ginkgo unit tests and Chainsaw e2e tests run in CI.
 - **Lint**: golangci-lint via GitHub Actions.
-- **Dependency updates**: Dependabot for `gomod` and `github-actions`.
+- **Dependency updates**: Dependabot for `gomod`, `github-actions` and `docker`.
 
 ## Important Constraints
 

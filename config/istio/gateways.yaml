@@ -110,3 +110,35 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same
+---
+# Skiperator's routingProvider=Legacy generates Istio Gateways whose TLS servers
+# reference secrets as "kubernetes://<name>". istiod only serves those to a
+# gateway whose ServiceAccount can read secrets in its namespace. The Helm
+# istio/gateway chart grants this, but auto-deployed Gateway API gateways
+# don't, so grant it here to let them serve Legacy routes too.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gateway-secret-reader
+  namespace: istio-gateways
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gateway-secret-reader
+  namespace: istio-gateways
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gateway-secret-reader
+subjects:
+  - kind: ServiceAccount
+    name: istio-external-istio
+    namespace: istio-gateways
+  - kind: ServiceAccount
+    name: istio-internal-istio
+    namespace: istio-gateways

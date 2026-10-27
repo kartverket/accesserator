@@ -40,7 +40,7 @@ CRDOC_IMAGE                ?= ghcr.io/fybrik/crdoc@sha256:355ef777a45021ee864e61
 CRDOC_RESOURCES_DIR        := crdoc-resources
 
 KUBERNETES_VERSION			= 1.35.0
-ISTIO_VERSION 				= 1.30.1
+ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
 CERT_MANAGER_VERSION		= 1.20.2
 
 KIND_IMAGE					= kindest/node:v$(KUBERNETES_VERSION)
@@ -51,6 +51,10 @@ HOSTS_FILE				   ?= /etc/hosts
 GATEWAY					   ?= istio-external
 GATEWAY_NS 				   ?= istio-gateways
 GATEWAY_PORTS 			   ?= 443:443 80:80
+GATEWAY_FORWARD_PID        ?= /tmp/accesserator-gateway-forward.pid
+GATEWAY_FORWARD_LOG        ?= /tmp/accesserator-gateway-forward.log
+KUBEFWD_PID                ?= /tmp/ztoperator-kubefwd.pid
+KUBEFWD_LOG                ?= /tmp/ztoperator-kubefwd.log
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
@@ -78,9 +82,9 @@ KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
 GOLANGCI_LINT_VERSION ?= v2.13.2
 HELM_VERSION ?= v4.0.0
+GATEWAY_API_VERSION ?= v1.6.2
 KUBEFWD_VERSION ?= 1.25.15
 JQ_VERSION ?= 1.8.1
-GATEWAY_API_VERSION ?= 1.5.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -340,15 +344,16 @@ jwker: kustomize install-jwker-crds jwker-namespace ## Installing Jwker on k8s c
 .PHONY: skiperator
 skiperator: ## Install Skiperator on k8s cluster
 	@echo -e "🤞  Installing Skiperator..."
-	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-skiperator.sh
+	@KUBECONTEXT=$(KUBECONTEXT) SKIPERATOR_VERSION=$(SKIPERATOR_VERSION) GATEWAY_API_VERSION=$(GATEWAY_API_VERSION) \
+	  /bin/bash ./scripts/install-skiperator.sh
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
 .PHONY: gateway-api-crds
 gateway-api-crds: kubectl ## Install Gateway API CRDs (standard channel — includes ListenerSet)
-	@echo "⬇️  Installing Gateway API v$(GATEWAY_API_VERSION) CRDs..."
+	@echo "⬇️  Installing Gateway API $(GATEWAY_API_VERSION) CRDs..."
 	"$(KUBECTL)" apply --context $(KUBECONTEXT) --server-side --force-conflicts \
-	  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v$(GATEWAY_API_VERSION)/standard-install.yaml
+	  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/$(GATEWAY_API_VERSION)/standard-install.yaml
 	"$(KUBECTL)" wait --for=condition=Established --timeout=60s --context $(KUBECONTEXT) \
 	  crd/gateways.gateway.networking.k8s.io \
 	  crd/httproutes.gateway.networking.k8s.io \
@@ -359,7 +364,12 @@ install-istio: gateway-api-crds ## Install istio
 	@echo "⬇️ Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "⛵️  Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
+	@# Strict gateway merging is disabled so Skiperator's Legacy (Istio Gateway) and
+	@# Standard (Gateway API) routing can both be served by the Gateway API managed gateways.
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y \
+	  --set meshConfig.accessLogFile=/dev/stdout \
+	  --set profile=ambient \
+	  --set values.pilot.env.PILOT_ENABLE_STRICT_GATEWAY_MERGING=false
 	@rm -rf istio-$(ISTIO_VERSION)
 	@echo "✅  Istio installation complete."
 
@@ -402,7 +412,7 @@ tokendings-database: kubectl
 	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash scripts/setup-tokendings-database.sh
 
 .PHONY: mock-oauth2
-mock-oauth2: kubectl ## Deployinh Mock-OAuth service in auth namespace
+mock-oauth2: kubectl ## Deploying mock-oauth service in auth namespace
 	@echo -e "🤞  Deploying 'mock-oauth2'..."
 	@KUBECONTEXT=$(KUBECONTEXT) MOCK_OAUTH2_CONFIG=scripts/mock-oauth2-server-config.json /bin/bash ./scripts/install-mock-oauth2.sh
 	@$(MAKE) wait-for-skiperator-pod app=mock-oauth2 namespace=auth
@@ -411,7 +421,7 @@ mock-oauth2: kubectl ## Deployinh Mock-OAuth service in auth namespace
 ##@ Helpers
 
 .PHONY: mock-oauth2-ingress
-mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, restarting it if necessary
+mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd running in the background (stop with 'make mock-oauth2-ingress-stop')
 	@KUBEFWD=$$(command -v kubefwd 2>/dev/null || echo "$(KUBEFWD)"); \
 	if [ ! -x "$$KUBEFWD" ]; then \
 		echo -e "❌  kubefwd not found. Install it or run 'make kubefwd'."; \
@@ -428,25 +438,49 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd, res
 		echo -e "✅  mock-oauth2 is reachable on http://mock-oauth2.auth:8080"; \
 		exit 0; \
 	fi; \
-	echo -e "⚠️   mock-oauth2 is not reachable (HTTP $$STATUS). Starting kubefwd..."; \
+	echo -e "⚠️   mock-oauth2 is not reachable (HTTP $$STATUS). Starting kubefwd in the background (requires sudo)..."; \
+	sudo -v || { echo -e "❌  sudo authentication failed"; exit 1; }; \
 	if pgrep -x "kubefwd" >/dev/null 2>&1; then \
 		echo -e "⏳  Stopping existing kubefwd..."; \
-		sudo -E pkill -x "kubefwd" || true; \
+		sudo pkill -x "kubefwd" || true; \
 		sleep 1; \
 	fi; \
-	LOG=/tmp/kubefwd.log; \
-	sudo -E "$$KUBEFWD" svc -n auth --context $(KUBECONTEXT) 2>&1 | tee "$$LOG" > /dev/null & \
+	rm -f "$(KUBEFWD_PID)"; \
+	nohup sudo -E "$$KUBEFWD" svc -n auth --context $(KUBECONTEXT) \
+		--kubeconfig "$${KUBECONFIG:-$$HOME/.kube/config}" \
+		> "$(KUBEFWD_LOG)" 2>&1 & \
+	echo $$! > "$(KUBEFWD_PID)"; \
 	echo -e "⏳  Waiting for kubefwd to establish connections..."; \
-	for i in $$(seq 1 15); do \
+	for i in $$(seq 1 30); do \
 		sleep 2; \
+		if ! ps -p "$$(cat "$(KUBEFWD_PID)")" > /dev/null 2>&1; then \
+			echo -e "❌  kubefwd exited. See $(KUBEFWD_LOG):"; \
+			tail -n 20 "$(KUBEFWD_LOG)"; \
+			rm -f "$(KUBEFWD_PID)"; \
+			exit 1; \
+		fi; \
 		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
 		if [ "$$STATUS" = "200" ]; then \
-			echo -e "✅  mock-oauth2 is now reachable on http://mock-oauth2.auth:8080"; \
+			echo -e "✅  mock-oauth2 is now reachable on http://mock-oauth2.auth:8080 (kubefwd PID $$(cat "$(KUBEFWD_PID)"), log: $(KUBEFWD_LOG))"; \
+			echo -e "ℹ️   Stop it with: make mock-oauth2-ingress-stop"; \
 			exit 0; \
 		fi; \
 	done; \
-	echo -e "❌  mock-oauth2 is still not reachable. Check $$LOG for details."; \
+	echo -e "❌  mock-oauth2 is still not reachable. Check $(KUBEFWD_LOG) for details."; \
 	exit 1
+
+.PHONY: mock-oauth2-ingress-stop
+mock-oauth2-ingress-stop: ## Stop the background kubefwd started by 'make mock-oauth2-ingress'
+	@if [ -f "$(KUBEFWD_PID)" ] && ps -p "$$(cat "$(KUBEFWD_PID)")" > /dev/null 2>&1; then \
+		echo -e "🛑  Stopping kubefwd (PID $$(cat "$(KUBEFWD_PID)"), requires sudo)"; \
+		sudo kill "$$(cat "$(KUBEFWD_PID)")" || true; \
+	elif pgrep -x "kubefwd" >/dev/null 2>&1; then \
+		echo -e "🛑  Stopping kubefwd (no PID file, requires sudo)"; \
+		sudo pkill -x "kubefwd" || true; \
+	else \
+		echo -e "✅  kubefwd is not running, nothing to stop"; \
+	fi; \
+	rm -f "$(KUBEFWD_PID)"
 
 .PHONY: mock-token
 mock-token: ## Retrieves a JWT issued by mock-oauth2
@@ -514,14 +548,20 @@ host-entry-clean: ## Remove /etc/hosts entries added by 'make host-entry'. All o
 	echo "✅  Removed $$(printf '%s\n' "$$matches" | wc -l | tr -d ' ') entry/entries from $(HOSTS_FILE)"
 
 .PHONY: gateway-forward
-gateway-forward: kubectl ## Forward the istio gateway to localhost so ingresses resolve in your browser. Override: GATEWAY=istio-internal GATEWAY_PORTS="8443:443"
-	@echo "🔍  Checking gateway '$(GATEWAY)' in namespace '$(GATEWAY_NS)'..."
-	@"$(KUBECTL)" wait gateway $(GATEWAY) -n $(GATEWAY_NS) --for=condition=Programmed \
+gateway-forward: kubectl ## Forward the istio gateway to localhost in the background (stop with 'make gateway-forward-stop'). Override: GATEWAY=istio-internal GATEWAY_PORTS="8443:443 80:80"
+	@if [ -f "$(GATEWAY_FORWARD_PID)" ] && ps -p "$$(cat "$(GATEWAY_FORWARD_PID)")" > /dev/null 2>&1; then \
+	   echo "✅  Gateway forward already running (PID $$(cat "$(GATEWAY_FORWARD_PID)"), log: $(GATEWAY_FORWARD_LOG))"; \
+	   echo "ℹ️   Restart with: make gateway-forward-stop gateway-forward"; \
+	   exit 0; \
+	fi; \
+	rm -f "$(GATEWAY_FORWARD_PID)"; \
+	echo "🔍  Checking gateway '$(GATEWAY)' in namespace '$(GATEWAY_NS)'..."; \
+	"$(KUBECTL)" wait gateway $(GATEWAY) -n $(GATEWAY_NS) --for=condition=Programmed \
 	   --timeout=30s --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
 	   echo "❌  Gateway '$(GATEWAY)' is not Programmed. Install it with 'make istio-gateways'."; \
 	   exit 1; \
-	}
-	@svc="$(GATEWAY)-istio"; \
+	}; \
+	svc="$(GATEWAY)-istio"; \
 	"$(KUBECTL)" get svc "$$svc" -n $(GATEWAY_NS) --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
 	   echo "❌  Service '$$svc' not found in $(GATEWAY_NS)."; \
 	   exit 1; \
@@ -545,9 +585,41 @@ gateway-forward: kubectl ## Forward the istio gateway to localhost so ingresses 
 	      fi; \
 	   done; \
 	fi; \
-	echo "🔌  Forwarding $(GATEWAY_PORTS) from $$svc (Ctrl-C to stop, sudo needed for ports below 1024)"; \
-	exec sudo KUBECONFIG="$$HOME/.kube/config" "$(KUBECTL)" port-forward \
-	   -n $(GATEWAY_NS) "svc/$$svc" $(GATEWAY_PORTS) --context $(KUBECONTEXT)
+	echo "🔌  Forwarding $(GATEWAY_PORTS) from $$svc in the background (sudo needed for ports below 1024)"; \
+	sudo -v || { echo "❌  sudo authentication failed"; exit 1; }; \
+	nohup sudo KUBECONFIG="$$HOME/.kube/config" "$(KUBECTL)" port-forward \
+	   -n $(GATEWAY_NS) "svc/$$svc" $(GATEWAY_PORTS) --context $(KUBECONTEXT) \
+	   > "$(GATEWAY_FORWARD_LOG)" 2>&1 & \
+	echo $$! > "$(GATEWAY_FORWARD_PID)"; \
+	for mapping in $(GATEWAY_PORTS); do \
+	   port="$${mapping%%:*}"; \
+	   for i in $$(seq 1 20); do \
+	      lsof -nP -iTCP:"$$port" -sTCP:LISTEN > /dev/null 2>&1 && break; \
+	      if ! ps -p "$$(cat "$(GATEWAY_FORWARD_PID)")" > /dev/null 2>&1; then \
+	         echo "❌  Port-forward exited. See $(GATEWAY_FORWARD_LOG):"; \
+	         tail -n 20 "$(GATEWAY_FORWARD_LOG)"; \
+	         rm -f "$(GATEWAY_FORWARD_PID)"; \
+	         exit 1; \
+	      fi; \
+	      sleep 0.5; \
+	   done; \
+	done; \
+	echo "✅  Gateway forward running (PID $$(cat "$(GATEWAY_FORWARD_PID)"), log: $(GATEWAY_FORWARD_LOG))"; \
+	echo "ℹ️   Stop it with: make gateway-forward-stop"
+
+.PHONY: gateway-forward-stop
+gateway-forward-stop: ## Stop the background gateway port-forward started by 'make gateway-forward'
+	@if [ ! -f "$(GATEWAY_FORWARD_PID)" ]; then \
+	   echo "✅  No gateway forward PID file found, nothing to stop"; \
+	   exit 0; \
+	fi; \
+	pid=$$(cat "$(GATEWAY_FORWARD_PID)"); \
+	if ps -p "$$pid" > /dev/null 2>&1; then \
+	   echo "🛑  Stopping gateway forward (PID $$pid, requires sudo)"; \
+	   sudo kill "$$pid" || true; \
+	fi; \
+	rm -f "$(GATEWAY_FORWARD_PID)"; \
+	echo "✅  Gateway forward stopped"
 
 .PHONY: ensurelocal
 ensurelocal: kind kubectl ## Ensure local environment is set up with necessary tools and kind cluster is running
@@ -651,7 +723,7 @@ ensure-ghcr-secret:
 .PHONY: istiohelm
 istiohelm: helm ## Fetch helm charts for Istio
 	# Ensure istio helm repo exists
-	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && $(HELM) repo add istio https://istio-release.storage.googleapis.com/charts)
+	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && $(HELM) repo add istio https://istio-release.r2.istio.io/charts)
 	# Make sure the requested ISTIO_VERSION is available; update index if not
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && $(HELM) repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
@@ -719,7 +791,7 @@ kind: $(KIND) ## Download kind locally if necessary.
 $(KIND): $(LOCALBIN)
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind,$(KIND_VERSION))
 
-.PHONY: kubefwd
+PHONY: kubefwd
 kubefwd: $(KUBEFWD) ## Download kubefwd locally if necessary.
 $(KUBEFWD): $(LOCALBIN)
 	@set -e; \
@@ -839,6 +911,11 @@ $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{
 endef
 
 ### CUSTOM TARGETS ###
+
+# Extracts the version number for a given dependency found in go.mod.
+# Makes the test setup be in sync with what the operator itself uses.
+extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
+
 ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running and that mock-oauth2 is reachable
 	@KUBEFWD_PIDS=$$(pgrep -f "kubefwd( |$$)" 2>/dev/null); \
 	if [ -z "$$KUBEFWD_PIDS" ]; then \
