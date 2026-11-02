@@ -38,7 +38,7 @@ jobs:
 
   build:
     needs: tags
-    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-bundle.yml@v5.1.0
+    uses: kartverket/github-workflows/.github/workflows/build-and-push-opa-bundle.yml@v5.1.1
     with:
       artifact-name: ghcr.io/${{ github.repository }}/opa-bundle
       path: .opa
