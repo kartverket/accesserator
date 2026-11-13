@@ -397,6 +397,12 @@ spec:
                       Client defines the Maskinporten client configuration inline.
                       Use this when you want to configure the client directly.
                     properties:
+                      accessTokenLifetime:
+                        description: |-
+                          AccessTokenLifetime is the maximum lifetime in seconds for access tokens issued to this client.
+                          The actual lifetime is also limited by the requested scopes.
+                        minimum: 1
+                        type: integer
                       clientName:
                         description: |-
                           ClientName is the client name to be registered at DigDir.
