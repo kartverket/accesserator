@@ -183,6 +183,13 @@ type MaskinportenClientSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	Scopes *MaskinportenScope `json:"scopes,omitempty"`
+
+	// AccessTokenLifetime is the maximum lifetime in seconds for access tokens issued to this client.
+	// The actual lifetime is also limited by the requested scopes.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	AccessTokenLifetime *int `json:"accessTokenLifetime,omitempty"`
 }
 
 // MaskinportenScope defines consumed scopes for the application.

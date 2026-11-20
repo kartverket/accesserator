@@ -93,7 +93,8 @@ var _ = Describe("Maskinporten Resolver", func() {
 						Maskinporten: &accesseratorv1alpha.MaskinportenSpec{
 							Enabled: true,
 							Client: &accesseratorv1alpha.MaskinportenClientSpec{
-								ClientName: "test-client",
+								ClientName:          "test-client",
+								AccessTokenLifetime: utilities.Ptr(600),
 								Scopes: &accesseratorv1alpha.MaskinportenScope{
 									ConsumedScopes: []naisiov1.ConsumedScope{
 										{Name: "scope1"},
@@ -114,6 +115,7 @@ var _ = Describe("Maskinporten Resolver", func() {
 				Expect(result.ClientSpec).NotTo(BeNil())
 				Expect(result.ClientSpec.ClientName).To(Equal("test-client"))
 				Expect(result.ClientSpec.Scopes.ConsumedScopes).To(HaveLen(2))
+				Expect(result.ClientSpec.AccessTokenLifetime).To(HaveValue(Equal(600)))
 				Expect(result.ClientSpec.SecretName).To(Equal(utilities.NewMaskinportenNamer(sc).SecretName()))
 			})
 

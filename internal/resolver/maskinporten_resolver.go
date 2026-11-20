@@ -51,7 +51,8 @@ func ResolveMaskinportenConfig(logger log.Logger, ctx context.Context, k8sClient
 			Enabled: true,
 			Type:    *maskinportenConfigType,
 			ClientSpec: &naisiov1.MaskinportenClientSpec{
-				ClientName: securityConfig.Spec.Maskinporten.Client.ClientName,
+				ClientName:          securityConfig.Spec.Maskinporten.Client.ClientName,
+				AccessTokenLifetime: securityConfig.Spec.Maskinporten.Client.AccessTokenLifetime,
 				Scopes: naisiov1.MaskinportenScope{
 					ConsumedScopes: consumedScopes,
 				},
