@@ -208,7 +208,7 @@ jobs:
 
       - name: Create Pull Request in github-workflows
         id: create-pr-github-workflows
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           path: github-workflows
           token: ${{ steps.octo-sts-github-workflows.outputs.token }}
@@ -281,7 +281,7 @@ jobs:
           mise run set-opa-image "$OPA_IMAGE"
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           path: skip-tilgangsstyring-local
           token: ${{ steps.octo-sts.outputs.token }}
@@ -344,7 +344,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.api-docs.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           path: target
           token: ${{ steps.octo-sts.outputs.token }}
