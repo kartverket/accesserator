@@ -115,6 +115,8 @@ jobs:
 
           regal_version=""
           required_opa=""
+          latest_tag=""
+          latest_opa=""
           # Regal's vendored OPA dependency increases monotonically with
           # newer releases, so walking oldest -> newest and taking the first
           # minor >= ours gives the *closest* compatible release, rather than
@@ -128,6 +130,9 @@ jobs:
               | awk '{print $2}' | sed 's/^v//')"
             [ -z "$candidate_opa" ] && continue
 
+            latest_tag="$tag"
+            latest_opa="$candidate_opa"
+
             candidate_opa_minor="$(cut -d. -f1,2 <<< "$candidate_opa")"
 
             if [ "$(printf '%s\n%s\n' "$opa_minor" "$candidate_opa_minor" | sort -V | tail -n1)" = "$candidate_opa_minor" ]; then
@@ -138,8 +143,15 @@ jobs:
             fi
           done
 
+          # No Regal release depends on OPA >= our minor yet, so use the newest one.
+          if [ -z "$regal_version" ] && [ -n "$latest_tag" ]; then
+            regal_version="${latest_tag#v}"
+            required_opa="$latest_opa"
+            echo "::warning::No Regal release found with OPA dependency >= v${opa_minor}.x, falling back to latest Regal ${latest_tag} (OPA v${required_opa})"
+          fi
+
           if [ -z "$regal_version" ]; then
-            echo "::error::No Regal release found with OPA dependency >= v${opa_minor}.x"
+            echo "::error::Could not determine a Regal release with a readable OPA dependency"
             exit 1
           fi
 
@@ -167,6 +179,8 @@ jobs:
           required_opa_minor="$(cut -d. -f1,2 <<< "$required_opa")"
           if [ "$required_opa_minor" = "$opa_minor" ]; then
             echo "match-kind=exact minor match" >> "$GITHUB_OUTPUT"
+          elif [ "$(printf '%s\n%s\n' "$opa_minor" "$required_opa_minor" | sort -V | tail -n1)" = "$opa_minor" ]; then
+            echo "match-kind=**fallback to latest Regal** — no release depends on OPA >= v${opa_minor}.x yet; using newest (built against OPA v${required_opa}, older than pinned v${opa_version}); review the Regal lint diff carefully" >> "$GITHUB_OUTPUT"
           else
             echo "match-kind=**fallback** — nearest OPA dependency (v${required_opa}) above pinned v${opa_version}; review the Regal lint diff carefully" >> "$GITHUB_OUTPUT"
           fi
